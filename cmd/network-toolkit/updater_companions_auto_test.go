@@ -507,13 +507,28 @@ func TestDocumentIconRepairOfTheOpenWithEntry(t *testing.T) {
 		if got := reg.str(t, editorRegApplication+`\DefaultIcon`, ""); got != `"`+testCopyA+`",3` {
 			t.Fatalf("DefaultIcon %q", got)
 		}
+		// The verb icon keeps the program icon in Open with (1.21.51 and
+		// older wrote none).
+		if got := reg.str(t, editorRegApplication+`\shell\open`, "Icon"); got != `"`+testCopyA+`",1` {
+			t.Fatalf("verb Icon %q", got)
+		}
 		reg.SetString(editorRegApplication+`\DefaultIcon`, "", `"`+testCopyA+`",1`)
+		reg.DeleteValue(editorRegApplication+`\shell\open`, "Icon")
 		if reg.dump() != before {
 			t.Fatalf("other values changed:\n%s\n%s", before, reg.dump())
 		}
 		reg.SetString(editorRegApplication+`\DefaultIcon`, "", `"`+testCopyA+`",3`)
+		reg.SetString(editorRegApplication+`\shell\open`, "Icon", `"`+testCopyA+`",1`)
 		if changed, err := editorRegRepairDocumentIcon(platform, testCopyA); err != nil || changed || *notified != 1 {
-			t.Fatalf("rewrote a current icon: %v %v", changed, err)
+			t.Fatalf("rewrote current icons: %v %v", changed, err)
+		}
+		// Only the verb icon missing: only it is written.
+		reg.DeleteValue(editorRegApplication+`\shell\open`, "Icon")
+		if changed, err := editorRegRepairDocumentIcon(platform, testCopyA); err != nil || !changed || *notified != 2 {
+			t.Fatalf("missing verb icon: %v %v", changed, err)
+		}
+		if got := reg.str(t, editorRegApplication+`\shell\open`, "Icon"); got != `"`+testCopyA+`",1` {
+			t.Fatalf("verb Icon %q", got)
 		}
 	})
 	for _, tc := range []struct {
@@ -536,16 +551,18 @@ func TestDocumentIconRepairOfTheOpenWithEntry(t *testing.T) {
 		})
 	}
 	t.Run("a read that fails changes nothing", func(t *testing.T) {
-		reg := fixtureRegistry()
-		reg.SetString(editorRegProgKey+`\DefaultIcon`, "", `"`+testCopyA+`",1`)
-		reg.SetString(editorRegProgKey+`\shell\open\command`, "", command)
-		reg.SetString(editorRegApplication+`\DefaultIcon`, "", `"`+testCopyA+`",1`)
-		reg.SetString(editorRegApplication+`\shell\open\command`, "", command)
-		reg.readFault = editorRegApplication + `\DefaultIcon`
-		before := reg.dump()
-		platform, notified := testEditorPlatform(reg)
-		if changed, err := editorRegRepairDocumentIcon(platform, testCopyA); err == nil || changed || *notified != 0 || reg.dump() != before {
-			t.Fatalf("changed after a failed read: %v %v", changed, err)
+		for _, path := range []string{editorRegApplication + `\DefaultIcon`, editorRegApplication + `\shell\open`} {
+			reg := fixtureRegistry()
+			reg.SetString(editorRegProgKey+`\DefaultIcon`, "", `"`+testCopyA+`",1`)
+			reg.SetString(editorRegProgKey+`\shell\open\command`, "", command)
+			reg.SetString(editorRegApplication+`\DefaultIcon`, "", `"`+testCopyA+`",1`)
+			reg.SetString(editorRegApplication+`\shell\open\command`, "", command)
+			reg.readFault = path
+			before := reg.dump()
+			platform, notified := testEditorPlatform(reg)
+			if changed, err := editorRegRepairDocumentIcon(platform, testCopyA); err == nil || changed || *notified != 0 || reg.dump() != before {
+				t.Fatalf("%s unreadable: changed after a failed read: %v %v", path, changed, err)
+			}
 		}
 	})
 }
@@ -577,6 +594,9 @@ func TestDocumentIconRepairOfWindowsOwnEditorEntry(t *testing.T) {
 			}
 			if got := reg.str(t, editorRegEditorApplication+`\shell\open\command`, ""); got != `"`+installedEditor+`" "%1"` {
 				t.Fatalf("Windows' command changed: %q", got)
+			}
+			if _, found := reg.value(editorRegEditorApplication+`\shell\open`, "Icon"); found {
+				t.Fatal("a verb icon was written into Windows' entry of the Text Editor program")
 			}
 			// What the uninstaller does: the value, while it is what was written.
 			simulateUninstallEditorAppIcon(reg)

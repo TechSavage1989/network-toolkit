@@ -253,6 +253,7 @@ func TestEditorRegistrationPlanWritesSetupsKeysForThisCopy(t *testing.T) {
 		{editorRegRegistered, "Network Toolkit Text Editor"}:         `Software\Network Toolkit\Capabilities`,
 		{editorRegApplication, "FriendlyAppName"}:                    "Network Toolkit Text Editor",
 		{editorRegApplication + `\DefaultIcon`, ""}:                  `"` + testCopyA + `",3`,
+		{editorRegApplication + `\shell\open`, "Icon"}:               `"` + testCopyA + `",1`,
 		{editorRegApplication + `\shell\open\command`, ""}:           command,
 		{editorRegMenuVerb, ""}:                                      "Edit with Network Toolkit Text Editor",
 		{editorRegMenuVerb, "Icon"}:                                  `"` + testCopyA + `",1`,
@@ -433,6 +434,16 @@ func TestEditorRegistrationLeavesAnotherProgramsOpenWithEntry(t *testing.T) {
 	if got := reg.str(t, editorRegApplication+`\shell\open\command`, ""); got != editorRegCommand(testCopyA) {
 		t.Errorf("Windows' own entry for this copy was not updated: %q", got)
 	}
+	// Taken over, it carries every value of the registration's own entry.
+	for _, at := range [][3]string{
+		{editorRegApplication + `\DefaultIcon`, "", `"` + testCopyA + `",3`},
+		{editorRegApplication + `\shell\open`, "Icon", `"` + testCopyA + `",1`},
+		{editorRegApplication, "FriendlyAppName", editorRegAppName},
+	} {
+		if got := reg.str(t, at[0], at[1]); got != at[2] {
+			t.Errorf("%s [%s] = %q after taking over Windows' entry, want %q", at[0], at[1], got, at[2])
+		}
+	}
 }
 
 // When the user picks Network_Toolkit_TextEditor.exe in "Open with", Windows
@@ -475,6 +486,9 @@ func TestEditorRegistrationGivesWindowsOwnEditorEntryTheDocumentIcon(t *testing.
 		}
 		if _, found := reg.value(editorRegEditorApplication, "FriendlyAppName"); found {
 			t.Fatal("only the icon is written into Windows' entry")
+		}
+		if _, found := reg.value(editorRegEditorApplication+`\shell\open`, "Icon"); found {
+			t.Fatal("the verb icon belongs to the registration's own entry, not to Windows' entry of the Text Editor program")
 		}
 		// A repair writes the same and records nothing more.
 		snapshot := reg.dump()
@@ -882,6 +896,8 @@ func TestEditorRegistrationMatchesSetup(t *testing.T) {
 	for _, line := range []string{
 		`WriteRegStr HKCU "` + editorRegCapabilities + `" "ApplicationIcon" '"$INSTDIR\Network_Toolkit.exe",` + fmt.Sprint(editorRegEditorIcon) + `'`,
 		`WriteRegStr HKCU "` + editorRegMenuVerb + `" "Icon" '"$INSTDIR\Network_Toolkit.exe",` + fmt.Sprint(editorRegEditorIcon) + `'`,
+		// Open with shows the program by its verb icon, whatever it reads.
+		`WriteRegStr HKCU "` + editorRegApplication + `\shell\open" "Icon" '"$INSTDIR\Network_Toolkit.exe",` + fmt.Sprint(editorRegEditorIcon) + `'`,
 		`WriteRegStr HKCU "` + editorRegSetupRecord + `" "` + editorRegEditorAppIcon + `" '"$INSTDIR\Network_Toolkit.exe",` + fmt.Sprint(editorRegDocumentIcon) + `'`,
 	} {
 		if !strings.Contains(text, line) {

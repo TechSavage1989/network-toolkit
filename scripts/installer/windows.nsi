@@ -34,8 +34,9 @@ RequestExecutionLevel user
 ; order of ICON_GROUPS in scripts/build_windows_resources.py: 0 app, 1 Text
 ; Editor, 2 Terminal, 3 text document. Released Setups and shortcuts use 0 to 2,
 ; so new groups are only ever appended.
-;   EDITOR_ICON    the Text Editor as a program: Default apps (ApplicationIcon)
-;                  and the right-click entry (the verb's Icon).
+;   EDITOR_ICON    the Text Editor as a program: Default apps (ApplicationIcon),
+;                  the right-click entry (the verb's Icon) and the open verb's
+;                  Icon of Applications\Network_Toolkit.exe (Open with).
 ;   DOCUMENT_ICON  a file that opens with the Text Editor: the ProgID's
 ;                  DefaultIcon, and the DefaultIcon of the Applications entries
 ;                  below. Explorer shows the DefaultIcon of the key that
@@ -74,11 +75,14 @@ RequestExecutionLevel user
 ;                          the program with the bare file name.
 ;      FriendlyAppName     the name shown instead of the program's version text.
 ;      DefaultIcon         the icon of every file the user associates through
-;                          this entry (DOCUMENT_ICON, see above), as Visual
-;                          Studio Code's Setup registers Code.exe: its file
-;                          icon here, the program on the verb. Open with and
-;                          Default apps show the program by other values
-;                          (the program file, ApplicationIcon).
+;                          this entry (DOCUMENT_ICON, see above).
+;      shell\open Icon     the program icon (EDITOR_ICON) on the verb, so that
+;                          Open with shows the program whichever value it
+;                          reads. Visual Studio Code's Setup registers Code.exe
+;                          the same way: its file icon as DefaultIcon, the
+;                          program on the open verb. Default apps shows the
+;                          program by ApplicationIcon.
+;                          Uninstall removes both with the entry.
 ;    SupportedTypes is deliberately absent: it limits Open with to the listed
 ;    types, and the Text Editor opens any file.
 ;    https://learn.microsoft.com/windows/win32/shell/app-registration
@@ -675,6 +679,7 @@ FunctionEnd
     !insertmacro ProbeUserKey "${APPLICATIONS_KEY}" $R1
     WriteRegStr HKCU "${APPLICATION_KEY}" "FriendlyAppName" "${EDITOR_NAME}"
     WriteRegStr HKCU "${APPLICATION_KEY}\DefaultIcon" "" '${DOCUMENT_ICON}'
+    WriteRegStr HKCU "${APPLICATION_KEY}\shell\open" "Icon" '${EDITOR_ICON}'
     WriteRegStr HKCU "${APPLICATION_KEY}\shell\open\command" "" '${EDITOR_COMMAND}'
     WriteRegDWORD HKCU "${CREATED_KEYS}" "Applications\${APP_FILENAME}" 1
     ${If} $R1 == 1

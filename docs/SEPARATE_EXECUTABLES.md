@@ -403,7 +403,9 @@ them as its own.
     for `Applications\Network_Toolkit.exe\DefaultIcon` when that entry's
     command is the Text Editor command of the running program (1.21.51 and
     older wrote the editor icon there, and Explorer shows that value for the
-    files associated through the entry). Windows' own
+    files associated through the entry), and adds the program icon (1) as
+    that entry's `shell\open` `Icon`, which keeps Open with showing the
+    program. Windows' own
     `Applications\Network_Toolkit_TextEditor.exe` entry (written when the user
     picks the separate program in Open with; no `DefaultIcon`, so its files
     showed that program's icon 0, the editor tile) gets

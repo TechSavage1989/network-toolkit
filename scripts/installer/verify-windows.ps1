@@ -504,9 +504,10 @@ function Assert-Installed([string]$ExpectedHash = $portableHash) {
     }
     # "Open with" for any file: the program is registered under Applications
     # with its command and no SupportedTypes, which would limit it to a list.
-    # Its DefaultIcon is the icon of the files associated through it: the sheet.
+    # Its DefaultIcon is the icon of the files associated through it: the sheet;
+    # the open verb's Icon keeps the program icon for Open with.
     if ($applicationOwnedBySetup) {
-        $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$installedExe`",$documentIconIndex}`n[shell]{[open]{[command]{=String:$editorCommand}}}"
+        $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$installedExe`",$documentIconIndex}`n[shell]{[open]{Icon=String:`"$installedExe`",$editorIconIndex`n[command]{=String:$editorCommand}}}"
         Assert-Same (Get-UserKeyTree $applicationSubkey) $expectedApplication 'Open With registration for any file'
         Assert-Same (Read-UserValue $createdSubkey 'Applications\Network_Toolkit.exe') 1 'Record that Setup created the Open With registration'
         $expectedRecord = if ($applicationsKeyExisted) { $null } else { 1 }
@@ -1091,7 +1092,7 @@ function Assert-PortableRegistered([string]$Launched, [bool]$Menu) {
             Assert-Same (Read-UserValue $portableCreatedSubkey "$ext\OpenWithProgids") $expectedRecord "Portable record for the Open With list of $ext"
         }
     }
-    $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$Exe`",$documentIconIndex}`n[shell]{[open]{[command]{=String:$command}}}"
+    $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$Exe`",$documentIconIndex}`n[shell]{[open]{Icon=String:`"$Exe`",$editorIconIndex`n[command]{=String:$command}}}"
     Assert-Same (Get-UserKeyTree $applicationSubkey) $expectedApplication 'Portable Open With registration for any file'
     Assert-Same (Read-UserValue $portableCreatedSubkey 'Applications\Network_Toolkit.exe') 1 'Portable record of the Open With registration'
     # Windows' own Open With entry of copy A's Text Editor program (set up

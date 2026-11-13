@@ -58,7 +58,8 @@ const (
 	editorRegPortableKeys = editorRegPortable + `\CreatedKeys`
 	// Zero-based icon groups of the program file (ICON_GROUPS in
 	// scripts/build_windows_resources.py). The program icon of the Text Editor
-	// stands for the application (Default apps, the right-click entry); the
+	// stands for the application (Default apps, the right-click entry, the
+	// open verb's Icon of its Applications entry for Open with); the
 	// document icon for files: the ProgID's DefaultIcon and the DefaultIcon of
 	// an Applications entry, which Explorer shows for every file the user
 	// associated through that entry (AGENTS.md, the icon rule).
@@ -609,8 +610,11 @@ func planEditorRegister(reg editorRegistry, status editorRegistrationStatus, con
 	plan.str(editorRegRegistered, editorRegAppName, editorRegCapabilities)
 	if ownApplication {
 		plan.str(editorRegApplication, "FriendlyAppName", editorRegAppName)
-		// The icon of the files the user associates through this entry.
+		// The icon of the files the user associates through this entry, and
+		// the program icon on its verb, which keeps Open with showing the
+		// program whichever value it reads (Visual Studio Code's pattern).
 		plan.str(editorRegApplication+`\DefaultIcon`, "", editorRegIcon(exe, editorRegDocumentIcon))
+		plan.str(editorRegApplication+`\shell\open`, "Icon", editorRegIcon(exe, editorRegEditorIcon))
 		plan.str(editorRegApplication+`\shell\open\command`, "", command)
 	}
 	if err := planEditorAppIcon(reg, &plan, exe, editorRegPortable); err != nil {
@@ -785,6 +789,7 @@ func planEditorRemove(reg editorRegistry, status editorRegistrationStatus) (edit
 	if records[`Applications\`+editorRegAppFile] && appCommand == command {
 		plan.del(editorRegApplication+`\shell\open\command`, "")
 		plan.empty(editorRegApplication + `\shell\open\command`)
+		plan.del(editorRegApplication+`\shell\open`, "Icon")
 		plan.empty(editorRegApplication + `\shell\open`)
 		plan.empty(editorRegApplication + `\shell`)
 		plan.del(editorRegApplication+`\DefaultIcon`, "")
