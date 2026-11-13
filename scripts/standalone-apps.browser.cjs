@@ -9,6 +9,7 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 const {handleTextTools}=require('./editor-text-tools-fixture.cjs');
+const {handleFind}=require('./editor-find-fixture.cjs');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(__dirname,'..'),version=require('../package.json').version,out=process.env.NTK_BROWSER_OUTPUT_DIR||process.env.TOOLKIT_TEST_OUTPUT,origin='https://standalone-apps.toolkit.test';
 const report={passed:false,checks:[],errors:[],screenshots:[],scope:'Synthetic production-asset browser acceptance in Chromium. Not native Windows WebView2 acceptance.'};
@@ -22,7 +23,7 @@ async function open(mode,options={}){
  const f=fixture,sessions=options.sessions||[];
  const context=await browser.newContext({viewport:{width:1280,height:800},serviceWorkers:'block'});page=await context.newPage();page.setDefaultTimeout(15000);
  page.on('pageerror',error=>report.errors.push(mode+': '+error.message));
- await page.route('**/*',async route=>{if(await handleEditorActivityMetadata(route,origin,report))return;if(await handleTextTools(route))return;
+ await page.route('**/*',async route=>{if(await handleEditorActivityMetadata(route,origin,report))return;if(await handleTextTools(route))return;if(await handleFind(route))return;
   const req=route.request(),url=new URL(req.url()),p=url.pathname,method=req.method();assert.equal(url.origin,origin,'No external requests are allowed');
   if(p.startsWith('/api/')){let data={};const body=()=>{try{return req.postDataJSON();}catch{return null;}};f.calls.push(method+' '+p);
    if(p==='/api/state'&&method==='GET')data=f.saved;else if(p==='/api/state')f.saved=body();
@@ -176,7 +177,7 @@ async function standaloneTerminal(){
  const mainCommands=await palette();for(const label of GONE)assert(mainCommands.some(row=>row.endsWith('| '+label)),'main window keeps '+label);
  for(const label of ['Ping','Text Editor','Terminal','Reports'])assert(mainCommands.some(row=>row.endsWith('| '+label)),'main window keeps the '+label+' tool');
  assert.equal(mainCommands.some(row=>/Open Network Toolkit (Terminal|Text Editor)|\| Window settings$/.test(row)),false);
- const mainHelp=await helpRows();assert.deepEqual([...new Set(mainHelp.map(row=>row.split(' | ')[0]))],['Application','Text Editor','Terminal','File browser','Panels']);assert.equal(mainHelp.length,16);
+ const mainHelp=await helpRows();assert.deepEqual([...new Set(mainHelp.map(row=>row.split(' | ')[0]))],['Application','Text Editor','Terminal','File browser','Panels']);assert.equal(mainHelp.length,20);
  await page.evaluate(()=>navigate('editor'));await page.locator('#networkToolkitFileEditor button[aria-label="Connections"],#networkToolkitFileEditor button[title="Connections"]').first().click();
  await page.waitForFunction(()=>/Connect through Terminal or the SFTP \/ FTP \/ FTPS browser first\./.test(document.querySelector('#ntEditorRemoteHint')?.textContent||''));
  assert.equal(await page.evaluate(()=>[...document.querySelectorAll('#networkToolkitFileEditor [data-rb-action="openTerminal"]')].some(el=>getComputedStyle(el).display!=='none')),true,'the main window keeps Open terminal for file connections');

@@ -92,6 +92,19 @@ function catalog(){
  // document: the main window's editor, detached editor windows and the
  // standalone Text Editor. The standalone Terminal shows no editor.
  const editor=root.NetworkToolkitFileEditor,textTools=root.NTKEditorTextTools,editorShown=doc.getElementById('networkToolkitFileEditor');
+ // The Find window (editor-find.js), its results panel and bookmarks.
+ const find=editor?.find;
+ if(allowedTool('editor')&&find&&editor?.active&&editorShown&&!editorShown.hidden&&standalone()?.mode?.()!=='terminal')global.push(
+  {id:'editor-find',label:'Find…',group:'Text Editor',shortcut:'Ctrl+F',keywords:'search text find next count find all',run:()=>void find.open('find')},
+  {id:'editor-replace',label:'Replace…',group:'Text Editor',shortcut:'Ctrl+H',keywords:'search and replace all in all opened documents',run:()=>void find.open('replace')},
+  {id:'editor-mark',label:'Mark…',group:'Text Editor',shortcut:'Ctrl+M',keywords:'mark all highlight bookmark line copy marked text',run:()=>void find.open('mark')},
+  {id:'editor-find-next',label:'Find next',group:'Text Editor',shortcut:'F3',keywords:'search again',run:()=>void find.findNext(false)},
+  {id:'editor-find-previous',label:'Find previous',group:'Text Editor',shortcut:'Shift+F3',keywords:'search again backward',run:()=>void find.findNext(true)},
+  {id:'editor-search-results',label:'Show or hide search results',group:'Text Editor',keywords:'find all results panel',run:()=>find.showResults()},
+  {id:'editor-bookmark',label:'Bookmark this line',group:'Text Editor',shortcut:'Ctrl+F2',keywords:'toggle bookmark remove',run:()=>find.toggleBookmark()},
+  {id:'editor-next-bookmark',label:'Next bookmark',group:'Text Editor',shortcut:'F2',keywords:'go to bookmark',run:()=>void find.nextBookmark(false)},
+  {id:'editor-previous-bookmark',label:'Previous bookmark',group:'Text Editor',shortcut:'Shift+F2',keywords:'go to bookmark',run:()=>void find.nextBookmark(true)}
+ );
  if(allowedTool('editor')&&textTools&&editor?.active&&editorShown&&!editorShown.hidden&&standalone()?.mode?.()!=='terminal')for(const tool of textTools.TOOLS){
   const group=textTools.GROUPS.find(entry=>entry.id===tool.group);
   global.push({id:'text-tool-'+tool.id,label:'Text tools: '+tool.label.replace(/…$/,''),group:'Text Editor',shortcut:tool.shortcut||'',keywords:(group?.label||'')+' '+tool.description,run:()=>void editor.textMenu?.run(tool.id)});
@@ -134,6 +147,10 @@ function highlight(){
 function helpText(){
  const all=[['Application','Ctrl+Shift+P','Search tools and commands'],['Application','F1','Open this help sheet'],['Application','Ctrl+Shift+T','Reopen an eligible recently closed tab'],
  ['Text Editor','Ctrl+N','New document'],['Text Editor','Alt+Shift+Left / Right','Reorder a document tab'],
+ ['Text Editor','Ctrl+F / Ctrl+H / Ctrl+M','Open the Find window on Find, Replace or Mark'],
+ ['Text Editor','F3 / Shift+F3','Find the next / previous match'],
+ ['Text Editor','Ctrl+F2','Bookmark the line of the cursor, or remove its bookmark'],
+ ['Text Editor','F2 / Shift+F2','Go to the next / previous bookmark'],
  ['Text Editor','Shift+F10','Open the document tab menu'],
  ['Text Editor','Ctrl+Shift+U / Ctrl+U','Change the selection or the document to UPPERCASE / lowercase'],
  ['Text Editor','Ctrl+J / Ctrl+Shift+L','Join lines / Split lines at a text'],
