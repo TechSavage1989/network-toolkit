@@ -364,7 +364,8 @@
       return false;
     }
     if (primary && event.shiftKey && !event.altKey && key === 'f') {
-      event.preventDefault(); event.stopPropagation(); showTerminalSearch(); return false;
+      // The shortcut toggles like the Find button: it closes Find when it is open.
+      event.preventDefault(); event.stopPropagation(); if (typeof toggleTerminalSearch === 'function') toggleTerminalSearch(); else showTerminalSearch(); return false;
     }
     if (!primary && !event.altKey && !event.isComposing && (['backspace','delete'].includes(key) || Array.from(event.key).length === 1) && root.NetworkToolkitTerminalInput?.selection(entry)) {
       const deleted = root.NetworkToolkitTerminalInput.deleteSelection(entry);

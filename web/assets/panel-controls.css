@@ -4,3 +4,6 @@
 .panel-visibility-toggle .panel-visibility-icon{width:16px;height:16px;flex:0 0 16px;pointer-events:none;transform:none!important}
 .panel-visibility-toggle:disabled{opacity:.45;cursor:default}
 .panel-reveal-surface{cursor:pointer}
+/* A button that shows a row, bar or panel is a toggle (owner rule): pressing it
+   again closes what it opened. It looks pressed while open, like .btn.selected. */
+:is(.btn,.iconbtn).reveal-toggle[aria-expanded="true"]{color:var(--accent);border-color:var(--accent);background:var(--accentBg)}
