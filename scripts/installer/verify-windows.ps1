@@ -247,7 +247,10 @@ $progKey = "HKCU:\Software\Classes\$progID"
 $progSubkey = "Software\Classes\$progID"
 # Zero-based icon groups of the program file (ICON_GROUPS in
 # scripts/build_windows_resources.py): 0 app, 1 Text Editor, 2 Terminal,
-# 3 text document. The program values use the editor icon; files use the sheet.
+# 3 text document. The program values (Default apps, right-click entry) use the
+# editor icon; files use the sheet: the ProgID's DefaultIcon and the DefaultIcon
+# of the Applications entries, which Explorer shows for files associated
+# through them.
 $editorIconIndex = 1
 $documentIconIndex = 3
 $iconGroupCount = 4
@@ -265,6 +268,12 @@ $editorCommandFormat = '"{0}" --editor-standalone --open-file "%1"'
 # of the keys it created where another program's key could have been.
 $applicationsSubkey = 'Software\Classes\Applications'
 $applicationSubkey = "$applicationsSubkey\Network_Toolkit.exe"
+# Windows writes this entry itself when the user picks the separate Text Editor
+# program in "Open with": a command, no icon. Setup never creates it; when it
+# starts the installed Text Editor program, Setup gives it the document icon and
+# records the value (EditorApplicationIcon), and uninstall takes back only that.
+$editorApplicationSubkey = "$applicationsSubkey\Network_Toolkit_TextEditor.exe"
+$editorApplicationExpected = $false
 $allFilesSubkey = 'Software\Classes\*'
 $menuVerbSubkey = "$allFilesSubkey\shell\NetworkToolkit.TextEditor"
 $editorKey = "$appKey\TextEditor"
@@ -364,6 +373,7 @@ $allFilesShellExisted = (Get-UserKeyTree "$allFilesSubkey\shell") -cne '<absent>
 $applicationsKeyExisted = $classSnapshots[$applicationsSubkey] -cne '<absent>'
 $applicationOwnedBySetup = $classSnapshots[$applicationSubkey] -ceq '<absent>'
 if (-not $applicationOwnedBySetup) { throw "This runner already has HKCU\$applicationSubkey; the Open With check needs a clean account." }
+Assert-Same (Get-UserKeyTree $editorApplicationSubkey) '<absent>' 'Preexisting Open With entry of the Text Editor program'
 Assert-Same (Get-UserKeyTree $menuVerbSubkey) '<absent>' 'Preexisting right-click entry'
 
 function Assert-ClassKeysRestored([string]$When) {
@@ -494,8 +504,10 @@ function Assert-Installed([string]$ExpectedHash = $portableHash) {
     }
     # "Open with" for any file: the program is registered under Applications
     # with its command and no SupportedTypes, which would limit it to a list.
+    # Its DefaultIcon is the icon of the files associated through it: the sheet;
+    # the open verb's Icon keeps the program icon for Open with.
     if ($applicationOwnedBySetup) {
-        $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$installedExe`",$editorIconIndex}`n[shell]{[open]{[command]{=String:$editorCommand}}}"
+        $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$installedExe`",$documentIconIndex}`n[shell]{[open]{Icon=String:`"$installedExe`",$editorIconIndex`n[command]{=String:$editorCommand}}}"
         Assert-Same (Get-UserKeyTree $applicationSubkey) $expectedApplication 'Open With registration for any file'
         Assert-Same (Read-UserValue $createdSubkey 'Applications\Network_Toolkit.exe') 1 'Record that Setup created the Open With registration'
         $expectedRecord = if ($applicationsKeyExisted) { $null } else { 1 }
@@ -503,6 +515,13 @@ function Assert-Installed([string]$ExpectedHash = $portableHash) {
     } else {
         Assert-Same (Read-UserValue $createdSubkey 'Applications\Network_Toolkit.exe') $null "Record for another program's Open With entry"
         Assert-Same (Read-UserValue $createdSubkey 'Applications') $null "Record for the Applications key beside another program's entry"
+    }
+    # Windows' own entry of the installed Text Editor program: the sheet, its
+    # command exactly as Windows wrote it, and Setup's record of the icon.
+    if ($editorApplicationExpected) {
+        $documentIcon = '"{0}",{1}' -f $installedExe, $documentIconIndex
+        Assert-Same (Get-UserKeyTree $editorApplicationSubkey) "[DefaultIcon]{=String:$documentIcon}`n[shell]{[open]{[command]{=String:`"$installedEditor`" `"%1`"}}}" "Windows' own Open With entry of the Text Editor program"
+        Assert-Same (Read-UserValue 'Software\Network Toolkit\TextEditor' 'EditorApplicationIcon') $documentIcon 'Record of the icon Setup wrote into that entry'
     }
     # The right-click entry exists only when it was chosen.
     if ($contextMenuExpected) {
@@ -634,6 +653,8 @@ Assert-Absent $desktopShortcut
 # Every icon a registry value or shortcut names exists: the text document icon
 # is the last group, after the three that released Setups already use.
 Assert-IconGroups $installedExe $iconGroupCount
+# A second Applications entry would list the Text Editor twice in Open with.
+Assert-Same (Get-UserKeyTree $editorApplicationSubkey) '<absent>' "Windows' own Open With entry of the Text Editor program, which Setup never creates"
 
 Write-Host 'Checking a terminal link reaches the running Terminal window without connecting.'
 # A headless Terminal owner stands in for the open window; the link launch
@@ -765,6 +786,9 @@ try {
 # itself, with the bare file name. Setup replaces the command of an entry that
 # starts the program it installs.
 Set-UserValue "$applicationSubkey\shell\open\command" '' ('"{0}" "%1"' -f $installedExe)
+# Setup up to 1.21.51 gave that entry the editor icon, which Explorer shows for
+# the files associated through it; repair and upgrade write the sheet.
+Set-UserValue "$applicationSubkey\DefaultIcon" '' ('"{0}",{1}' -f $installedExe, $editorIconIndex)
 # The icon that versions up to 1.21.44 gave the associated files; repair and
 # upgrade replace it with the text document icon (checked by Assert-Installed).
 Set-UserValue "$progSubkey\DefaultIcon" '' ('"{0}",{1}' -f $installedExe, $editorIconIndex)
@@ -837,6 +861,12 @@ $installedExe = Join-Path $installDir 'Network_Toolkit.exe'
 $installedEditor = Join-Path $installDir 'Network_Toolkit_TextEditor.exe'
 $installedTerminal = Join-Path $installDir 'Network_Toolkit_Terminal.exe'
 $uninstaller = Join-Path $installDir 'Uninstall.exe'
+# The user picked this folder's Text Editor program in "Open with" (from a
+# copy left behind, below), so Windows wrote its own entry for it: a command,
+# no icon. Setup gives it the sheet and uninstall leaves it as Windows wrote it
+# (Assert-ClassKeysRestored compares the Applications key with this snapshot).
+Set-UserValue "$editorApplicationSubkey\shell\open\command" '' ('"{0}" "%1"' -f $installedEditor)
+Save-ClassSnapshot $applicationsSubkey
 # An uninstaller of 1.21.46 or older, after an in-app update added the separate
 # programs, leaves them behind. A fresh setup in that folder replaces them once
 # they are closed, a read-only one included, and refuses while one is open.
@@ -849,10 +879,12 @@ try {
     Assert-Absent $installedExe
     Assert-Absent $uninstallKey
     Assert-Same ([IO.File]::ReadAllText($installedEditor)) 'Separate program left by an older uninstaller' 'Left-behind Text Editor program while another one is open'
+    Assert-Same (Get-UserKeyTree $editorApplicationSubkey) ('[shell]{[open]{[command]{=String:"' + $installedEditor + '" "%1"}}}') "Windows' own Open With entry of the Text Editor program after a refused setup"
 } finally { $leftoverLock.Dispose() }
 (Get-Item -LiteralPath $installedTerminal).IsReadOnly = $true
 Invoke-Silent $setup 0 "/S /DesktopShortcut /ContextMenu /D=$installDir"
 $contextMenuExpected = $true
+$editorApplicationExpected = $true
 Assert-Installed
 Assert-Preserved
 $desktopShell = New-Object -ComObject WScript.Shell
@@ -873,6 +905,19 @@ Invoke-Silent $setup
 Assert-Installed
 Assert-Same (Read-RegistryValue $uninstallKey 'DesktopShortcut') 1 'Preserved desktop shortcut choice'
 Assert-Same (Read-RegistryValue $uninstallKey 'ContextMenu') 1 'Preserved right-click menu choice'
+
+Write-Host "Checking an upgrade keeps an icon the user gave Windows' own entry of the Text Editor program."
+$userEditorIcon = 'C:\Synthetic Icons\editor-files.ico'
+Set-UserValue "$editorApplicationSubkey\DefaultIcon" '' $userEditorIcon
+Invoke-Silent $setup
+$editorApplicationExpected = $false
+Assert-Installed
+Assert-Same (Get-UserKeyTree $editorApplicationSubkey) ("[DefaultIcon]{=String:$userEditorIcon}`n" + '[shell]{[open]{[command]{=String:"' + $installedEditor + '" "%1"}}}') "An icon the user set on Windows' own entry of the Text Editor program"
+# Back to the icon Setup recorded: the next upgrade and uninstall own it again.
+Set-UserValue "$editorApplicationSubkey\DefaultIcon" '' ('"{0}",{1}' -f $installedExe, $documentIconIndex)
+$editorApplicationExpected = $true
+Invoke-Silent $setup
+Assert-Installed
 
 Write-Host 'Checking /NoContextMenu removes the right-click entry and the two switches together are refused.'
 Invoke-Silent $setup 2 '/S /ContextMenu /NoContextMenu' 'Choose either /ContextMenu or /NoContextMenu, not both'
@@ -1047,9 +1092,16 @@ function Assert-PortableRegistered([string]$Launched, [bool]$Menu) {
             Assert-Same (Read-UserValue $portableCreatedSubkey "$ext\OpenWithProgids") $expectedRecord "Portable record for the Open With list of $ext"
         }
     }
-    $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$Exe`",1}`n[shell]{[open]{[command]{=String:$command}}}"
+    $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$Exe`",$documentIconIndex}`n[shell]{[open]{Icon=String:`"$Exe`",$editorIconIndex`n[command]{=String:$command}}}"
     Assert-Same (Get-UserKeyTree $applicationSubkey) $expectedApplication 'Portable Open With registration for any file'
     Assert-Same (Read-UserValue $portableCreatedSubkey 'Applications\Network_Toolkit.exe') 1 'Portable record of the Open With registration'
+    # Windows' own Open With entry of copy A's Text Editor program (set up
+    # below) shows A's sheet; the portable record keeps the value written, also
+    # through B's takeover, so that whoever removes the registration takes it back.
+    $entryIcon = Read-UserValue "$editorApplicationSubkey\DefaultIcon" ''
+    if (-not $entryIcon -or $entryIcon -ine ('"{0}",{1}' -f $portableA, $documentIconIndex)) { throw "Windows' own Open With entry of copy A's Text Editor program has the icon '$entryIcon'." }
+    Assert-Same (Read-UserValue $portableSubkey 'EditorApplicationIcon') $entryIcon 'Portable record of the icon written into that entry'
+    Assert-Same (Read-UserValue "$editorApplicationSubkey\shell\open\command" '') $portableEditorCommandA "Command of Windows' own entry of copy A's Text Editor program"
     if ($Menu) {
         Assert-Same (Get-UserKeyTree $menuVerbSubkey) "=String:Edit with $registeredName`nIcon=String:`"$Exe`",1`n[command]{=String:$command}" 'Portable right-click entry'
         Assert-Same (Read-UserValue $portableSubkey 'ContextMenu') 1 'Portable right-click choice'
@@ -1062,6 +1114,13 @@ function Assert-PortableRegistered([string]$Launched, [bool]$Menu) {
 # The Open With entry of another copy (from the check above) goes, so that the
 # portable copy and then Setup own "Open with" for any file.
 [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($applicationSubkey)
+# Windows' own entry of the separate Text Editor program now starts copy A's
+# (the user picked it in "Open with"); the program file need not exist for the
+# registry checks. Copy A's registration gives it A's sheet.
+$portableEditorCommandA = '"{0}" "%1"' -f (Join-Path $portableDirA 'Network_Toolkit_TextEditor.exe')
+Set-UserValue "$editorApplicationSubkey\shell\open\command" '' $portableEditorCommandA
+Assert-Same (Get-UserKeyTree "$editorApplicationSubkey\DefaultIcon") '<absent>' "Icon of Windows' own entry of the Text Editor program before the portable checks"
+$editorApplicationExpected = $false
 # Its parent, Applications, stays (now without that entry): snapshot both.
 Save-ClassSnapshot $applicationsSubkey
 Save-ClassSnapshot $applicationSubkey
@@ -1111,6 +1170,12 @@ $contextMenuExpected = $true
 Assert-Installed
 Assert-Preserved
 Assert-Absent $portableKey
+# The entry starts copy A's Text Editor program, not the installed one: Setup
+# leaves its icon and takes over the record of it, so uninstall takes it back.
+$portableEntryIcon = Read-UserValue "$editorApplicationSubkey\DefaultIcon" ''
+if (-not $portableEntryIcon -or $portableEntryIcon -ine ('"{0}",{1}' -f $portableA, $documentIconIndex)) { throw "Setup changed the icon of Windows' own entry of copy A's Text Editor program to '$portableEntryIcon'." }
+Assert-Same (Read-UserValue 'Software\Network Toolkit\TextEditor' 'EditorApplicationIcon') $portableEntryIcon "Setup's record of the icon the portable copy wrote"
+Assert-Same (Read-UserValue "$editorApplicationSubkey\shell\open\command" '') $portableEditorCommandA "Command of Windows' own entry of copy A's Text Editor program after Setup"
 Write-Host 'Checking the portable record is retired and the installed program keeps every command.'
 $installedClasses = Get-ClassesTree
 $installedAppKey = Get-UserKeyTree 'Software\Network Toolkit'
@@ -1142,7 +1207,7 @@ Assert-Same (Get-ClassesTree) $classesBefore 'HKCU\Software\Classes after the po
 Assert-Preserved
 Remove-Item -LiteralPath $portableRoot -Recurse
 
-foreach ($synthetic in "$allFilesSubkey\shell\SyntheticEdit", $applicationSubkey, $rivalProgSubkey, 'Software\Classes\.cfg', 'Software\Classes\.ini') {
+foreach ($synthetic in "$allFilesSubkey\shell\SyntheticEdit", $applicationSubkey, $editorApplicationSubkey, $rivalProgSubkey, 'Software\Classes\.cfg', 'Software\Classes\.ini') {
     # The synthetic Open With entry was removed for the portable checks above.
     [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($synthetic, $false)
 }

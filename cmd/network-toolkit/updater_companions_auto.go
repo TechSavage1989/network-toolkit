@@ -319,11 +319,29 @@ var (
 	postUpdateExecutable     = updateCurrentExecutable
 )
 
-// editorRegRepairDocumentIcon points the ProgID's DefaultIcon at the document
-// icon (index 3) when the ProgID's command starts exe, as Setup does on every
+// editorRegEditorAppIconUninstallerVersion is the first Setup whose
+// uninstaller takes back the document icon a registration writes into
+// Windows' own entry of the separate Text Editor program
+// (RemoveEditorApplicationIcon in windows.nsi). The start after an in-app
+// update writes that icon for the installed program only when the installed
+// uninstaller (DisplayVersion, written only by Setup) is at least this
+// version; otherwise the next Setup writes it. It is the version that follows
+// 1.21.51, the first to ship this; if that release gets another number, set
+// it here in the same change.
+const editorRegEditorAppIconUninstallerVersion = "1.21.52"
+
+func editorRegUninstallerRemovesAppIcon(version string) bool {
+	return updateVersionPattern.MatchString(version) && !updateNewer(editorRegEditorAppIconUninstallerVersion, version)
+}
+
+// editorRegRepairDocumentIcon gives the files of the running program's Text
+// Editor registration the document icon (index 3), as Setup does on every
 // install and upgrade (DOCUMENT_ICON). An in-app update does not run Setup, so
-// a registration written before 1.21.45 kept the editor icon. Nothing else is
-// written, and a ProgID of another program is never touched.
+// a registration written before 1.21.45 kept the editor icon on the ProgID,
+// and one written before 1.21.52 on its "Open with" entry. Three values, each
+// only where this program's registration owns it (planEditorIconRepair);
+// nothing of another program is touched. Every read comes first: a read that
+// fails writes nothing.
 func editorRegRepairDocumentIcon(p editorRegPlatform, exe string) (bool, error) {
 	if !strings.EqualFold(editorRegBase(exe), editorRegAppFile) {
 		return false, nil
@@ -335,22 +353,116 @@ func editorRegRepairDocumentIcon(p editorRegPlatform, exe string) (bool, error) 
 		return false, err
 	}
 	defer release()
-	exists, _, _, err := p.registry.KeyInfo(editorRegProgKey)
-	if err != nil || !exists {
+	plan, err := planEditorIconRepair(p.registry, exe)
+	if err != nil || len(plan) == 0 {
 		return false, err
 	}
-	command, found, ok, err := p.registry.String(editorRegProgKey+`\shell\open\command`, "")
-	if err != nil || !found || !ok || !editorRegStartsWith(command, exe) {
-		return false, err
-	}
-	want := editorRegIcon(editorRegCommandProgram(command), editorRegDocumentIcon)
-	current, found, ok, err := p.registry.String(editorRegProgKey+`\DefaultIcon`, "")
-	if err != nil || found && ok && current == want {
-		return false, err
-	}
-	if err := p.registry.SetString(editorRegProgKey+`\DefaultIcon`, "", want); err != nil {
-		return false, err
-	}
+	err = plan.apply(p.registry)
+	// SHCNE_ASSOCCHANGED after any change, also a partial one.
 	p.notify()
-	return true, nil
+	return err == nil, err
+}
+
+// planEditorIconRepair computes the writes of editorRegRepairDocumentIcon:
+//   - the ProgID's DefaultIcon, when the ProgID's command starts exe;
+//   - the DefaultIcon of Applications\Network_Toolkit.exe and the program
+//     icon on its open verb (shell\open, Icon), when its command is the Text
+//     Editor command of exe, so Setup or the portable registration wrote it
+//     and removes it with its other values (an entry Windows wrote itself,
+//     with the bare file name, is nobody's to take back, so it is left alone).
+//     Each only where it is absent or exactly what 1.21.44 to 1.21.51 wrote
+//     (the editor icon as DefaultIcon, no verb Icon): an icon the user set
+//     there stays;
+//   - Windows' own entry of the separate Text Editor program beside exe
+//     (planEditorAppIcon), recorded in the record of this program's
+//     registration: Setup's, when exe is the installed program and the
+//     installed uninstaller takes it back (editorRegUninstallerRemovesAppIcon),
+//     or the portable record, when it names exe and nothing is installed.
+func planEditorIconRepair(reg editorRegistry, exe string) (editorRegPlan, error) {
+	var plan editorRegPlan
+	// owned reads a key's command: the program it starts, when that is exe
+	// and accept agrees.
+	owned := func(key string, accept func(command string) bool) (string, error) {
+		command, found, ok, err := reg.String(key+`\shell\open\command`, "")
+		if err != nil || !found || !ok || !editorRegStartsWith(command, exe) || !accept(command) {
+			return "", err
+		}
+		return editorRegCommandProgram(command), nil
+	}
+	// set adds want unless the value is already want. With keepOthers, only
+	// where the value is absent or one of replaceable: anything else stays.
+	set := func(key, name, want string, keepOthers bool, replaceable ...string) error {
+		current, found, ok, err := reg.String(key, name)
+		if err != nil || found && ok && current == want {
+			return err
+		}
+		if found && keepOthers {
+			mine := false
+			for _, r := range replaceable {
+				mine = mine || ok && current == r
+			}
+			if !mine {
+				return nil
+			}
+		}
+		plan.str(key, name, want)
+		return nil
+	}
+	progID, err := editorRegExists(reg, editorRegProgKey)
+	if err != nil {
+		return nil, err
+	}
+	if progID {
+		program, err := owned(editorRegProgKey, func(string) bool { return true })
+		if err != nil {
+			return nil, err
+		}
+		if program != "" {
+			if err := set(editorRegProgKey+`\DefaultIcon`, "", editorRegIcon(program, editorRegDocumentIcon), false); err != nil {
+				return nil, err
+			}
+		}
+	}
+	program, err := owned(editorRegApplication, func(command string) bool {
+		return strings.EqualFold(command, editorRegCommand(editorRegCommandProgram(command)))
+	})
+	if err != nil {
+		return nil, err
+	}
+	if program != "" {
+		if err := set(editorRegApplication+`\DefaultIcon`, "", editorRegIcon(program, editorRegDocumentIcon), true, editorRegIcon(program, editorRegEditorIcon)); err != nil {
+			return nil, err
+		}
+		// No released version wrote a verb icon: only an absent one is added.
+		if err := set(editorRegApplication+`\shell\open`, "Icon", editorRegIcon(program, editorRegEditorIcon), true); err != nil {
+			return nil, err
+		}
+	}
+	location, found, ok, err := reg.String(editorRegUninstall, "InstallLocation")
+	if err != nil {
+		return nil, err
+	}
+	if found && ok && strings.TrimSpace(location) != "" {
+		installed, version, err := editorRegInstalledHere(reg, exe)
+		if err != nil || !installed || !editorRegUninstallerRemovesAppIcon(version) {
+			return plan, err
+		}
+		record, err := editorRegExists(reg, editorRegSetupRecord)
+		if err != nil || !record {
+			return plan, err
+		}
+		// Setup's own path, as Setup writes DOCUMENT_ICON with $INSTDIR.
+		err = planEditorAppIcon(reg, &plan, editorRegJoin(strings.TrimSpace(location), editorRegAppFile), editorRegSetupRecord)
+		return plan, err
+	}
+	recorded, found, ok, err := reg.String(editorRegPortable, "Executable")
+	if err != nil {
+		return nil, err
+	}
+	if found && ok && editorRegSamePath(recorded, exe) {
+		if err := planEditorAppIcon(reg, &plan, recorded, editorRegPortable); err != nil {
+			return nil, err
+		}
+	}
+	return plan, nil
 }

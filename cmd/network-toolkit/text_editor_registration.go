@@ -58,9 +58,24 @@ const (
 	editorRegPortableKeys = editorRegPortable + `\CreatedKeys`
 	// Zero-based icon groups of the program file (ICON_GROUPS in
 	// scripts/build_windows_resources.py). The program icon of the Text Editor
-	// stands for the application; the document icon for files of its types.
+	// stands for the application (Default apps, the right-click entry, the
+	// open verb's Icon of its Applications entry for Open with); the
+	// document icon for files: the ProgID's DefaultIcon and the DefaultIcon of
+	// an Applications entry, which Explorer shows for every file the user
+	// associated through that entry (AGENTS.md, the icon rule).
 	editorRegEditorIcon   = 1
 	editorRegDocumentIcon = 3
+	// The separate Text Editor program (EDITOR_FILENAME). Windows writes
+	// Applications\Network_Toolkit_TextEditor.exe itself when the user picks
+	// that program in "Open with" (EDITOR_APPLICATION_KEY): a command and no
+	// DefaultIcon, so its files show the program's first icon, the editor
+	// tile. A registration gives such an entry the document icon and records
+	// the value it wrote under EDITOR_APPLICATION_ICON in its own record
+	// (Setup's EDITOR_KEY, or the portable record); it never creates the
+	// entry and never changes its command.
+	editorRegEditorFile        = editorProgramWindows
+	editorRegEditorApplication = editorRegApplications + `\` + editorRegEditorFile
+	editorRegEditorAppIcon     = "EditorApplicationIcon"
 )
 
 // The command every registration starts the Text Editor with: the program, the
@@ -595,8 +610,27 @@ func planEditorRegister(reg editorRegistry, status editorRegistrationStatus, con
 	plan.str(editorRegRegistered, editorRegAppName, editorRegCapabilities)
 	if ownApplication {
 		plan.str(editorRegApplication, "FriendlyAppName", editorRegAppName)
-		plan.str(editorRegApplication+`\DefaultIcon`, "", editorRegIcon(exe, editorRegEditorIcon))
+		// The icon of the files the user associates through this entry, and
+		// the program icon on its verb, which keeps Open with showing the
+		// program whichever value it reads (Visual Studio Code's pattern).
+		// Each only where it is absent or what a registration wrote (this
+		// copy's or the replaced copy's): an icon the user set there stays.
+		for _, icon := range []struct{ path, name, want string }{
+			{editorRegApplication + `\DefaultIcon`, "", editorRegIcon(exe, editorRegDocumentIcon)},
+			{editorRegApplication + `\shell\open`, "Icon", editorRegIcon(exe, editorRegEditorIcon)},
+		} {
+			current, found, _, err := reg.String(icon.path, icon.name)
+			if err != nil {
+				return nil, err
+			}
+			if !found || editorRegWrittenIcon(current, exe, previous) {
+				plan.str(icon.path, icon.name, icon.want)
+			}
+		}
 		plan.str(editorRegApplication+`\shell\open\command`, "", command)
+	}
+	if err := planEditorAppIcon(reg, &plan, exe, editorRegPortable); err != nil {
+		return nil, err
 	}
 	verbCommand, verbFound, _, err := reg.String(editorRegMenuVerb+`\command`, "")
 	if err != nil {
@@ -618,6 +652,19 @@ func planEditorRegister(reg editorRegistry, status editorRegistrationStatus, con
 	return plan, nil
 }
 
+// editorRegWrittenIcon reports whether an icon value of the registration's
+// own Open with entry is one a registration of these programs wrote: the
+// editor or the document icon of one of them (empty names are skipped).
+// Anything else is the user's and is not replaced.
+func editorRegWrittenIcon(value string, programs ...string) bool {
+	for _, program := range programs {
+		if program != "" && (value == editorRegIcon(program, editorRegEditorIcon) || value == editorRegIcon(program, editorRegDocumentIcon)) {
+			return true
+		}
+	}
+	return false
+}
+
 // The right-click entry: the values this program wrote, then each key once it
 // is empty, then the shared parents that this registration created.
 func planEditorRemoveMenu(plan *editorRegPlan, records map[string]bool) {
@@ -634,6 +681,78 @@ func planEditorRemoveMenu(plan *editorRegPlan, records map[string]bool) {
 	}
 	plan.del(editorRegPortableKeys, "*")
 	plan.del(editorRegPortableKeys, `*\shell`)
+}
+
+// planEditorAppIcon gives Windows' own "Open with" entry of the separate Text
+// Editor program beside exe the document icon of exe (EDITOR_APPLICATION_KEY,
+// RegisterEditorApplicationIcon in windows.nsi). record is the registration's
+// record key, which keeps the value written (EDITOR_APPLICATION_ICON).
+//
+// Only an entry that exists and whose command starts that program, and only
+// when it has no DefaultIcon key or its icon is the one this registration
+// wrote (the recorded value, or exactly the value it would write). An icon of
+// anyone else, an icon key someone else created, and an entry of another
+// program are left as they are; the entry itself is never created and its
+// command never changed. The record is written before the icon.
+func planEditorAppIcon(reg editorRegistry, plan *editorRegPlan, exe, record string) error {
+	exists, err := editorRegExists(reg, editorRegEditorApplication)
+	if err != nil || !exists {
+		return err
+	}
+	command, found, ok, err := reg.String(editorRegEditorApplication+`\shell\open\command`, "")
+	if err != nil {
+		return err
+	}
+	if !found || !ok || !editorRegStartsWith(command, editorRegJoin(editorRegDir(exe), editorRegEditorFile)) {
+		return nil
+	}
+	want := editorRegIcon(exe, editorRegDocumentIcon)
+	iconKey, err := editorRegExists(reg, editorRegEditorApplication+`\DefaultIcon`)
+	if err != nil {
+		return err
+	}
+	current, currentFound, currentOK, err := reg.String(editorRegEditorApplication+`\DefaultIcon`, "")
+	if err != nil {
+		return err
+	}
+	recorded, recordedFound, recordedOK, err := reg.String(record, editorRegEditorAppIcon)
+	if err != nil {
+		return err
+	}
+	ours := !iconKey || currentFound && currentOK && (current == want || recordedFound && recordedOK && recorded != "" && current == recorded)
+	if !ours {
+		return nil
+	}
+	if !recordedFound || !recordedOK || recorded != want {
+		plan.str(record, editorRegEditorAppIcon, want)
+	}
+	if !currentFound || !currentOK || current != want {
+		plan.str(editorRegEditorApplication+`\DefaultIcon`, "", want)
+	}
+	return nil
+}
+
+// planEditorRemoveAppIcon takes back the icon planEditorAppIcon wrote, as
+// RemoveEditorApplicationIcon in windows.nsi: the DefaultIcon value only while
+// it is still the recorded value, then its key once empty (this registration
+// created it), never Windows' entry. The record value goes in any case.
+func planEditorRemoveAppIcon(reg editorRegistry, plan *editorRegPlan, record string) error {
+	recorded, found, ok, err := reg.String(record, editorRegEditorAppIcon)
+	if err != nil || !found {
+		return err
+	}
+	if ok && recorded != "" {
+		current, currentFound, currentOK, err := reg.String(editorRegEditorApplication+`\DefaultIcon`, "")
+		if err != nil {
+			return err
+		}
+		if currentFound && currentOK && current == recorded {
+			plan.del(editorRegEditorApplication+`\DefaultIcon`, "")
+			plan.empty(editorRegEditorApplication + `\DefaultIcon`)
+		}
+	}
+	plan.del(record, editorRegEditorAppIcon)
+	return nil
 }
 
 // planEditorRemove computes what Remove (or Clean up, for a registration whose
@@ -695,6 +814,7 @@ func planEditorRemove(reg editorRegistry, status editorRegistrationStatus) (edit
 	if records[`Applications\`+editorRegAppFile] && appCommand == command {
 		plan.del(editorRegApplication+`\shell\open\command`, "")
 		plan.empty(editorRegApplication + `\shell\open\command`)
+		plan.del(editorRegApplication+`\shell\open`, "Icon")
 		plan.empty(editorRegApplication + `\shell\open`)
 		plan.empty(editorRegApplication + `\shell`)
 		plan.del(editorRegApplication+`\DefaultIcon`, "")
@@ -704,6 +824,11 @@ func planEditorRemove(reg editorRegistry, status editorRegistrationStatus) (edit
 	}
 	if records["Applications"] {
 		plan.empty(editorRegApplications)
+	}
+	// Windows' own entry of the separate Text Editor program: the icon the
+	// record says this registration wrote, while it is still that.
+	if err := planEditorRemoveAppIcon(reg, &plan, editorRegPortable); err != nil {
+		return nil, err
 	}
 	verbCommand, verbFound, _, err := reg.String(editorRegMenuVerb+`\command`, "")
 	if err != nil {

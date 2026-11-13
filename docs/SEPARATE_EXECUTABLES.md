@@ -399,8 +399,23 @@ them as its own.
     `DefaultIcon` at the document icon (`"<program>",3`) when its
     `shell\open\command` starts the running `Network_Toolkit.exe` (Setup's or
     the portable registration), as Setup does on every install; an in-app
-    update from 1.21.44 or older left the editor icon (1). Only that value is
-    written, then `SHChangeNotify(SHCNE_ASSOCCHANGED)`.
+    update from 1.21.44 or older left the editor icon (1). It does the same
+    for `Applications\Network_Toolkit.exe\DefaultIcon` when that entry's
+    command is the Text Editor command of the running program (1.21.51 and
+    older wrote the editor icon there, and Explorer shows that value for the
+    files associated through the entry), and adds the program icon (1) as
+    that entry's `shell\open` `Icon`, which keeps Open with showing the
+    program. Windows' own
+    `Applications\Network_Toolkit_TextEditor.exe` entry (written when the user
+    picks the separate program in Open with; no `DefaultIcon`, so its files
+    showed that program's icon 0, the editor tile) gets
+    `"<folder>\Network_Toolkit.exe",3` and a record of the value
+    (`EditorApplicationIcon`) when it starts the Text Editor program beside
+    the registered portable copy, or beside the installed program whose
+    uninstaller is 1.21.52 or later (`editorRegEditorAppIconUninstallerVersion`;
+    an older one would leave the value behind, so the next Setup writes it).
+    The entry is never created and its command never changed. All reads come
+    first; then `SHChangeNotify(SHCNE_ASSOCCHANGED)`.
 
   The updater page offers **Install the separate Text Editor and Terminal
   programs** when they are still missing or not of this version (Windows main
