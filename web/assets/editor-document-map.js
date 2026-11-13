@@ -116,11 +116,19 @@ function create(adapter){
   host.addEventListener('lostpointercapture',()=>{drag=null;host?.classList.remove('is-dragging');});
   host.addEventListener('wheel',wheel,{passive:false});
   view.addEventListener('keydown',keydown);
-  // Scroll events do not bubble: listen in the capture phase for every text
-  // area and scroll bar of the editor (single view, split panes, disk pages).
-  (host.closest('.nt-editor')||host.parentElement)?.addEventListener('scroll',schedule,true);
-  if(typeof root.ResizeObserver==='function')new root.ResizeObserver(()=>schedule()).observe(host);
-  if(typeof root.MutationObserver==='function'&&document?.documentElement)new root.MutationObserver(()=>schedule()).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+  // The map follows the editor without being told: scroll events (they do
+  // not bubble, so in the capture phase) of every text area and scroll bar,
+  // changed controls (Wrap, font size, indent, colours), the editor's palette,
+  // font and view classes, the theme, and the size of the document area.
+  // Edits and document switches arrive through schedule() from the tab strip.
+  const editor=host.closest('.nt-editor')||host.parentElement;
+  editor?.addEventListener('scroll',schedule,true);
+  editor?.addEventListener('change',schedule);
+  if(typeof root.ResizeObserver==='function'){const resize=new root.ResizeObserver(()=>schedule());resize.observe(host);const area=editor?.querySelector('.nt-editor-document-area');if(area)resize.observe(area);}
+  if(typeof root.MutationObserver==='function'){
+   if(document?.documentElement)new root.MutationObserver(()=>schedule()).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+   if(editor)new root.MutationObserver(()=>schedule()).observe(editor,{attributes:true,attributeFilter:['style','class','data-palette']});
+  }
  }
 
  function schedule(){if(!frame&&host)frame=root.requestAnimationFrame(update);}
