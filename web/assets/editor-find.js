@@ -202,6 +202,7 @@ function create(a){
   lastFound={uid:d.uid,revision:a.revision(d),from:result.from,to:result.to};
   await a.select(d,result.from,result.to,false);
   lastFound.revision=a.revision(d);
+  refreshFound();
   if(scope&&area.within)scope.revision=lastFound.revision;
   status(result.wrapped?(backwards?'Find: Found the last occurrence from the bottom. The start of the '+(area.within?'selection':'document')+' has been reached.':'Find: Found the first occurrence from the top. The end of the '+(area.within?'selection':'document')+' has been reached.'):'Match on line '+count(result.line+1)+'.');
   return true;
@@ -524,7 +525,32 @@ function create(a){
  // The marks of [from, to) of a document, for painting: an array of
  // [from, to] when known; otherwise null, and a repaint follows once they
  // are found. Each mark pattern searches only that part of the document.
+ // The match Find Next selected, while it is still the selection: shown as
+ // the current match, also when the text does not have the focus (a text
+ // area hides its selection then).
+ let foundShown='',foundBase=null,foundKey='',foundRanges=null;
+ function currentMatch(d){
+  if(!d||!lastFound||lastFound.uid!==d.uid||lastFound.to<=lastFound.from||a.current()!==d||lastFound.revision!==a.revision(d))return null;
+  const sel=a.selection(d);
+  return sel.start===lastFound.from&&sel.end===lastFound.to?lastFound:null;
+ }
+ function refreshFound(){
+  const d=a.current(),found=currentMatch(d),key=found?d.uid+':'+found.revision+':'+found.from+':'+found.to:'';
+  if(key===foundShown)return;
+  foundShown=key;if(d)a.repaint(d,true);
+ }
  function marksIn(d,from,to){
+  const base=patternMarks(d,from,to),found=currentMatch(d);
+  if(!found||found.to<=from||found.from>=to)return base;
+  const key=found.from+':'+found.to;
+  if(foundBase!==base||foundKey!==key){
+   foundBase=base;foundKey=key;
+   const others=(base||[]).filter(([x,y])=>y<=found.from||x>=found.to);
+   foundRanges=[...others,[found.from,found.to,'current']].sort((x,y)=>x[0]-y[0]);
+  }
+  return foundRanges;
+ }
+ function patternMarks(d,from,to){
   const list=marksOf(d);if(!list.length)return [];
   const key=[a.revision(d),from,to,markVersion].join(':'),cached=markCache.get(d);
   if(cached?.key===key)return cached.ranges;
@@ -578,7 +604,7 @@ function create(a){
   const check=(option,label,extra='',tabs='')=>'<label class="nt-find-check"'+(tabs?' data-tabs="'+tabs+'"':'')+'><input type="checkbox" data-ed-find-option="'+option+'"'+extra+'> '+label+'</label>';
   return '<div class="nt-find-head" data-ed-find-drag title="Drag to move the Find window"><div class="nt-find-tabs" role="tablist" aria-label="Find, Replace or Mark">'+tabs+'</div><button type="button" class="nt-find-x" data-ed-find-close aria-label="Close the Find window" title="Close (Esc)">×</button></div>'+
   '<div class="nt-find-panel" id="ntFindPanel" role="tabpanel" aria-labelledby="ntFindTab-find">'+
-   '<div class="nt-find-fields">'+
+   '<div class="nt-find-main"><div class="nt-find-fields">'+
     '<label class="nt-find-field"><span>Find what:</span><span class="nt-find-input"><input type="text" data-ed-query list="ntEditorFindHistory" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Find what"></span></label><datalist id="ntEditorFindHistory"></datalist>'+
     '<div class="nt-find-field" data-ed-replace-fields data-tabs="replace"><label for="ntFindReplacement">Replace with:</label><span class="nt-find-input"><input type="text" id="ntFindReplacement" data-ed-replacement list="ntEditorReplaceHistory" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Replace with"></span>'+
      '<span class="nt-find-swap"><button type="button" class="btn small ghost" data-ed-find-swap="swap" title="Swap Find what and Replace with" aria-label="Swap Find what and Replace with">⇅</button><button type="button" class="btn small ghost nt-find-swap-more" data-ed-find-swap-menu aria-haspopup="menu" aria-expanded="false" aria-label="More swap choices" title="More swap choices">▾</button>'+
@@ -587,7 +613,7 @@ function create(a){
    '<div class="nt-find-options">'+
     check('bookmark','Bookmark line','','mark')+check('purge','Purge for each search','','mark')+
     check('backward','Backward direction',' aria-keyshortcuts="Shift+F3"','find replace')+check('word','Match whole word only',' data-ed-word')+check('matchCase','Match case',' data-ed-case')+check('wrap','Wrap around',' checked','find replace')+
-   '</div>'+
+   '</div></div>'+
    '<fieldset class="nt-find-mode" data-ed-search-mode data-ed-search-mode-label title="'+escapeHTML(MODE_HELP.normal)+'"><legend>Search Mode</legend>'+
     MODES.map(([value,label])=>'<label class="nt-find-check" title="'+escapeHTML(MODE_HELP[value])+'"><input type="radio" name="ntFindMode" value="'+value+'"'+(value==='normal'?' checked':'')+'> '+escapeHTML(label)+'</label>').join('')+
     check('dotAll','. matches newline',' disabled')+
@@ -690,6 +716,7 @@ function create(a){
   closeSwapMenu();
  }
  function selectionChanged(){
+  refreshFound();
   if(!el)return;
   const d=a.current(),box=el.querySelector('[data-ed-find-option="inSelection"]');
   if(!box)return;
@@ -821,7 +848,7 @@ function create(a){
   open,close,isOpen:()=>!!el&&!el.hidden,key,draw,
   findNext,replaceOne,replaceAll,
   selectionChanged,edited,closed,
-  marksIn,hasMarks:d=>marksOf(d).length>0,
+  marksIn,hasMarks:d=>marksOf(d).length>0||!!currentMatch(d),
   bookmarks:d=>{const list=bookmarks.get(d);return list?.length?new Set(list):null;},
   hasBookmarks:d=>!!bookmarks.get(d)?.length,
   toggleBookmark,nextBookmark,

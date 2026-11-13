@@ -735,10 +735,10 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    markRanges = ranges;
    markKey = key;
    let html = '', at = from;
-   for (const [a, b] of ranges) {
+   for (const [a, b, kind] of ranges) {
     const start = Math.max(a - page.start, at), stop = Math.min(b - page.start, to);
     if (stop <= start) continue;
-    html += escapeText(text.slice(at, start)) + '<mark>' + escapeText(text.slice(start, stop)) + '</mark>';
+    html += escapeText(text.slice(at, start)) + (kind ? '<mark class="is-current">' : '<mark>') + escapeText(text.slice(start, stop)) + '</mark>';
     at = stop;
    }
    markLayer.innerHTML = html + escapeText(text.slice(at, to)) + '\n';

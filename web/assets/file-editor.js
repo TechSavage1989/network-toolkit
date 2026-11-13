@@ -1227,7 +1227,7 @@ function paintMarks(d){
  if(layer._ntMarks!==ranges||layer._ntKey!==key){
   layer._ntMarks=ranges;layer._ntKey=key;
   let html='',at=from;
-  for(const [a,b] of ranges){const start=Math.max(a,at),end=Math.min(b,to);if(end<=start)continue;html+=escaped(text.slice(at,start))+'<mark>'+escaped(text.slice(start,end))+'</mark>';at=end;}
+  for(const [a,b,kind] of ranges){const start=Math.max(a,at),end=Math.min(b,to);if(end<=start)continue;html+=escaped(text.slice(at,start))+'<mark'+(kind?' class="is-current"':'')+'>'+escaped(text.slice(start,end))+'</mark>';at=end;}
   layer.innerHTML=html+escaped(text.slice(at,to))+'\n';
  }
  layer._ntTop=top;layer.hidden=!ranges.length;placeMarks(d,ta);
@@ -1251,7 +1251,7 @@ function repaintFind(d){
  if(ta&&gutter){gutter._ntLargeRange=null;paintGutter(d,ta,gutter);gutter.style.transform='translateY('+(-ta.scrollTop)+'px)';}
  paintMarks(d);
 }
-findWindow=root.NTKEditorFind?.create({
+const findAdapter={
  windowEl:()=>{skin();return overlay?.querySelector('.nt-editor-window');},
  current,documents:()=>[...documents.values()],byUid:uid=>[...documents.values()].find(d=>d.uid===uid),
  nameOf:d=>nameOf(d.path),title:d=>(d.source?d.source+' · ':'')+d.path,
@@ -1294,7 +1294,8 @@ findWindow=root.NTKEditorFind?.create({
  async goLine(d,line){if(d.disk){const view=diskView();if(view){await view.goLine(line,true);const cursor=view.cursor;void cursor;}status();return;}positionAt(lineIndex(d)[Math.min(line,lineIndex(d).length-1)]||0,true);status();},
  repaint:repaintFind,comparing:()=>!!comparison,layoutChanged:()=>{const d=current();if(d&&!d.disk&&!paneWorkspace())paintText(d);},
  savePreferences:()=>keepPreferences()
-})||null;
+};
+findWindow=root.NTKEditorFind?.create(findAdapter)||null;
 const sessionCarry=error=>!(error?.status===400||error?.status===404||/damaged|no longer available/i.test(error?.message||''));
 function sessionFormat(d,format,file=false){if(!format)return;d.encoding=format.encoding;d.bom=format.bom===true;
  // Only the engine knows whether the reopened text still has lines that end
@@ -1580,5 +1581,8 @@ const textMenu=Object.freeze({
   if(root.NTKEditorTextTools?.tool(action)){void textTools?.run(action);return true;}
   const button=overlay?.querySelector('[data-ed="'+action+'"]');if(!button||button.disabled)return false;button.click();return true;}
 });
-root.NetworkToolkitFileEditor={session:Object.freeze({get phase(){return session?.phase||'unavailable';},save:()=>session?session.save():Promise.resolve(new Set()),tick:()=>!!session?.tick(),isKept:d=>!!session?.isKept(d)}),textMenu,listDocuments,insertText,pickInsert,cancelInsertPick:endPick,insertPickActive:()=>!!pickState,openTabActions(uid){const d=[...documents.values()].find(item=>item.uid===uid);if(!d||!overlay||overlay.hidden)return false;const button=[...overlay.querySelectorAll('[data-ed-tab-actions]')].find(el=>el.dataset.edTabActions===uid);if(!button)return false;const rect=button.getBoundingClientRect();openTabMenu(d,rect.left,rect.bottom);return true;},beginSidebarPointerDrag,finishSidebarPointerDrop,cancelSidebarPointerDrag,requestName:(title,message,value)=>{skin();return askEditor({title,message,value,accept:'Create',validate:value=>value.trim()?'':'Enter a name.'});},moveDocumentToView,openSplit,get viewGroups(){return groups.snapshot();},windowAdapter,canReorderDocuments,reorderDocument,open,openDesktopFile,importFiles,openLocalPath,newDocument,adoptHandover,discardAdopted,renderPage,detachPage,closeAll,preferConnection,refreshConnectedSources,openRemotePath,showRemoteFilePicker,get documents(){return documents;},activateDocument,openComparison,closeComparison,get comparison(){return comparison;},get active(){return current();}};
+root.NetworkToolkitFileEditor={session:Object.freeze({get phase(){return session?.phase||'unavailable';},save:()=>session?session.save():Promise.resolve(new Set()),tick:()=>!!session?.tick(),isKept:d=>!!session?.isKept(d)}),textMenu,
+ // The Find window (editor-find.js): the command palette opens it; a range
+ // of the active document can be selected for its In selection.
+ find:findWindow,selectRange(start,end){const d=current();return d?findAdapter.select(d,start,end,true):Promise.resolve();},listDocuments,insertText,pickInsert,cancelInsertPick:endPick,insertPickActive:()=>!!pickState,openTabActions(uid){const d=[...documents.values()].find(item=>item.uid===uid);if(!d||!overlay||overlay.hidden)return false;const button=[...overlay.querySelectorAll('[data-ed-tab-actions]')].find(el=>el.dataset.edTabActions===uid);if(!button)return false;const rect=button.getBoundingClientRect();openTabMenu(d,rect.left,rect.bottom);return true;},beginSidebarPointerDrag,finishSidebarPointerDrop,cancelSidebarPointerDrag,requestName:(title,message,value)=>{skin();return askEditor({title,message,value,accept:'Create',validate:value=>value.trim()?'':'Enter a name.'});},moveDocumentToView,openSplit,get viewGroups(){return groups.snapshot();},windowAdapter,canReorderDocuments,reorderDocument,open,openDesktopFile,importFiles,openLocalPath,newDocument,adoptHandover,discardAdopted,renderPage,detachPage,closeAll,preferConnection,refreshConnectedSources,openRemotePath,showRemoteFilePicker,get documents(){return documents;},activateDocument,openComparison,closeComparison,get comparison(){return comparison;},get active(){return current();}};
 })(globalThis);

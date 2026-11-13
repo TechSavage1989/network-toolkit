@@ -17,8 +17,9 @@
 .nt-find-tabs button:focus-visible,.nt-find-x:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .nt-find-x{margin-left:auto;align-self:center;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-bottom:3px;border:0;border-radius:5px;background:transparent;color:var(--muted);font-size:17px;line-height:1;cursor:pointer}
 .nt-find-x:hover{background:var(--hover);color:var(--text)}
-.nt-find-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,auto);grid-template-areas:"fields buttons" "options buttons" "mode transparency";gap:8px 12px;padding:10px 12px;overflow:auto;min-height:0;align-items:start}
-.nt-find-fields{grid-area:fields;display:grid;gap:6px;min-width:0}
+.nt-find-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,auto);grid-template-rows:auto auto 1fr;grid-template-areas:"main buttons" "mode buttons" "mode transparency";gap:8px 12px;padding:10px 12px;overflow:auto;min-height:0;align-items:start}
+.nt-find-main{grid-area:main;display:grid;gap:10px;min-width:0}
+.nt-find-fields{display:grid;gap:6px;min-width:0}
 .nt-find-field{display:grid;grid-template-columns:6.8em minmax(0,1fr) auto;align-items:center;gap:6px;min-width:0}
 .nt-find-field>span:first-child,.nt-find-field>label{color:var(--muted);white-space:nowrap}
 .nt-find-input{position:relative;display:block;min-width:0}
@@ -29,7 +30,7 @@
 .nt-find-swap-list{position:absolute;right:0;top:calc(100% + 3px);z-index:2;display:flex;flex-direction:column;gap:2px;min-width:190px;padding:5px;border:1px solid var(--border);border-radius:7px;background:var(--panel);box-shadow:var(--shadow);font-size:11px}
 .nt-find-swap-list button{text-align:left;border:0;border-radius:5px;background:transparent;color:var(--text);padding:6px 8px;font:inherit;cursor:pointer}
 .nt-find-swap-list button:hover,.nt-find-swap-list button:focus{background:var(--hover);outline:0}
-.nt-find-options{grid-area:options;display:grid;grid-template-columns:repeat(2,max-content);gap:3px 16px;min-width:0}
+.nt-find-options{display:grid;grid-template-columns:repeat(2,max-content);gap:3px 16px;min-width:0}
 .nt-find-check{display:flex;align-items:center;gap:6px;white-space:nowrap;min-width:0;cursor:pointer}
 .nt-find-check input{width:14px;height:14px;margin:0;flex:0 0 auto}
 .nt-find-check:has(input:disabled){color:var(--faint);cursor:default}
@@ -53,7 +54,7 @@
 .nt-find-window[data-tab=mark] [data-tabs]:not([data-tabs~=mark]){display:none}
 /* A narrow window (a detached editor at its minimum size). */
 @media(max-width:620px){
- .nt-find-panel{grid-template-columns:minmax(0,1fr);grid-template-areas:"fields" "buttons" "options" "mode" "transparency"}
+ .nt-find-panel{grid-template-columns:minmax(0,1fr);grid-template-areas:"main" "buttons" "mode" "transparency"}
  .nt-find-buttons{flex-flow:row wrap}
  .nt-find-buttons .btn{width:auto;flex:1 1 auto}
  .nt-find-in-selection{flex-basis:100%}
@@ -70,6 +71,9 @@
 .nt-editor-marks{position:absolute;inset:0;width:max-content;min-width:100%;height:auto;min-height:100%;margin:0;padding:10px 12px 20px;border:0;background:transparent;font:inherit;line-height:1.55;letter-spacing:0;tab-size:var(--nt-editor-tab,4);white-space:pre;overflow-wrap:normal;overflow:visible;pointer-events:none;color:transparent}
 .nt-editor-marks.is-wrapped{white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;min-width:0;right:auto;bottom:auto;box-sizing:border-box}
 .nt-editor-marks mark{color:transparent;background:var(--nt-find-mark);border-radius:2px;box-shadow:0 0 0 1px color-mix(in srgb,var(--nt-find-mark) 60%,transparent)}
+/* The match Find Next selected: the selection colour, also while the Find
+   window has the focus. */
+.nt-editor-marks mark.is-current{background:var(--accentBg,color-mix(in srgb,var(--accent) 35%,transparent));box-shadow:0 0 0 1px var(--accent)}
 /* Bookmarks: a dot in the line-number gutter. */
 .nt-editor-gutter .is-bookmarked{position:relative;color:var(--nt-code-fg,var(--text))}
 .nt-editor-gutter .is-bookmarked::after{content:'';position:absolute;left:4px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:var(--nt-find-bookmark);box-shadow:0 0 0 1px color-mix(in srgb,var(--nt-code-bg,var(--input)) 70%,transparent)}
@@ -82,7 +86,7 @@
 .nt-find-results-summary{color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nt-find-results-head .btn{min-height:22px;padding:1px 8px}
 .nt-find-results-head .nt-find-x{margin:0}
-.nt-find-results-scroll{position:relative;flex:1 1 0;min-height:0;overflow:auto;background:var(--nt-code-bg,var(--input));color:var(--nt-code-fg,var(--text));font:12px/20px var(--mono,Consolas,monospace);outline:0}
+.nt-find-results-scroll{position:relative;flex:1 1 0;min-height:0;overflow:auto;tab-size:4;background:var(--nt-code-bg,var(--input));color:var(--nt-code-fg,var(--text));font:12px/20px var(--mono,Consolas,monospace);outline:0}
 .nt-find-results-scroll:focus-visible{box-shadow:inset 0 0 0 2px var(--accent)}
 .nt-find-results-space{width:1px}
 .nt-find-results-rows{position:absolute;inset:0 auto auto 0;min-width:100%}
