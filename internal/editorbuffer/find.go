@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"unicode/utf8"
 )
@@ -419,6 +420,7 @@ func (s *Snapshot) MarkedText(ctx context.Context, marks []MarkSearch, sep strin
 	}
 	var out []byte
 	var count int64
+	read := s.reader(ctx)
 	start, end := int64(-1), int64(-1)
 	flush := func() error {
 		if start < 0 || end <= start {
@@ -431,7 +433,9 @@ func (s *Snapshot) MarkedText(ctx context.Context, marks []MarkSearch, sep strin
 		if int64(len(out))+end-start > most {
 			return ErrTooMuchText
 		}
-		return s.copyBytes(ctx, start, end, func(p []byte) error { out = append(out, p...); return nil })
+		var err error
+		out, err = read.appendBytes(out, start, end)
+		return err
 	}
 	for {
 		var next *source
@@ -511,7 +515,7 @@ func (s *Snapshot) FindAll(ctx context.Context, q Search, from, to int64, add fu
 	if err != nil {
 		return 0, err
 	}
-	track := s.tracker(lo)
+	track, read := s.tracker(lo), s.reader(ctx)
 	type pending struct {
 		line, startByte, startUnits, fromByte, fromUnits int64
 		hits                                             [][2]int64
@@ -522,7 +526,7 @@ func (s *Snapshot) FindAll(ctx context.Context, q Search, from, to int64, add fu
 		if row == nil {
 			return nil
 		}
-		r, err := s.row(ctx, row.line, row.startByte, row.fromByte, row.fromUnits)
+		r, err := s.row(read, row.line, row.startByte, row.fromByte, row.fromUnits)
 		if err != nil {
 			return err
 		}
@@ -562,9 +566,9 @@ func (s *Snapshot) FindAll(ctx context.Context, q Search, from, to int64, add fu
 
 // row reads the text of a row whose first match starts at fromByte on a
 // line that starts at lineByte.
-func (s *Snapshot) row(ctx context.Context, line, lineByte, fromByte, fromUnits int64) (Row, error) {
+func (s *Snapshot) row(read *searchCursor, line, lineByte, fromByte, fromUnits int64) (Row, error) {
 	r := Row{Line: line}
-	before, err := s.readBytes(ctx, max(lineByte, fromByte-4*rowBefore), fromByte)
+	before, err := read.readBytes(max(lineByte, fromByte-4*rowBefore), fromByte)
 	if err != nil {
 		return r, err
 	}
@@ -586,7 +590,7 @@ func (s *Snapshot) row(ctx context.Context, line, lineByte, fromByte, fromUnits 
 	r.CutStart = start > lineByte
 	r.Start = fromUnits - units
 	total := size(s.root).bytes
-	text, err := s.readBytes(ctx, start, min(total, start+4*rowText+4))
+	text, err := read.readBytes(start, min(total, start+4*rowText+4))
 	if err != nil {
 		return r, err
 	}
@@ -615,14 +619,38 @@ func (s *Snapshot) row(ctx context.Context, line, lineByte, fromByte, fromUnits 
 	return r, nil
 }
 
+// reader reads small stretches of a snapshot one after the other, keeping
+// the piece it last read: the rows of a Find All and the stretches of Copy
+// Marked Text are read without fetching a piece again for each of them.
+func (s *Snapshot) reader(ctx context.Context) *searchCursor {
+	return &searchCursor{snapshot: s, ctx: ctx, limit: -1}
+}
+
+// appendBytes adds the document's bytes [from, to) to out.
+func (c *searchCursor) appendBytes(out []byte, from, to int64) ([]byte, error) {
+	for at := from; at < to; {
+		c.at = at
+		part, err := c.current()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return out, err
+		}
+		n := min(int64(len(part)), to-at)
+		out = append(out, part[:n]...)
+		at += n
+	}
+	return out, nil
+}
+
 // readBytes reads the document's bytes [from, to), starting at the first
 // character that begins in it.
-func (s *Snapshot) readBytes(ctx context.Context, from, to int64) ([]byte, error) {
+func (c *searchCursor) readBytes(from, to int64) ([]byte, error) {
 	if to <= from {
 		return nil, nil
 	}
-	var out []byte
-	err := s.copyBytes(ctx, from, to, func(p []byte) error { out = append(out, p...); return nil })
+	out, err := c.appendBytes(nil, from, to)
 	for len(out) > 0 && !utf8.RuneStart(out[0]) {
 		out = out[1:]
 	}
