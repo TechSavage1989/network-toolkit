@@ -67,6 +67,18 @@ async function verifyLongLineWrap(page,editor){
  assert.ok(wheel.slides>10,'the page slid along the line');
  await page.screenshot({path:path.join(out,'editor-long-line-wrap-end.png')});
 
+ // A paint that runs between a move of the bar and the bar's scroll event
+ // must not move the bar back (CI lost a track click that way). Move the bar
+ // as a click would and paint in the same task (restore paints after its
+ // first await, before the scroll event): the view must still follow the bar.
+ await page.evaluate(()=>{
+  const el=document.querySelector('.nt-editor-disk-scroll');
+  el.scrollTop=(el.scrollHeight-el.clientHeight)/2;
+  void view.restore(view.capture());
+ });
+ await page.waitForFunction(units=>Math.abs(view.capture().offset-units/2)<units/8,units,{timeout:10000})
+  .catch(async()=>{throw Error('a paint undid a move of the document bar: '+JSON.stringify(await state()));});
+
  // The bar: Home, a click on the track, and a drag to the end.
  await bar.press('Home');
  await page.waitForFunction(()=>view.capture().offset===0&&session.state().page.start===0);

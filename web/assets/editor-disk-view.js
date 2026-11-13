@@ -115,6 +115,27 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
  let wrapped = false, wrapStyle = '', measure, measured, wrapGeometry, gutterGeometry;
  let wrapFrame = 0, wrapRead;
  let verticalFrame = 0, horizontalFrame = 0;
+ // Where the view last put each bar. A bar that is elsewhere was moved by the
+ // user (a click on the track, a drag) and its scroll event is still on its
+ // way: painting must not move it back, or the user's move is lost (CI caught
+ // a track click undone by a paint that ran before the bar's scroll event).
+ let barSet = 0, barLeftSet = 0;
+ const barMoved = () => Math.abs(vertical.scrollTop - barSet) > 1;
+ const barLeftMoved = () => Math.abs(horizontal.scrollLeft - barLeftSet) > 1;
+ // A bar that is or was just hidden has no position the user chose (the
+ // browser may reset it while hidden): take it as the view's own.
+ function showBar(bar, hidden) {
+  const was = bar.hidden;
+  bar.hidden = hidden;
+  if (was || hidden) {
+   if (bar === vertical) barSet = vertical.scrollTop;
+   else barLeftSet = horizontal.scrollLeft;
+  }
+ }
+ function placeBar(moved) {
+  if (!verticalFrame && !moved && Math.abs(vertical.scrollTop - barTop) > 1) vertical.scrollTop = barTop;
+  if (!moved) barSet = vertical.scrollTop;
+ }
  // A pointer selection in progress: its anchor may leave the page while the
  // page slides under the pointer.
  let drag = null, pressed = null, clicks = 0;
@@ -638,15 +659,15 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   else {
    flowView = null;
    const scrollLines = alignment?.rows || lines, scrollTop = projected?.row ?? top;
-   vertical.hidden = scrollLines <= clientRows;
-   const lastTop = Math.max(1, scrollLines - clientRows);
+   showBar(vertical, scrollLines <= clientRows);
+   const lastTop = Math.max(1, scrollLines - clientRows), moved = barMoved();
    barTop = clamp(scrollTop / lastTop, 0, 1) * thumb(vertical, clientRows / scrollLines);
-   if (!verticalFrame && Math.abs(vertical.scrollTop - barTop) > 1) vertical.scrollTop = barTop;
+   placeBar(moved);
    scrollbarValue(vertical, scrollLines, scrollTop + 1);
   }
   // With word wrap the vertical bar covers long lines too.
   const longLine = page.lineUnits > pageUnits && !flow;
-  horizontal.hidden = !longLine;
+  showBar(horizontal, !longLine);
   horizontal.setAttribute('aria-label', wrapped ? 'Section of long source line' : 'Position in long line');
   container.classList.toggle('nt-editor-disk-long-line', longLine);
   if (longLine) {
@@ -654,9 +675,10 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    horizontal.style.left = surface.offsetLeft + 'px';
    horizontal.style.width = surface.offsetWidth + 'px';
    const column = page.column + textarea.scrollLeft / characterWidth;
-   const lastColumn = Math.max(1, page.lineUnits - (wrapped ? 1 : clientColumns));
+   const lastColumn = Math.max(1, page.lineUnits - (wrapped ? 1 : clientColumns)), moved = barLeftMoved();
    barLeft = clamp(column / lastColumn, 0, 1) * thumb(horizontal, wrapped ? 1 / page.lineUnits : clientColumns / page.lineUnits);
-   if (!horizontalFrame && Math.abs(horizontal.scrollLeft - barLeft) > 1) horizontal.scrollLeft = barLeft;
+   if (!horizontalFrame && !moved && Math.abs(horizontal.scrollLeft - barLeft) > 1) horizontal.scrollLeft = barLeft;
+   if (!moved) barLeftSet = horizontal.scrollLeft;
    scrollbarValue(horizontal, page.lineUnits + 1, Math.floor(column) + 1);
   }
   if (!flow && page.start + page.text.length < units) {
@@ -727,7 +749,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   const end = page.start + page.text.length, whole = page.start === 0 && end >= units;
   const range = Math.max(0, textarea.scrollHeight - textarea.clientHeight);
   const view = flowView = flowPosition();
-  vertical.hidden = whole && range <= 1;
+  showBar(vertical, whole && range <= 1);
   let position, share;
   if (whole) {
    position = range ? textarea.scrollTop / range : 0;
@@ -739,8 +761,9 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    const rows = lines + Math.max(0, units - lines + 1) / wrapGrid();
    share = Math.min(1, viewHeight() / rowHeight / Math.max(1, rows));
   }
+  const moved = barMoved();
   barTop = position * thumb(vertical, share);
-  if (!verticalFrame && Math.abs(vertical.scrollTop - barTop) > 1) vertical.scrollTop = barTop;
+  placeBar(moved);
   const percent = Math.round(position * 1000) / 10;
   scrollbarValue(vertical, 100, percent, 'Line ' + (top + 1).toLocaleString() + ' of ' + lines.toLocaleString() + ', ' + percent + '%', 0);
  }
@@ -1711,10 +1734,11 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
  textarea.addEventListener('wheel', wheel, {...listeners, passive: false});
 
  vertical.addEventListener('scroll', () => {
-  if (Math.abs(vertical.scrollTop - barTop) <= 1 || verticalFrame) return;
+  if (!barMoved() || verticalFrame) return;
   verticalFrame = root.requestAnimationFrame(() => {
    verticalFrame = 0;
-   if (disposed || Math.abs(vertical.scrollTop - barTop) <= 1) return;
+   if (disposed || !barMoved()) return;
+   barSet = vertical.scrollTop;
    const position = clamp(vertical.scrollTop / Math.max(1, vertical.scrollHeight - vertical.clientHeight), 0, 1);
    if (flowing()) {
     const {units} = session.state().metadata;
@@ -1756,10 +1780,11 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   run(alignment ? goAlignedRow(targets[event.key]) : goLine(targets[event.key]));
  }, listeners);
  horizontal.addEventListener('scroll', () => {
-  if (Math.abs(horizontal.scrollLeft - barLeft) <= 1 || horizontalFrame) return;
+  if (!barLeftMoved() || horizontalFrame) return;
   horizontalFrame = root.requestAnimationFrame(() => {
    horizontalFrame = 0;
-   if (disposed || Math.abs(horizontal.scrollLeft - barLeft) <= 1) return;
+   if (disposed || !barLeftMoved()) return;
+   barLeftSet = horizontal.scrollLeft;
    const last = Math.max(0, page.lineUnits - (wrapped ? 1 : clientColumns));
    run(panLongLine(Math.round(horizontal.scrollLeft / Math.max(1, horizontal.scrollWidth - horizontal.clientWidth) * last)));
   });
