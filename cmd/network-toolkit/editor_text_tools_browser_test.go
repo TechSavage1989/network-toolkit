@@ -57,7 +57,7 @@ func TestEditorSessionBrowserTextTools(t *testing.T) {
 	}
 	small, _ := sonicwallFixture(2)
 	contents := map[string]string{
-		"firewall.exp":     export,
+		"firewall.exp":     export + "&&", // a real export ends with "&&"
 		"branch.exp":       small,
 		"large.b64":        encoded,
 		"settings.txt":     "a=1&b=2&c=3",

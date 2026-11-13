@@ -221,7 +221,7 @@ func TestEditorSonicWallReadableCopy(t *testing.T) {
 	a, m, _ := editorFixture(t)
 	export, readable := sonicwallFixture(9000)
 	path := filepath.Join(t.TempDir(), "firewall.exp")
-	os.WriteFile(path, []byte(export), 0600)
+	os.WriteFile(path, []byte(export+"&&"), 0600) // a real export ends with "&&"
 	lease, status, code := openAnyFile(t, a, path)
 	if code != 200 {
 		t.Fatal(code)
@@ -275,7 +275,7 @@ func TestEditorSonicWallReadableCopy(t *testing.T) {
 	if w := windowText(t, a, editorFixtureUID, lease, 0, 64); w.Revision != status.Metadata.Revision || w.Dirty || w.Text != export[:64] {
 		t.Fatal("the export changed")
 	}
-	if raw, _ := os.ReadFile(path); string(raw) != export {
+	if raw, _ := os.ReadFile(path); string(raw) != export+"&&" {
 		t.Fatal("the export changed on disk")
 	}
 }
