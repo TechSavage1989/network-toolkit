@@ -2,16 +2,19 @@
 // Driven by TestEditorSessionBrowserTextTools (editor_text_tools_browser_test.go):
 // the shipped page of the standalone Text Editor against its production
 // engine, through the Tools menu (owner request v1.21.53).
-//  1. The Tools button opens the tool groups; each item shows a description,
-//     the same as its tooltip, and its shortcut.
+//  1. The Tools button opens the tool groups (Lines, Encode / decode,
+//     Format); each item shows a description, the same as its tooltip, in at
+//     most two lines, and its shortcut.
 //  2. Split at text on page-held text: & becomes a line break; Undo.
 //  3. The Find bar's Extended mode: Replace all & with \n; Undo. Regular
 //     expression mode: $2=$1. Both on page-held and disk-backed text.
 //  4. Base64 decode of a whole 1.7 MB single-line disk-backed document with
 //     nothing selected (Ctrl+Shift+B); Undo.
-//  5. A 1.5 MB SonicWall export offers its readable copy; Make readable opens
-//     a new tab with every setting and leaves the export unchanged. Another
-//     export's offer can be dismissed.
+//  5. The editor guide's recipe for a one-line encoded settings file, on a
+//     synthetic 1.5 MB file: Base64 decode stops at the "&&" after the Base64
+//     and changes nothing; its bar's one button, Decode the part before it,
+//     decodes up to there; Split at text &; URL decode; Undo of each step. The
+//     same on page-held text with a selection.
 // The Go test then checks the files on disk. Screenshots (light and dark, at
 // device scale 1) go to TOOLKIT_TEST_OUTPUT when it is set.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
@@ -52,9 +55,16 @@ const file=name=>path.join(files,name);
   await menu.waitFor({state:'visible'});
   assert.equal(await tools.getAttribute('aria-expanded'),'true');
   const groups=await menu.locator('.nt-editor-menu-root [data-editor-submenu]').evaluateAll(list=>list.map(el=>[el.querySelector('.nt-editor-menu-label').textContent,el.title,el.querySelector('small').textContent]));
-  assert.deepEqual(groups.map(g=>g[0]),['Lines','Encode / decode','Format','Device configs']);
+  assert.deepEqual(groups.map(g=>g[0]),['Lines','Encode / decode','Format']);
   for(const [label,title,shown] of groups)assert(title&&title===shown,label+' shows its description, also as its tooltip');
-  await menu.locator('[data-editor-submenu="tools-lines"]').click();
+  // No description wraps beyond two lines, in the groups or their items.
+  const lineCount=()=>menu.locator('small').evaluateAll(list=>list.filter(el=>el.offsetParent).map(el=>[el.closest('[data-editor-menu-action],[data-editor-submenu]')?.querySelector('.nt-editor-menu-label')?.textContent,Math.round(el.getBoundingClientRect().height/parseFloat(getComputedStyle(el).lineHeight))]));
+  for(const group of ['tools-encode','tools-format','tools-lines']){
+   await menu.locator('[data-editor-submenu="'+group+'"]').click();
+   await menu.locator('[data-editor-submenu-panel="'+group+'"]').waitFor({state:'visible'});
+   for(const [label,count] of await lineCount())assert(count>=1&&count<=2,label+' takes '+count+' lines in the menu');
+   await shoot('editor-'+group+'.png');
+  }
   const lines=menu.locator('[data-editor-submenu-panel="tools-lines"]');
   await lines.waitFor({state:'visible'});
   const items=await lines.locator('[data-editor-menu-action]').evaluateAll(list=>list.map(el=>({action:el.dataset.editorMenuAction,title:el.title,shown:el.querySelector('small')?.textContent,kbd:el.querySelector('kbd')?.textContent||''})));
@@ -176,40 +186,100 @@ const file=name=>path.join(files,name);
    await page.waitForFunction(()=>!NetworkToolkitFileEditor.active.dirty,null,{timeout:30000});
   }
 
-  // 5. The SonicWall export: the offer, and its readable copy in a new tab.
-  const readable=fs.readFileSync(file('expected.txt'),'utf8');
-  await open('firewall.exp');
-  const exportTab=await active();
-  assert.equal(exportTab.disk,true);
-  const offer=page.locator('[data-ed-tool-bar="offer"]');
-  await offer.waitFor({state:'visible'});
-  assert.equal(await offer.locator('.nt-editor-insert-text').textContent(),'This looks like a SonicWall settings export.');
-  assert.match(await offer.locator('[data-ed-tool-offer="readable"]').getAttribute('title'),/new tab/);
-  await shoot('editor-sonicwall-offer.png');
-  await offer.locator('[data-ed-tool-offer="readable"]').click();
-  await page.waitForFunction(()=>/^Opened a readable copy of firewall\.exp: /.test(document.querySelector('[data-ed-message]').textContent),null,{timeout:60000});
+  // 5. The guide's recipe for a one-line encoded settings file (synthetic
+  // key=value& settings with %XX escapes as Base64, followed by "&&"; 1.5 MB,
+  // so disk-backed): Base64 decode stops at the "&&" and changes nothing;
+  // Decode the part before it; Split at text &; URL decode; Undo.
+  const encodedFile=fs.readFileSync(file('settings.b64'),'utf8');
+  const decoded=Buffer.from(encodedFile.slice(0,-2),'base64').toString('utf8')+'&&';
+  const readable=fs.readFileSync(file('expected-readable.txt'),'utf8');
+  await open('settings.b64');
+  const encodedTab=await active();
+  assert.equal(encodedTab.disk,true,'a 1.5 MB file is disk-backed');
+  await text().focus();await page.keyboard.press('Control+Home');
+  await page.keyboard.press('Control+Shift+B');
+  const partBar=page.locator('[data-ed-tool-bar="partial"]');
+  await partBar.waitFor({state:'visible',timeout:60000});
+  const stopped="'&' is not a Base64 character. (line 1, column "+(encodedFile.length-1)+') Nothing was changed.';
+  assert.equal(await message(),stopped,'the message names the character, its line and column');
+  assert.equal(await partBar.locator('[data-ed-tool-partial-text]').textContent(),stopped);
+  assert.equal(await partBar.locator('button').count(),1,'the bar offers one button');
+  const decodeBefore=partBar.locator('[data-ed-tool-partial]');
+  assert.equal(await decodeBefore.textContent(),'Decode the part before it');
+  assert.equal(await decodeBefore.getAttribute('title'),'Decodes the whole document from its start up to line 1, column '+(encodedFile.length-1)+'. That character and everything after it stay as they are; Undo (Ctrl+Z) takes it back.');
+  shown=await active();
+  assert.deepEqual([shown.revision,shown.dirty,shown.units],[encodedTab.revision,false,encodedFile.length],'Base64 decode changed nothing');
+  await shoot('editor-decode-part-before.png');
+  await decodeBefore.click();
+  await page.waitForFunction(()=>/^Decoded the part before line 1, column \d+ from Base64; the text from there on is unchanged\. Undo \(Ctrl\+Z\) takes it back\.$/.test(document.querySelector('[data-ed-message]').textContent),null,{timeout:60000});
+  await settled();
+  assert.equal(await partBar.count(),0,'the bar is gone');
+  shown=await active();
+  assert.equal(shown.dirty,true);
+  assert.equal(await diskText(shown.units),decoded,'the Base64 is decoded and the "&&" after it is unchanged');
+  // Split at text & (Tools → Lines), with the dialog's own default. The
+  // decoded part is still selected, so the next steps work on it and the
+  // "&&" after it stays as it is.
+  assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.textMenu.state().selection),true,'the decoded part is selected');
+  await tools.click();await menu.waitFor({state:'visible'});
+  await menu.locator('[data-editor-submenu="tools-lines"]').click();
+  await lines.locator('[data-editor-menu-action="split"]').click();
+  await dialog.waitFor({state:'visible'});
+  assert.equal(await dialog.locator('[data-ed-dialog-input]').inputValue(),'&');
+  await dialog.locator('[data-ed-dialog-action="accept"]').click();
+  await page.waitForFunction(()=>/^Split the selection at [\d,.]+ place\(s\)\./.test(document.querySelector('[data-ed-message]').textContent),null,{timeout:60000});
+  await settled();
+  const split=await diskText((await active()).units);
+  assert.equal(split,decoded.slice(0,-2).replaceAll('&','\n')+'&&','one setting per line');
+  // URL decode (Tools → Encode / decode).
+  await tools.click();await menu.waitFor({state:'visible'});
+  await menu.locator('[data-editor-submenu="tools-encode"]').click();
+  await menu.locator('[data-editor-submenu-panel="tools-encode"] [data-editor-menu-action="url-decode"]').click();
+  await page.waitForFunction(()=>/^Decoded [\d,.]+ URL escape\(s\) in the selection\./.test(document.querySelector('[data-ed-message]').textContent),null,{timeout:60000});
   await settled();
   shown=await active();
-  assert.deepEqual([shown.name,shown.untitled,shown.disk,shown.dirty],['firewall (readable).txt',true,true,true]);
-  assert.equal(shown.units,readable.length);
-  assert.equal(await diskText(shown.units),readable,'every setting, one per line, in order');
-  assert.match(await message(),new RegExp('Opened a readable copy of firewall\\.exp: '+(readable.split('\n').length-1).toLocaleString('en-US').replace(/,/g,'.?')+' settings'));
-  await shoot('editor-sonicwall-readable.png');
-  assert.equal(await page.locator('[data-ed-tool-bar="offer"]').count(),0,'no offer on the readable copy');
-  // The export tab is unchanged and offers nothing more.
-  await page.locator('[data-ed-open]').filter({hasText:'firewall.exp'}).click();
-  await settled();
-  const after=await active();
-  assert.deepEqual([after.name,after.dirty,after.revision],['firewall.exp',false,exportTab.revision]);
-  assert.equal(await page.locator('[data-ed-tool-bar="offer"]').count(),0);
-  // Another export: Dismiss hides the offer for that tab.
-  await open('branch.exp');
-  await offer.waitFor({state:'visible'});
-  await offer.locator('[data-ed-tool-offer="dismiss"]').click();
-  assert.equal(await page.locator('[data-ed-tool-bar="offer"]').count(),0);
+  assert.equal(await diskText(shown.units),readable,'every setting readable, one per line, in order');
+  await shoot('editor-recipe-readable.png');
+  // Undo takes back each step: URL decode, the split, the partial decode.
+  for(const [step,want] of [['URL decode',split],['Split at text',decoded],['Decode the part before it',encodedFile]]){
+   const units=want.length;
+   await text().focus();await page.keyboard.press('Control+z');
+   await page.waitForFunction(units=>NetworkToolkitFileEditor.active.diskMeta.units===units&&!NetworkToolkitFileEditor.active.diskSession?.pending,units,{timeout:30000});
+   assert.equal(await diskText(units),want,'Undo of '+step);
+  }
+  assert.equal((await active()).dirty,false,'back to the file as it was read');
+
+  // The same on page-held text, with a selection: Decode the part before it
+  // decodes from the start of the selection; the rest stays as it is.
+  const small=fs.readFileSync(file('small.b64'),'utf8');
+  await open('small.b64');
+  assert.equal((await active()).disk,false,'a small file is page-held');
+  await text().focus();
+  await text().evaluate((el,end)=>el.setSelectionRange(0,end),small.length-1);
+  await page.keyboard.press('Control+Shift+B');
+  await partBar.waitFor({state:'visible'});
+  assert.equal(await message(),"'&' is not a Base64 character. (line 1, column "+(small.length-1)+') Nothing was changed.');
+  assert.match(await decodeBefore.getAttribute('title'),/^Decodes the selection from its start up to line 1, column \d+\./);
+  assert.equal((await active()).content,small,'nothing changed');
+  // Another tab takes the offer away; it is not shown again.
   await page.locator('[data-ed-open]').filter({hasText:'settings.txt'}).click();
-  await page.locator('[data-ed-open]').filter({hasText:'branch.exp'}).click();
-  assert.equal(await page.locator('[data-ed-tool-bar="offer"]').count(),0,'a dismissed offer stays dismissed');
+  assert.equal(await partBar.count(),0);
+  await page.locator('[data-ed-open]').filter({hasText:'small.b64'}).click();
+  assert.equal(await partBar.count(),0,'the offer belongs to the moment the decoder stopped');
+  await text().focus();
+  await text().evaluate((el,end)=>el.setSelectionRange(0,end),small.length-1);
+  await page.keyboard.press('Control+Shift+B');
+  await partBar.waitFor({state:'visible'});
+  await decodeBefore.click();
+  await page.waitForFunction(want=>NetworkToolkitFileEditor.active.content===want,fs.readFileSync(file('expected-small.txt'),'utf8'));
+  assert.match(await message(),/^Decoded the part before line 1, column \d+ from Base64; the text from there on is unchanged\./);
+  await text().focus();await page.keyboard.press('Control+z');
+  await page.waitForFunction(want=>NetworkToolkitFileEditor.active.content===want,small);
+  // With nothing before the problem, nothing is offered.
+  await text().evaluate(el=>el.setSelectionRange(el.value.length-2,el.value.length));
+  await page.keyboard.press('Control+Shift+B');
+  await page.waitForFunction(()=>/^'&' is not a Base64 character\./.test(document.querySelector('[data-ed-message]').textContent));
+  assert.equal(await partBar.count(),0,'nothing to decode before it, so no offer');
 
   // The command palette lists the tools of the editor.
   await page.keyboard.press('Control+Shift+P');

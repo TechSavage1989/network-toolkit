@@ -15,8 +15,10 @@ test('every tool has a group, a label, a description and a message; shortcuts ar
   // Short enough for two lines in the menu (the browser check measures them).
   assert(tool.label&&tool.description&&tool.description.length<=130,tool.id+' needs a label and a short description');
   if(tool.engine)assert(tool.done&&tool.same,tool.id+' needs its messages');
-  // Every engine tool shows what it does with a tiny example.
-  if(tool.engine)assert(tool.description.includes('→'),tool.id+' needs an example in its description');
+  // Every engine tool shows what it does with a tiny example, which the
+  // list marks with backticks: shown without them and never broken in two.
+  if(tool.engine)assert(/\S\u00a0→\u00a0\S/.test(tool.description),tool.id+' needs an example in its description');
+  assert(!tool.description.includes('`'),tool.id+' shows a backtick');
   if(tool.shortcut){assert(!shortcuts.has(tool.shortcut),tool.shortcut+' twice');shortcuts.add(tool.shortcut);}
  }
  for(const group of tools.GROUPS)assert(tools.TOOLS.some(tool=>tool.group===group.id),group.id+' is empty');

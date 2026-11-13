@@ -56,7 +56,7 @@ func TestEditorTextToolsForPageHeldText(t *testing.T) {
 // settingsLine is a fictional one-line settings file: key=value& settings
 // with %XX escapes as one line of Base64, the kind the editor guide's recipe
 // makes readable (Base64 decode, Split at text &, URL decode). readable is
-// the recipe's result for the Base64 followed by "&&".
+// what the recipe makes of plain: one setting per line, values decoded.
 func settingsLine(settings int) (encoded, plain, readable string) {
 	var pairs, lines strings.Builder
 	add := func(key, value, shown string) {
@@ -69,8 +69,7 @@ func settingsLine(settings int) (encoded, plain, readable string) {
 		add(fmt.Sprintf("note_%d", i), "a+b%3Ac%20d", "a+b:c d")
 		add(fmt.Sprintf("site_%d", i), "www.example.com%2Fpath", "www.example.com/path")
 	}
-	// The "&&" after the Base64 become two more empty lines.
-	return base64.StdEncoding.EncodeToString([]byte(pairs.String())), pairs.String(), lines.String() + "\n\n"
+	return base64.StdEncoding.EncodeToString([]byte(pairs.String())), pairs.String(), lines.String()
 }
 
 // waitTool polls a text tool until it ends.

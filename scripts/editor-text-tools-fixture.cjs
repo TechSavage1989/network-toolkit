@@ -14,7 +14,16 @@ const tools={
  'hex-encode':text=>Buffer.from(text,'utf8').toString('hex'),
  'hex-decode':text=>Buffer.from(text.replace(/[\s:,-]/g,''),'hex').toString('utf8')
 };
+// Base64 decode stops at a character that is not Base64, as the engine does:
+// nothing changes, and with Base64 before it the answer offers that part
+// ("partial", Decode the part before it).
+function base64Stop(text){
+ const at=text.search(/[^A-Za-z0-9+/=_\s-]/);
+ if(at<0)return null;
+ return {ok:false,error:"'"+text[at]+"' is not a Base64 character.",offset:at,partial:/[A-Za-z0-9+/_-]/.test(text.slice(0,at))};
+}
 function runTool(body){
+ if(body.tool==='base64-decode'&&base64Stop(body.text))return base64Stop(body.text);
  const fn=tools[body.tool];
  if(!fn)return {ok:false,error:'This text tool is not available in the synthetic fixture.'};
  const text=fn(body.text);

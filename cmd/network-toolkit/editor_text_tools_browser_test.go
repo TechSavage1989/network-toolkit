@@ -37,7 +37,7 @@ func TestEditorSessionBrowserTextTools(t *testing.T) {
 	root := t.TempDir()
 	a := sharedTestApp(t, root, standaloneEditorDirectory, standaloneEditorMode)
 	files := t.TempDir()
-	encodedSettings, _, readable := settingsLine(10000)
+	encodedSettings, _, readable := settingsLine(11000)
 	if len(encodedSettings) < 1500000 {
 		t.Fatalf("the settings fixture is only %d bytes", len(encodedSettings))
 	}
@@ -67,7 +67,9 @@ func TestEditorSessionBrowserTextTools(t *testing.T) {
 		"replace.txt":           "host=a&port=22&user=admin",
 		"pairs.txt":             pairs.String(),
 		"hosts.txt":             hosts.String(),
-		"expected-readable.txt": readable,
+		// After Decode the part before it, each step works on the text the
+		// step before selected: the "&&" after the Base64 stays as it is.
+		"expected-readable.txt": readable + "&&",
 		"expected-small.txt":    smallPlain + "&&",
 		"expected-b64.txt":      plain.String(),
 	}

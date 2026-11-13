@@ -235,8 +235,8 @@ async function standaloneTerminal(){
  // The editing actions this editor always had stay reachable by mouse
  // (Toggle comment, Duplicate, Format document, case, trim, sort and the
  // hex and Base64 conversions), in the Tools menu and the right-click menu.
- // The Text Editor's other text tools, their new shortcuts and the
- // SonicWall offer stay in the Text Editor.
+ // The Text Editor's other text tools and their new shortcuts stay in the
+ // Text Editor.
  const terminalTools={'tools-lines':['comment','duplicate','sort-asc','trim-trailing'],'tools-encode':['base64-decode','base64-encode','hex-decode','hex-encode'],'tools-format':['format','upper','lower']};
  const listed=async()=>{const out={};for(const group of await page.locator('#editorContextMenu .nt-editor-menu-root [data-editor-submenu]').evaluateAll(list=>list.map(el=>el.dataset.editorSubmenu)))out[group]=await page.locator('#editorContextMenu [data-editor-submenu-panel="'+group+'"] [data-editor-menu-action]').evaluateAll(list=>list.map(el=>el.dataset.editorMenuAction));return out;};
  assert.equal(await floating.locator('[data-ed="tools"]').isVisible(),true,'the Tools button is there');
@@ -251,6 +251,19 @@ async function standaloneTerminal(){
  await floating.locator('[data-ed-text]').focus();await page.keyboard.press('Control+Shift+L');await page.waitForTimeout(200);
  assert.equal(await page.locator('.nt-editor-dialog').count(),0,'no new tool shortcut in the Terminal');
  assert.equal(await page.evaluate(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value),'hostname lab-switch-01\n');
+ // Base64 decode keeps its Decode the part before it here: Base64 followed
+ // by text that is not Base64 decodes up to that text, one undo step.
+ await floating.locator('[data-ed-text]').fill('aGk=&&');
+ await floating.locator('[data-ed="tools"]').click();await page.locator('#editorContextMenu').waitFor();
+ await page.locator('#editorContextMenu [data-editor-submenu="tools-encode"]').hover();await page.locator('#editorContextMenu [data-editor-submenu-panel="tools-encode"] [data-editor-menu-action="base64-decode"]').click();
+ const partBar=floating.locator('[data-ed-tool-bar="partial"]');await partBar.waitFor();
+ assert.equal(await page.evaluate(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value),'aGk=&&','Base64 decode changed nothing');
+ await partBar.locator('[data-ed-tool-partial]').click();
+ await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='hi&&');
+ await floating.locator('[data-ed-text]').focus();await page.keyboard.press('Control+z');
+ await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='aGk=&&');
+ await page.keyboard.press('Control+z');
+ await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='hostname lab-switch-01\n');
  await shot('terminal-floating-editor');await floating.locator('[data-ed="close"]').click();
  pass('Terminal: the tab menu, the SFTP sidebar and the floating editor offer nothing that needs another Toolkit tool');
  // FTP/FTPS connections saved for the Toolkit's File Transfer tool are not listed in this app.
