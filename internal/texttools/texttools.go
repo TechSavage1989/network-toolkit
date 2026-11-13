@@ -71,6 +71,32 @@ type Env struct {
 	Dir string
 	// Progress, when set, receives how much of the work is done (0 to 1).
 	Progress func(float64)
+	// MaxOutput, when set, bounds the result in bytes (page-held text, whose
+	// result the engine holds in memory and sends to the page).
+	MaxOutput int64
+}
+
+// ErrTooLarge stops a tool whose result would pass Env.MaxOutput.
+var ErrTooLarge = errors.New("The result would be too large to send to the page, so the tool stopped.")
+
+// boundedEdits stops a tool whose result passes a size.
+type boundedEdits struct {
+	Edits
+	max, size int64
+}
+
+func (b *boundedEdits) Keep(n int64) error {
+	if b.size += n; b.size > b.max {
+		return ErrTooLarge
+	}
+	return b.Edits.Keep(n)
+}
+
+func (b *boundedEdits) Insert(p []byte) error {
+	if b.size += int64(len(p)); b.size > b.max {
+		return ErrTooLarge
+	}
+	return b.Edits.Insert(p)
 }
 
 // Tool describes one tool for the registry.
@@ -141,15 +167,18 @@ func Run(ctx context.Context, id string, opts Options, src Source, out Edits, en
 	}
 	j := &job{ctx: ctx, opts: opts, src: src, env: env, size: src.Size()}
 	j.in = newReader(ctx, r, j.progress)
+	if env.MaxOutput > 0 {
+		out = &boundedEdits{Edits: out, max: env.MaxOutput}
+	}
 	if tool.Rewrite {
 		compare, err := src.Open()
 		if err != nil {
 			return Result{}, err
 		}
 		j.rewrite = &rewriter{edits: out, same: bufio.NewReaderSize(compare, 32<<10), size: j.size}
-		j.out = &emitter{out: j.rewrite}
+		j.out = &emitter{ctx: ctx, out: j.rewrite}
 	} else {
-		j.out = &emitter{out: out}
+		j.out = &emitter{ctx: ctx, out: out}
 	}
 	if err = tool.run(j); err != nil {
 		return Result{}, err
@@ -232,6 +261,9 @@ func (j *job) indent() int {
 // and the drops and insertions between two kept runs become one Drop and one
 // Insert (dropping and inserting at the same place commute).
 type emitter struct {
+	// ctx is asked for every block of new text: a tool that writes much
+	// more than it reads stops promptly when cancelled.
+	ctx     context.Context
 	out     Edits
 	keep    int64
 	drop    int64
@@ -299,6 +331,11 @@ func (e *emitter) flushChange() error {
 		}
 	}
 	if len(e.insert) > 0 {
+		if e.ctx != nil {
+			if err := e.ctx.Err(); err != nil {
+				return err
+			}
+		}
 		p := e.insert
 		e.insert = e.insert[:0]
 		if err := e.out.Insert(p); err != nil {

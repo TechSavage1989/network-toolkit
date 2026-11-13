@@ -222,6 +222,10 @@ func (d *editorDiskDocument) toolStatus(req editorDiskRequest, cancel bool) (any
 	return job.state(), nil
 }
 
+// pageToolOutputAllowance is part of the bound on the result of a tool over
+// page-held text (handleTextTools).
+const pageToolOutputAllowance = 32 << 20
+
 // detectPrefix is how much of a document's start is read to recognise it.
 const detectPrefix = 4096
 
@@ -336,7 +340,11 @@ func (m *editorViewRegistry) handleTextTools(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	out := &texttools.Output{In: []byte(req.Text)}
-	result, err := texttools.Run(r.Context(), req.Tool, req.Options, texttools.BytesSource(out.In), out, texttools.Env{})
+	// The result is held here and sent to the page, so it is bounded: four
+	// times the text sent plus the page's own document size (32 MiB,
+	// EDITOR_DOCUMENT_BYTES in file-editor.js). Ordinary tools stay far below;
+	// a crafted input that would blow up stops instead of filling memory.
+	result, err := texttools.Run(r.Context(), req.Tool, req.Options, texttools.BytesSource(out.In), out, texttools.Env{MaxOutput: 4*int64(len(out.In)) + pageToolOutputAllowance})
 	if err == nil && result.Changed {
 		err = out.Done()
 	}

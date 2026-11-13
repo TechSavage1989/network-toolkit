@@ -10,6 +10,22 @@ import (
 // Pretty-print and minify JSON and XML. Both read their input once, check
 // that it is well formed and copy every string, number, tag, comment and
 // text exactly as written: only the white space between them changes.
+//
+// Pretty-printing writes one indent for every level on every line, so a
+// small input that nests deeply would give an output that grows with the
+// square of its depth (8 KB of brackets, 64 MB of indents). Two bounds keep
+// it in proportion: nesting deeper than maxDepth is refused, and a result
+// more than maxGrowth times its input (plus growthAllowance) stops the tool.
+// Both change nothing. The writer asks the context whether to stop for
+// every block it writes, so Cancel and closing a tab stop it promptly
+// however little input is left.
+
+// maxDepth is the deepest nesting the formatters take.
+const maxDepth = 512
+
+// maxGrowth and growthAllowance bound a pretty-printed result: at most
+// maxGrowth times its input plus growthAllowance bytes.
+var maxGrowth, growthAllowance int64 = 64, 64 << 20
 
 func init() {
 	register(&Tool{ID: "json-pretty", Rewrite: true, run: func(j *job) error { return formatJSON(j, true) }})
@@ -22,6 +38,8 @@ func init() {
 type writer struct {
 	j   *job
 	buf []byte
+	// written counts what was passed on; limit, when set, bounds it.
+	written, limit int64
 }
 
 func (w *writer) byte(c byte) error {
@@ -44,9 +62,22 @@ func (w *writer) flush() error {
 	if len(w.buf) == 0 {
 		return nil
 	}
+	if err := w.j.ctx.Err(); err != nil {
+		return err
+	}
+	w.written += int64(len(w.buf))
+	if w.limit > 0 && w.written > w.limit {
+		return fmt.Errorf("Pretty-printing would make this text more than %d times larger, so it was not formatted.", maxGrowth)
+	}
 	err := w.j.out.Insert(w.buf)
 	w.buf = w.buf[:0]
 	return err
+}
+
+// grows bounds a pretty-printed result (see maxGrowth).
+func (w *writer) grows() *writer {
+	w.limit = maxGrowth*w.j.size + growthAllowance
+	return w
 }
 
 func (j *job) indentUnit() []byte {
@@ -246,6 +277,9 @@ func (s *jsonScan) number(first byte, at int64) error {
 
 func formatJSON(j *job, pretty bool) error {
 	s := &jsonScan{j: j, w: &writer{j: j}}
+	if pretty {
+		s.w.grows()
+	}
 	unit := j.indentUnit()
 	var stack []byte
 	const (
@@ -289,6 +323,9 @@ func formatJSON(j *job, pretty bool) error {
 					}
 					mode = after
 					continue
+				}
+				if len(stack) >= maxDepth {
+					return s.fail(at, "The JSON nests deeper than %d levels, more than the formatter takes.", maxDepth)
 				}
 				if err = s.w.byte(c); err != nil {
 					return err
@@ -527,6 +564,9 @@ func (x *xmlFormat) tag(at int64) (name string, empty bool, err error) {
 
 func formatXML(j *job, pretty bool) error {
 	x := &xmlFormat{j: j, w: &writer{j: j}, pretty: pretty, unit: j.indentUnit()}
+	if pretty {
+		x.w.grows()
+	}
 	var ws []byte
 	inText := false
 	text := func(c byte, at int64) error {
@@ -663,6 +703,9 @@ func formatXML(j *job, pretty bool) error {
 			if empty {
 				x.last = 'c'
 			} else {
+				if len(x.stack) >= maxDepth {
+					return x.fail(at, "The XML nests deeper than %d levels, more than the formatter takes.", maxDepth)
+				}
 				x.stack = append(x.stack, xmlOpen{name: name, at: at})
 				x.last = 'o'
 			}
