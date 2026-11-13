@@ -1,3 +1,7 @@
+## 1.21.54 Beta 1 - Text tools in the Text Editor
+
+- A Tools menu (and right-click and command search) with line, encode/decode and format tools implemented once in the engine (`internal/texttools`), on the selection or the whole document, any size, one undo step; Find and Replace modes Normal, Extended and Regular expression (replacement templates); a readable copy of a SonicWall settings export in a new tab, offered when one is opened.
+
 ## 1.21.53 Beta 1 - Wrapped long lines scroll all the way through
 
 - In a large document with Wrap on, the vertical bar follows the position in the whole text and scrolling continues through very long lines; selections continue across loaded pages and the status bar shows the selection size.

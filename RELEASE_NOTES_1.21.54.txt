@@ -1,0 +1,16 @@
+Network Toolkit 1.21.54
+
+## What's New
+
+- The Text Editor has a Tools menu: split and join lines, sort, remove duplicates, decode and encode Base64, URL text and more, and pretty-print JSON and XML. Each tool shows what it does, works on the selection or the whole document, and Ctrl+Z undoes it.
+- Find and Replace has Notepad++'s modes: in Extended mode, replace & with \n to put each setting on its own line.
+- Opening a SonicWall settings export (.exp) offers Make readable: a new tab with one setting per line, while the export stays unchanged.
+
+## Additional Details
+
+- Tools are in the Tools button, the right-click menu and Search (Ctrl+Shift+P). New shortcuts: Ctrl+Shift+L split at text, Ctrl+J join lines, Ctrl+Shift+B Base64 decode, Ctrl+Shift+U UPPERCASE, Ctrl+U lowercase.
+- The tools work on documents of any size. On a large file they show their progress and can be cancelled.
+- Base64 decode now decodes the whole document (or the whole selection), not only the first million characters.
+- Find and Replace modes: Normal, Extended (\n, \r, \t, \xNN, \uNNNN) and Regular expression (the Replace text may use $1, ${name} and \n).
+- Text actions that were under More (Comment, Duplicate, Trim spaces, UPPER, lower, Sort lines, the conversions) are now under Tools; More keeps Save copy, Text colors and the editor preferences.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
