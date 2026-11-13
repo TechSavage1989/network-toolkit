@@ -148,6 +148,16 @@ func (d *decoded) done() error {
 	return nil
 }
 
+// block passes the characters decoded so far on (flush) once they fill a
+// block and no character is half decoded, so that a long run of escapes is
+// never held whole.
+func (d *decoded) block(flush func() error) error {
+	if len(d.pending) > 0 || len(d.out) < 32<<10 {
+		return nil
+	}
+	return flush()
+}
+
 // take returns the characters decoded so far.
 func (d *decoded) take() []byte {
 	p := d.out
@@ -202,6 +212,9 @@ func urlDecode(form bool) func(*job) error {
 				if err = d.add(hi<<4|lo, start); err != nil {
 					return err
 				}
+				if err = d.block(flush); err != nil {
+					return err
+				}
 			case form && c == '+':
 				if len(d.pending) > 0 {
 					return d.done()
@@ -209,6 +222,9 @@ func urlDecode(form bool) func(*job) error {
 				span++
 				j.count++
 				if err = d.char(' ', start); err != nil {
+					return err
+				}
+				if err = d.block(flush); err != nil {
 					return err
 				}
 			case c == '\n' && d.cr && len(d.pending) == 0:
@@ -402,6 +418,9 @@ func unescape(j *job) error {
 			if err = d.char(r, start); err != nil {
 				return err
 			}
+			if err = d.block(flush); err != nil {
+				return err
+			}
 			continue
 		}
 		switch p[0] {
@@ -424,6 +443,9 @@ func unescape(j *job) error {
 				if err = d.add(hi<<4|lo, start); err != nil {
 					return err
 				}
+				if err = d.block(flush); err != nil {
+					return err
+				}
 				continue
 			}
 		case 'u':
@@ -437,6 +459,9 @@ func unescape(j *job) error {
 				span += int64(n) + 1
 				j.count++
 				if err = d.char(r, start); err != nil {
+					return err
+				}
+				if err = d.block(flush); err != nil {
 					return err
 				}
 				continue

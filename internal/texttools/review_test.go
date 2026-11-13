@@ -70,6 +70,37 @@ func TestCancelStopsAToolThatWrites(t *testing.T) {
 	}
 }
 
+// A long run of escapes is decoded in blocks, not held whole until the run
+// ends (6 MiB of %C3%A9 gave one 2 MiB insertion).
+func TestDecodersFlushLongRunsOfEscapes(t *testing.T) {
+	for _, c := range []struct{ id, unit, want string }{
+		{"url-decode", "%C3%A9", "é"},
+		{"url-decode-form", "%41+", "A "},
+		{"unescape", `\xC3\xA9`, "é"},
+		{"unescape", `é\n`, "é\n"},
+	} {
+		in := strings.Repeat(c.unit, (6<<20)/len(c.unit))
+		counter := &insertCounter{}
+		result, err := Run(context.Background(), c.id, Options{}, BytesSource(in), counter, Env{})
+		if err != nil || !result.Changed {
+			t.Fatal(c.id, err)
+		}
+		if counter.largest > 160<<10 {
+			t.Errorf("%s of %q: one insertion of %d bytes", c.id, c.unit, counter.largest)
+		}
+		// The blocks together are the whole decoded text.
+		if got, _, err := run(t, c.id, Options{}, in); err != nil || got != strings.Repeat(c.want, (6<<20)/len(c.unit)) {
+			t.Errorf("%s: %v", c.id, err)
+		}
+	}
+	// A character split between two blocks is still decoded whole, and a
+	// carriage return at the end of a block still joins the line break after it.
+	in := strings.Repeat("%41", 32<<10) + "%0D" + "\n" + "%C3" + "%A9"
+	if got, _, err := run(t, "url-decode", Options{}, in); err != nil || got != strings.Repeat("A", 32<<10)+"\né" {
+		t.Fatal(err, len(got))
+	}
+}
+
 // The result of a tool over page-held text is held in memory and sent to the
 // page: it stops at its bound.
 func TestPageHeldResultIsBounded(t *testing.T) {
