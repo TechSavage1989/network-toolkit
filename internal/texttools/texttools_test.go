@@ -256,6 +256,27 @@ func TestSonicWallReadable(t *testing.T) {
 	if !LooksLikeSonicWall([]byte(export[:120])) {
 		t.Error("the start of the export was not recognised")
 	}
+	// A real export ends its Base64 with "&&" (seen on the owner's export:
+	// "...==&&"); with or without padding, that trailer is not an error.
+	for _, trailer := range []string{"&&", "&&\r\n", "&"} {
+		if got, _, err = run(t, "sonicwall-readable", Options{}, export+trailer); err != nil || got != want {
+			t.Fatalf("trailer %q: %v", trailer, err)
+		}
+	}
+	unpadded := base64.StdEncoding.EncodeToString([]byte("buildNum=7&checksum=123&"))
+	if strings.Contains(unpadded, "=") {
+		t.Fatal("the unpadded fixture has padding")
+	}
+	if got, _, err = run(t, "sonicwall-readable", Options{}, unpadded+"&&"); err != nil || got != "buildNum=7\nchecksum=123\n" {
+		t.Fatalf("unpadded with trailer: %v %q", err, got)
+	}
+	// Only '&' and white space may follow it.
+	if _, _, err = run(t, "sonicwall-readable", Options{}, export+"&&QUJD"); err == nil || !strings.Contains(err.Error(), "continues after") {
+		t.Fatalf("text after the trailer: %v", err)
+	}
+	if _, _, err = run(t, "sonicwall-readable", Options{}, "&&"+export); err == nil {
+		t.Fatal("an export may not start with &")
+	}
 }
 
 // A multi-megabyte export on one line, as the owner's 1.75 MB file was.

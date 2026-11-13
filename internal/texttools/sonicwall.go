@@ -189,6 +189,9 @@ func sonicwallReadable(j *job) error {
 	w := &writer{j: j}
 	pairs := &sonicwallPairs{value: &readableValue{w: w}, w: w, first: true}
 	stream := &base64Stream{emit: pairs.add}
+	// A real export ends its Base64 with "&&" (for example "...AA==&&"):
+	// after the Base64, only '&' and white space may follow.
+	trailer := false
 	for {
 		at := j.in.units
 		c, err := j.in.byte()
@@ -197,6 +200,13 @@ func sonicwallReadable(j *job) error {
 		}
 		if err != nil {
 			return err
+		}
+		if c == '&' && stream.symbols > 0 {
+			trailer = true
+			continue
+		}
+		if trailer && !isSpace(c) {
+			return &PositionError{Offset: at, Message: "The export continues after its closing &."}
 		}
 		if err = stream.feed(c, at); err != nil {
 			return err
