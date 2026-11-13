@@ -11,9 +11,9 @@
  * selected; line tools widen a partial selection to whole lines. A decoder
  * that stops at a character it does not decode changes nothing; when the
  * text before it decodes on its own, a bar offers Decode the part before it
- * (the same tool over just that range). This file also holds the Find bar's
- * Extended escapes and the Replace template of the Regular expression search
- * mode, which the engine expands with the same rules
+ * (the same tool over just that range). This file also holds the Find
+ * window's Extended escapes (decodeExtended); the Replace template of the
+ * Regular expression search mode is expanded only by the engine
  * (internal/editorbuffer/template.go). Every list of tools (Tools menu,
  * right-click menu, command palette) comes from TOOLS below; the engine's
  * registry and the entries that name an engine tool are kept the same by

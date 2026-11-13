@@ -1,9 +1,8 @@
 'use strict';
 // Unit checks for the Text Editor's text tools page module (web/assets/
-// editor-text-tools.js): the list every menu shows, the Find bar's Extended
-// escapes, and the Replace template of the Regular expression search mode,
-// which must expand exactly as the engine does (the cases are shared with
-// internal/editorbuffer/rewrite_test.go).
+// editor-text-tools.js): the list every menu shows and the Find window's
+// Extended escapes. The Replace template of the Regular expression search
+// mode is the engine's alone (internal/editorbuffer/rewrite_test.go).
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{test}=require('node:test');
 const tools=require('../web/assets/editor-text-tools.js');
 

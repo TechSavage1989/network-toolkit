@@ -582,6 +582,63 @@ const step=name=>console.log('FIND WINDOW '+name);
   await option('inSelection').uncheck().catch(()=>{});
   step('in selection done');
 
+  // ---- The Document Map beside marks and the Search results panel ----
+  // The map takes the right edge of the document area, the results panel
+  // the bottom of the editor: neither covers the other or the text, and
+  // the marks stay on their text however wide the text area becomes.
+  step('document map');
+  await activate('config.txt');await settled();
+  await showTab('mark');await option('bookmark').uncheck();await option('purge').check();
+  await query('uplink');await win().locator('[data-ed-find-action="mark"]').click();
+  await messageIs(/^Mark: 12 matches\.$/);
+  await showTab('find');await win().locator('[data-ed-find-action="all-current"]').click();
+  await messageIs(/^Find All: 12 hits in 1 file of 1 searched\.$/);
+  await page.evaluate(()=>NetworkToolkitFileEditor.setDocumentMap(true));
+  await until(()=>{const m=document.querySelector('#networkToolkitFileEditor [data-ed-map]');return m&&!m.hidden&&NetworkToolkitFileEditor.documentMap.layout;});
+  const layout=()=>page.evaluate(()=>{
+   const box=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
+   const editor=document.querySelector('#networkToolkitFileEditor'),ta=editor.querySelector('.nt-editor-code textarea[data-ed-text]'),layer=editor.querySelector('[data-ed-marks]');
+   const marks=[...layer.querySelectorAll('mark')];
+   return {map:box(editor.querySelector('[data-ed-map]')),panel:box(editor.querySelector('[data-ed-find-results]')),panelShown:!editor.querySelector('[data-ed-find-results]').hidden,
+    text:box(ta),client:ta.clientWidth,layer:box(layer),layerWidth:layer.style.width,wrapped:layer.classList.contains('is-wrapped'),layerShown:!layer.hidden,
+    marks:marks.length,markText:[...new Set(marks.map(m=>m.textContent))],markRight:Math.max(...marks.map(m=>m.getBoundingClientRect().right)),
+    workspace:box(editor.querySelector('.nt-editor-workspace'))};
+  });
+  const check=(g,label)=>{
+   assert.equal(g.panelShown,true,label+': the results panel shows');
+   assert(Math.abs(g.map.right-g.workspace.right)<=2,label+': the map is at the right edge '+JSON.stringify(g));
+   assert(g.map.bottom<=g.panel.top+1,label+': the results panel is below the map '+JSON.stringify(g));
+   assert(g.panel.left<=g.text.left+1&&g.panel.right>=g.map.right-1,label+': the results panel spans the text and the map');
+   assert(g.text.right<=g.map.left+1,label+': the map does not cover the text');
+   assert.equal(g.layerShown,true,label+': the marks show');assert.equal(g.marks,12,label);assert.deepEqual(g.markText,['uplink'],label);
+   assert(g.markRight<=g.map.left+1,label+': no mark lies under the map');
+   assert(Math.abs(g.layer.left-g.text.left)<=2,label+': the marks start where the text does '+JSON.stringify(g));
+   if(g.wrapped)assert.equal(g.layerWidth,g.client+'px',label+': wrapped marks are as wide as the text area');
+  };
+  const mapOn=await layout();check(mapOn,'map on');
+  await shoot('editor-find-window-document-map-dark.png');await theme('light');await shoot('editor-find-window-document-map-light.png');await theme('dark');
+  check(await layout(),'map on, light');
+  await page.locator('#networkToolkitFileEditor [data-ed-wrap]').check();
+  await until(()=>document.querySelector('#networkToolkitFileEditor [data-ed-marks]').classList.contains('is-wrapped'));
+  check(await layout(),'map on, word wrap');
+  // Hiding the results panel gives the map the height back.
+  await page.locator('[data-ed-find-results-toggle]').click();
+  await until(()=>document.querySelector('#networkToolkitFileEditor [data-ed-find-results]').hidden);
+  await page.waitForTimeout(200);
+  const taller=await page.evaluate(()=>document.querySelector('#networkToolkitFileEditor [data-ed-map]').getBoundingClientRect().height);
+  assert(taller>mapOn.map.height+20,'the map grows when the results panel hides: '+taller+' after '+mapOn.map.height);
+  await page.locator('[data-ed-find-results-toggle]').click();
+  await until(()=>!document.querySelector('#networkToolkitFileEditor [data-ed-find-results]').hidden);
+  await page.locator('#networkToolkitFileEditor [data-ed-wrap]').uncheck();
+  await page.evaluate(()=>NetworkToolkitFileEditor.setDocumentMap(false));
+  await until(()=>document.querySelector('#networkToolkitFileEditor [data-ed-map]').hidden);
+  // The marks follow the text area back to its full width.
+  await until(()=>{const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code textarea[data-ed-text]'),m=document.querySelector('#networkToolkitFileEditor [data-ed-marks] mark');return m&&m.getBoundingClientRect().left>=ta.getBoundingClientRect().left;});
+  await showTab('mark');await win().locator('[data-ed-find-action="clear-marks"]').click();await option('purge').uncheck();await showTab('find');
+  await results().locator('.nt-find-row').first().click({button:'right'});
+  await page.locator('.nt-find-results-menu [data-ed-find-menu="clear"]').click();
+  step('document map done');
+
   // ---- 6. Transparency across a reload; a 640×400 window ----
   step('transparency');
   await win().locator('[data-ed-find-transparency]').check();

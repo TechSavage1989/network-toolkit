@@ -203,6 +203,7 @@ The **Document Map** is a narrow strip at the right edge of the document that sh
 
 - Click in the map to show that part of the document. Drag the box to scroll, or roll the mouse wheel over the map.
 - The map follows typing, **Wrap**, the font size, the light and dark themes and the editor colors. In split view it shows the document of the pane you are working in. While comparing it is hidden, because the comparison has its own change map.
+- The **Search results** panel opens below the text and the map, and the map grows back when you hide the panel. Marks and the match **Find Next** selected show in the text, not in the map.
 - A short document is drawn word by word in its syntax colors. A longer one is drawn as thin lines, and a very long one with one line for each row of the map, so the map stays quick for a document of any size.
 - A large file that the editor reads in sections is mapped by position, like its scroll bar: by line, or by character with **Wrap** on, so a file that is one long line (such as a Base64 export) is mapped from its first character to its last. The part you have read is drawn in detail; the rest is a light texture until you scroll there.
 
