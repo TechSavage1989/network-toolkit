@@ -116,6 +116,8 @@ async function main(){
   await page.setViewportSize(viewport);await page.evaluate(theme=>setTheme(theme),theme);await render(page,protocol,320,true);
   const button=page.locator('.transfer-server-sidebar-button'),server={};
   assert.equal(await button.getAttribute('aria-expanded'),'true');
+  // Owner rule: the rail's Connect button is the toggle; the settings heading has no separate close button.
+  assert.equal(await page.locator('.transfer-server-sidebar-header button, .transfer-server-sidebar-body [data-transfer-sidebar-toggle]').count(),0);
   for(const interaction of ['normal','hover','focus'])server[interaction]=await tabState(button,interaction);
   if(out&&viewport.width===1366&&protocol==='tftp'&&theme==='light')await button.screenshot({path:path.join(out,'server-selected-tab.png')});
   // Existing disclosure actions and saved state remain available with the

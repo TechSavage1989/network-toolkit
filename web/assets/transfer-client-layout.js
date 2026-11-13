@@ -62,6 +62,7 @@ function mount(k,{app,settings,library,libraryHTML}){
   aside.querySelector('[data-client-settings]').hidden=current.tab!=='settings';aside.querySelector('[data-client-library]').hidden=current.tab==='settings';
   aside.querySelector('[data-client-title]').textContent=current.tab==='settings'?'Connection settings':current.tab==='saved'?'Saved connections':'Recent connections';
   for(const button of aside.querySelectorAll('[data-client-tab]')){button.setAttribute('aria-selected',String(button.dataset.clientTab===current.tab));button.setAttribute('aria-expanded',String(button.dataset.clientTab===current.tab&&!current.collapsed));button.title=(current.collapsed||button.dataset.clientTab!==current.tab?'Open ':'Close ')+(button.dataset.clientTab==='settings'?'connection settings':button.dataset.clientTab+' connections');button.tabIndex=button.dataset.clientTab===current.tab?0:-1;}
+  for(const button of app.querySelectorAll('[data-rb-action="connectionSettings"]'))button.setAttribute('aria-expanded',String(current.tab==='settings'&&!current.collapsed));
   splitter.setAttribute('aria-valuemin',String(minimum));splitter.setAttribute('aria-valuemax',String(maximum));splitter.setAttribute('aria-valuenow',String(width));
  }
  function select(tab,toggle=false){const current=preferences(protocol);current.collapsed=toggle&&current.tab===tab?!current.collapsed:false;current.tab=tab;
