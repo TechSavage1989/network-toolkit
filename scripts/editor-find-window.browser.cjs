@@ -429,6 +429,12 @@ const step=name=>console.log('FIND WINDOW '+name);
   await win().locator('[data-ed-find-tab="find"]').click();
   await win().locator('[data-ed-find-action="count"]').click();
   await messageIs(/^Count: 10 matches in the selection\.$/);
+  // Find Next of a disk-backed document, In selection: past the range's end it wraps to its start.
+  await win().locator('[data-ed="next"]').click();
+  await messageIs(/^Find: Found the first occurrence from the top\. The end of the selection has been reached\.$/);
+  await until(()=>/^Ln 11, Col \d+ · 11 selected/.test(document.querySelector('[data-ed-position]').textContent));
+  await win().locator('[data-ed="next"]').click();
+  await messageIs(/^Match on line 12\.$/);
   await win().locator('[data-ed-find-tab="replace"]').click();
   await page.locator('[data-ed-replacement]').fill('example.net');
   await win().locator('[data-ed="replaceAll"]').click();

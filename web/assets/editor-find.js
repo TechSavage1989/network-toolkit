@@ -233,7 +233,7 @@ function create(a){
  const engine=body=>a.request(body);
  function textBody(d){return {text:a.text(d)};}
  async function call(d,action,body,signal){
-  if(a.disk(d)){await a.flush(d);return a.diskCall(d,action,body,signal);}
+  if(a.disk(d)){await a.flush(d);return a.diskCall(d,action==='next'?'find':action,body,signal);}
   const page={next:'next','find-matches':'matches','replace-text':'replace-text','find-start':'start'}[action]||action;
   // Page-held text is searched as sent: a revision means nothing there.
   const {revision,...rest}=body;void revision;
