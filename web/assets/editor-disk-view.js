@@ -17,6 +17,20 @@
 (function (root) {
 'use strict';
 
+// Chromium 151 (fixed by 153): once a click on a button has taken the focus
+// from a textarea, the page's selection stays at that textarea, and each later
+// click on a button puts back the selection the textarea had then, undoing
+// one set by script since (Find Next's match before Replace). Dropping that
+// stale page selection keeps the one set here (as in file-editor.js).
+function keepScriptSelection(ta) {
+ const doc = ta?.ownerDocument;
+ if (!doc || doc.activeElement === ta) return;
+ const s = doc.getSelection?.();
+ if (!s?.rangeCount) return;
+ const at = (node, offset) => node === ta || node === ta.parentNode && (node.childNodes[offset] === ta || node.childNodes[offset - 1] === ta);
+ if (at(s.anchorNode, s.anchorOffset) || at(s.focusNode, s.focusOffset)) s.removeAllRanges();
+}
+
 const RANGE = 1000000;
 const BUFFER_LINES = 40;
 const PREVIEW_UNITS = 512;
@@ -75,7 +89,7 @@ function measureWrapRows(text, textarea) {
 }
 
 function create({textarea, gutter, container, session, syntaxLanguage, wordWrap = () => false,
- changed = () => {}, message = () => {}, readOnly = false, locked = () => false, painted = () => {}}) {
+ changed = () => {}, message = () => {}, readOnly = false, locked = () => false, marks = null, bookmarks = null, painted = () => {}}) {
  const pageUnits = root.NTKEditorDiskSession.PAGE_UNITS;
  const abort = new AbortController();
  const listeners = {signal: abort.signal};
@@ -98,6 +112,17 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   syntax.hidden = true;
   syntax.setAttribute('aria-hidden', 'true');
   textarea.before(syntax);
+ }
+ // Marks of the Find window (editor-find.js): marks(from, to) gives the
+ // marked ranges of that part of the document, or null until it knows them;
+ // bookmarks() the bookmarked lines.
+ const markLayer = marks ? document.createElement('div') : null;
+ let markStamp = 0, markKey = '', markRanges = null;
+ if (markLayer) {
+  markLayer.className = 'nt-editor-marks nt-editor-disk-highlight';
+  markLayer.hidden = true;
+  markLayer.setAttribute('aria-hidden', 'true');
+  (syntax || textarea).before(markLayer);
  }
  container.classList.add('nt-editor-disk');
  textarea.wrap = 'off';
@@ -534,6 +559,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    direction
   );
   if (focus) textarea.focus({preventScroll: true});
+  else keepScriptSelection(textarea);
   announce();
  }
 
@@ -580,6 +606,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   textarea.classList.toggle('is-wrapped', next);
   container.classList.toggle('nt-editor-disk-wrapped', next);
   syntax?.classList.toggle('is-wrapped', next);
+  markLayer?.classList.toggle('is-wrapped', next);
   gutterStamp = '';
   wrapGeometry = null;
   flowView = null;
@@ -622,11 +649,12 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   const first = Math.max(0, row - 3);
   const count = projection?.rows.length || starts.length;
   const last = Math.min(count, wrapped ? rowAt(textarea.scrollTop + textarea.clientHeight) + 6 : first + clientRows + 8);
-  const stamp = [page.line, first, last, rowHeight, String(lines).length, alignmentTicket].join(':');
+  const stamp = [page.line, first, last, rowHeight, String(lines).length, alignmentTicket, markStamp].join(':');
   const geometry = ensureWrapGeometry();
   if (stamp !== gutterStamp || geometry !== gutterGeometry) {
    gutterStamp = stamp;
    gutterGeometry = geometry;
+   const marked = bookmarks?.();
    const rows = [];
    for (let line = first; line < last; line++) {
     const element = document.createElement('div');
@@ -638,6 +666,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
     if (!value?.gap) {
      const source = value?.source ?? line;
      element.dataset.sourceLine = String(page.line + source + 1);
+     if (marked?.has(page.line + source) && (source > 0 || page.column === 0)) element.classList.add('is-bookmarked');
      if (source > 0 || page.column === 0 || !wrapped) element.textContent = element.dataset.sourceLine;
     }
     rows.push(element);
@@ -651,6 +680,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   }
   gutter.style.transform = 'translateY(' + (-textarea.scrollTop) + 'px)';
   paintSyntax();
+  paintMarks();
   top = Math.min(lines - 1, page.line + (projection?.rows[groupStart(row)]?.source ?? row));
   fraction = rowFraction(row);
   alignedTop = projected?.row;
@@ -722,6 +752,52 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    syntax.hidden = false;
    textarea.classList.add('highlight-active');
   }).catch(() => {}), 140);
+ }
+
+ // The marks of the rows in view, in a layer behind the text placed like
+ // the syntax colours. A comparison's aligned rows show none.
+ function paintMarks() {
+  if (!markLayer) return;
+  const text = textarea.value;
+  if (projection || text !== page.text) {
+   markLayer.hidden = true;
+   return;
+  }
+  const top = displayRow(), bottom = Math.min(starts.length,
+   wrapped ? rowAt(textarea.scrollTop + textarea.clientHeight) + 3 : top + clientRows + 2);
+  const first = Math.max(0, top - 8), end = Math.min(starts.length, bottom + 12);
+  const from = starts[first] || 0, to = end < starts.length ? starts[end] : text.length;
+  const ranges = marks(page.start + from, page.start + to);
+  const key = [page.start, from, to, markStamp, text.length].join(':');
+  if (!ranges?.length) {
+   // Nothing marked here, or not known yet: no marks of another part show.
+   if (ranges || key !== markKey) markLayer.hidden = true;
+   if (ranges) {
+    markRanges = ranges;
+    markKey = key;
+   }
+   return;
+  }
+  if (ranges !== markRanges || key !== markKey) {
+   markRanges = ranges;
+   markKey = key;
+   let html = '', at = from;
+   for (const [a, b, kind] of ranges) {
+    const start = Math.max(a - page.start, at), stop = Math.min(b - page.start, to);
+    if (stop <= start) continue;
+    html += escapeText(text.slice(at, start)) + (kind ? '<mark class="is-current">' : '<mark>') + escapeText(text.slice(start, stop)) + '</mark>';
+    at = stop;
+   }
+   markLayer.innerHTML = html + escapeText(text.slice(at, to)) + '\n';
+   markLayer.dataset.first = String(first);
+  }
+  markLayer.hidden = false;
+  markLayer.style.transform = 'translate(' + (-textarea.scrollLeft) + 'px,' +
+   (pixelAt(Number(markLayer.dataset.first) || 0) - textarea.scrollTop) + 'px)';
+ }
+
+ function escapeText(value) {
+  return value.replace(/[&<>]/g, c => c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;');
  }
 
  function scrollbarValue(element, maximum, value, text = '', minimum = 1) {
@@ -1861,6 +1937,8 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   mapState, mapSeek, wheelBy,
   comparisonPage: () => ({line:page.line, text:page.text, column:page.column, complete:page.start+page.text.length>=session.state().metadata.units}),
   measureWrapRows:measureCurrentWrapRows, refreshWrap, refreshSyntax: paintSyntax,
+  // The Find window's marks or bookmarks changed: paint them again.
+  refreshMarks() { markStamp++; markKey = ''; gutterStamp = ''; schedulePaint(); },
   selectAll() { select(0, session.state().metadata.units, 'none', true); },
   // locked() is a document that can never be edited (a file that is not text).
   setReadOnly(value) { readOnly = !!value || !!locked(); updateReadOnly(); },
@@ -1893,6 +1971,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    for (const job of [frame, verticalFrame, horizontalFrame, wrapFrame, flowFrame]) if (job) root.cancelAnimationFrame(job);
    vertical.remove();
    horizontal.remove();
+   markLayer?.remove();
    if (syntax) {
     root.clearTimeout(syntaxTimer);
     root.NTKEditorLanguageService?.cancelHighlight?.(syntaxChannel);

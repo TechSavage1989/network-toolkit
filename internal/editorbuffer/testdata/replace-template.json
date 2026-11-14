@@ -1,5 +1,5 @@
 {
-  "about": "Replace text of a regular-expression search, expanded by the engine (internal/editorbuffer/template.go) and by the page (expandReplacement in web/assets/editor-text-tools.js). Both tests read these cases.",
+  "about": "Replace text of a regular-expression search, expanded only by the engine (internal/editorbuffer/template.go), for page-held text too (ReplaceInText). TestReplaceTemplate reads these cases.",
   "cases": [
     {"pattern": "(\\w+)=(\\w+)", "text": "key=value", "replacement": "$2=$1", "want": "value=key"},
     {"pattern": "(\\w+)=(\\w+)", "text": "key=value", "replacement": "$&!", "want": "key=value!"},

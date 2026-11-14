@@ -149,6 +149,36 @@ func (f *mixedFile) toolState(id string, options map[string]any, from, to any) m
 	}
 }
 
+// findReplace is Replace All of the Find window (editor_find.go): a
+// background job over the range within (nil: the whole document).
+func (f *mixedFile) findReplace(search map[string]any, replacement string, within []int64) map[string]any {
+	f.t.Helper()
+	body := map[string]any{"action": "find-start", "kind": "replace", "revision": f.revision, "search": search, "replacement": replacement}
+	if within != nil {
+		body["within"] = within
+	}
+	started := f.call(body)
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		r := editorHTTP(f.a, f.a.token, "/api/editor-views/find", map[string]any{"action": "status", "job": started["job"]})
+		var state map[string]any
+		json.Unmarshal(r.Body.Bytes(), &state)
+		switch state["state"] {
+		case "done":
+			if meta, _ := state["metadata"].(map[string]any); meta != nil {
+				f.revision = uint64(meta["revision"].(float64))
+			}
+			return state
+		case "failed":
+			f.t.Fatalf("Replace All: %v", state["error"])
+		}
+		if time.Now().After(deadline) {
+			f.t.Fatal("Replace All did not finish")
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+}
+
 // decodeBefore is the page's Decode the part before it: the decoder over
 // [from, to) stops at a character it does not decode, and runs again over
 // the range its failure names.
@@ -219,6 +249,20 @@ func TestEditorRangeCommandsKeepMixedLineEndings(t *testing.T) {
 		}, "one\r\ntwo three four\r\nfive\r\n"},
 		{"Tools: Base64 encode of a selection (one line for two)", func(f *mixedFile) { f.textTool("base64-encode", nil, 4, 13) }, "one\r\ndHdvCnRocmVl\rfour\r\nfive\r\n"},
 		{"Tools: Tabs to spaces with no tabs", func(f *mixedFile) { f.textTool("tabs-to-spaces", map[string]any{"indent": 4}, 0, 0) }, raw},
+		// The Find window (editor_find.go): Replace All in the background,
+		// of the whole document or "In selection".
+		{"Find window: Replace All of the document", func(f *mixedFile) {
+			f.findReplace(map[string]any{"query": "t", "matchCase": true}, "T", nil)
+		}, "one\r\nTwo\nThree\rfour\r\nfive\r\n"},
+		{"Find window: Replace All in selection, lines two to four", func(f *mixedFile) {
+			f.findReplace(map[string]any{"query": "o", "matchCase": true}, "0", []int64{4, 18})
+		}, "one\r\ntw0\nthree\rf0ur\r\nfive\r\n"},
+		{"Find window: Replace All in selection with a regular expression at each line start", func(f *mixedFile) {
+			f.findReplace(map[string]any{"query": "^", "regex": true}, "# ", []int64{4, 18})
+		}, "one\r\n# two\n# three\r# four\r\nfive\r\n"},
+		{"Find window: Replace All in selection that joins lines (. matches newline)", func(f *mixedFile) {
+			f.findReplace(map[string]any{"query": `o.t`, "regex": true, "dotAll": true}, "o t", []int64{4, 18})
+		}, "one\r\ntwo three\rfour\r\nfive\r\n"},
 		// Decode the part before it: Base64 over two lines up to the "&&"; the
 		// line break inside the decoded part goes, the "&&" keeps its CR.
 		{"Tools: Base64 decode of the part before a character that is not Base64", func(f *mixedFile) { f.decodeBefore("base64-decode", 4, 15) }, "one\r\nhello!&&\rfour\r\nfive\r\n"},

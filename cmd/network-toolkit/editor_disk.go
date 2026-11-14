@@ -437,6 +437,18 @@ type editorDiskRequest struct {
 	Tool    string            `json:"tool"`
 	Options texttools.Options `json:"options"`
 	Job     string            `json:"job"`
+	// The Find window (editor_find.go): its search, the searched range
+	// ("In selection"; nil is the whole document), the position Find Next
+	// starts at, wrap-around, the kind of a background search and the
+	// separator of Copy Marked Text.
+	Search    *editorbuffer.Search `json:"search,omitempty"`
+	Within    *[2]int64            `json:"within,omitempty"`
+	At        int64                `json:"at"`
+	Wrap      bool                 `json:"wrap"`
+	Kind      string               `json:"kind"`
+	Separator string               `json:"separator"`
+	// Marks are the searches of Copy Marked Text (editor_find.go).
+	Marks []editorbuffer.MarkSearch `json:"marks,omitempty"`
 }
 
 func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request, caller, uid string) {
@@ -544,7 +556,8 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		// (Reading it again from a browser file handle, "reload-start",
 		// "import-chunk", "import-finish" and "cancel", is answered above.)
 		switch req.Action {
-		case "status", "window", "find", "reload":
+		case "status", "window", "find", "find-matches", "find-start", "reload":
+			// find-start refuses Replace All (editor_find.go).
 		default:
 			jsonError(w, 409, editorbuffer.ErrBinary.Error())
 			return
@@ -586,17 +599,8 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		value, err = disk.markExportSaved(ctx, v, req.Receipt)
 	case "verify-start", "verify-chunk", "verify-finish":
 		value, err = disk.verifyBrowserSource(req)
-	case "find":
-		var snapshot *editorbuffer.Snapshot
-		snapshot, err = v.Buffer.Snapshot()
-		if err == nil {
-			if req.Backwards {
-				value, err = snapshot.FindPrevious(ctx, req.Query, req.Start, req.Regex, req.MatchCase, req.WholeWord)
-			} else {
-				value, err = snapshot.Find(ctx, req.Query, req.Start, req.Regex, req.MatchCase, req.WholeWord)
-			}
-			snapshot.Close()
-		}
+	case "find", "find-matches", "find-start":
+		value, err = m.findDisk(ctx, caller, disk, v, req)
 	case "replace-all":
 		value, err = disk.replaceDiskMatches(ctx, v.Buffer, req)
 	case "replace-text":

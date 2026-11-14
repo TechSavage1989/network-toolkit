@@ -33,7 +33,8 @@ func (d *editorDiskDocument) replaceDiskMatches(ctx context.Context, b *editorbu
 		s.Close()
 		return nil, editorbuffer.ErrRevision
 	}
-	staged, err := s.ReplaceAll(ctx, req.Query, req.Replace, req.Regex, req.MatchCase, req.WholeWord)
+	from, to := findRange(req.Within)
+	staged, err := s.ReplaceAllIn(ctx, req.findSearch(), req.Replace, from, to, nil)
 	// The snapshot holds the buffer open. It is released here, before this
 	// request waits for anything else: a Close of the buffer (a reload, the
 	// tab closing) may be waiting for it.

@@ -6,7 +6,7 @@
 //     Format); each item shows a description, the same as its tooltip, in at
 //     most two lines, and its shortcut.
 //  2. Split at text on page-held text: & becomes a line break; Undo.
-//  3. The Find bar's Extended mode: Replace all & with \n; Undo. Regular
+//  3. The Find window's Extended mode: Replace all & with \n; Undo. Regular
 //     expression mode: $2=$1. Both on page-held and disk-backed text.
 //  4. Base64 decode of a whole 1.7 MB single-line disk-backed document with
 //     nothing selected (Ctrl+Shift+B); Undo.
@@ -100,9 +100,11 @@ const file=name=>path.join(files,name);
   // 3. Extended mode: Find & and Replace \n with Replace all; Undo.
   await open('replace.txt');
   await text().focus();await page.keyboard.press('Control+h');
-  const mode=page.locator('[data-ed-search-mode]');
-  assert.deepEqual(await mode.locator('option').evaluateAll(list=>list.map(o=>[o.value,!!o.title])),[['normal',true],['extended',true],['regex',true]]);
-  await mode.selectOption('extended');
+  // The Search Mode of the Find window (editor-find.js): one choice each,
+  // with its help as the tooltip.
+  const mode=page.locator('[data-ed-search-mode]'),setMode=value=>mode.locator('input[value="'+value+'"]').check();
+  assert.deepEqual(await mode.locator('input[name="ntFindMode"]').evaluateAll(list=>list.map(o=>[o.value,!!o.closest('label').title])),[['normal',true],['extended',true],['regex',true]]);
+  await setMode('extended');
   assert.match(await page.locator('[data-ed-search-mode-label]').getAttribute('title'),/Extended/);
   await page.locator('[data-ed-query]').fill('&');
   await page.locator('[data-ed-replacement]').fill('\\n');
@@ -112,30 +114,30 @@ const file=name=>path.join(files,name);
   await text().focus();await page.keyboard.press('Control+z');
   await page.waitForFunction(()=>NetworkToolkitFileEditor.active.content==='host=a&port=22&user=admin');
   // Regular expression mode: groups in the Replace text.
-  await mode.selectOption('regex');
+  await setMode('regex');
   await page.locator('[data-ed-query]').fill('(\\w+)=(\\w+)');
   await page.locator('[data-ed-replacement]').fill('$2:$1');
   await page.locator('[data-ed="replaceAll"]').click();
   await page.waitForFunction(()=>NetworkToolkitFileEditor.active.content==='a:host&22:port&admin:user');
   // The same on a disk-backed document (one line of 60,000 settings): the
   // engine's Replace All, and a single Replace that expands $2=$1.
-  await page.locator('[data-ed="hideFind"]').click();
+  await page.locator('[data-ed="hideFind"],[data-ed-find-close]').click();
   await open('pairs.txt');
   let pairs=await active();
   assert.equal(pairs.disk,true);
   await text().focus();await page.keyboard.press('Control+Home');await page.keyboard.press('Control+h');
-  await mode.selectOption('extended');
+  await setMode('extended');
   await page.locator('[data-ed-query]').fill('&');
   await page.locator('[data-ed-replacement]').fill('\\n');
   await page.locator('[data-ed="replaceAll"]').click();
-  await page.waitForFunction(()=>/^Replaced 60,?000 occurrence/.test(document.querySelector('[data-ed-message]').textContent),null,{timeout:60000});
+  await page.waitForFunction(()=>/^Replace All: 60,?000 occurrences were replaced/.test(document.querySelector('[data-ed-message]').textContent),null,{timeout:60000});
   await settled();
   pairs=await active();
   assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.active.diskMeta.lines),60001);
   assert.equal((await engine('window',{start:0,limit:16})).text,'k0=0\nk1=1\nk2=2\nk');
   await text().focus();await page.keyboard.press('Control+z');
   await page.waitForFunction(()=>NetworkToolkitFileEditor.active.diskMeta.lines===1&&!NetworkToolkitFileEditor.active.dirty,null,{timeout:30000});
-  await mode.selectOption('regex');
+  await setMode('regex');
   await page.locator('[data-ed-query]').fill('(\\w+)=(\\d)');
   await page.locator('[data-ed-replacement]').fill('$2=$1');
   await text().focus();await page.keyboard.press('Control+Home');
@@ -144,7 +146,7 @@ const file=name=>path.join(files,name);
   await page.locator('[data-ed="replaceOne"]').click();
   await page.waitForFunction(()=>NetworkToolkitFileEditor.active.dirty&&!NetworkToolkitFileEditor.active.diskSession.pending);
   assert.equal((await engine('window',{start:0,limit:12})).text,'0=k0&k1=1&k2');
-  await page.locator('[data-ed="hideFind"]').click();
+  await page.locator('[data-ed="hideFind"],[data-ed-find-close]').click();
 
   // 4. Base64 decode of a whole 1.7 MB single-line document, nothing selected.
   const plain=fs.readFileSync(file('expected-b64.txt'),'utf8');

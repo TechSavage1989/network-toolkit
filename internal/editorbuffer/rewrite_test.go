@@ -218,6 +218,11 @@ func TestReplaceTemplate(t *testing.T) {
 		if got := textOf(t, v.Buffer); err != nil || got != want {
 			t.Errorf("Replace All %q with %q: %q (%v), want %q", c.Pattern, c.Replacement, got, err, want)
 		}
+		// Replace All over text a page holds (the Find window's page-held
+		// documents): the same template, the same result.
+		if got, _, err := ReplaceInText(context.Background(), c.Text, Search{Query: c.Pattern, Regex: true, MatchCase: true}, c.Replacement, 0, -1, 1<<20); err != nil || got != want {
+			t.Errorf("Replace All of page text %q with %q: %q (%v), want %q", c.Pattern, c.Replacement, got, err, want)
+		}
 		// The single Replace of the selected match.
 		w := importBytes(t, []byte(c.Text))
 		s2, _ := w.Buffer.Snapshot()

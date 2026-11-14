@@ -1,9 +1,8 @@
 'use strict';
 // Unit checks for the Text Editor's text tools page module (web/assets/
-// editor-text-tools.js): the list every menu shows, the Find bar's Extended
-// escapes, and the Replace template of the Regular expression search mode,
-// which must expand exactly as the engine does (the cases are shared with
-// internal/editorbuffer/rewrite_test.go).
+// editor-text-tools.js): the list every menu shows and the Find window's
+// Extended escapes. The Replace template of the Regular expression search
+// mode is the engine's alone (internal/editorbuffer/rewrite_test.go).
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{test}=require('node:test');
 const tools=require('../web/assets/editor-text-tools.js');
 
@@ -30,7 +29,7 @@ test('every tool has a group, a label, a description and a message; shortcuts ar
  assert.deepEqual(tools.TOOLS.filter(tool=>tool.partial).map(tool=>tool.id),['base64-decode','hex-decode']);
  for(const id of ['base64-decode','hex-decode'])assert.match(tools.tool(id).partial,/^Decoded the part before \{where\} from .+; the text from there on is unchanged\.$/);
  // The shortcuts do not clash with the editor's own or the app's.
- for(const taken of ['Ctrl+Z','Ctrl+Y','Ctrl+S','Ctrl+Shift+S','Ctrl+F','Ctrl+H','Ctrl+G','Ctrl+N','Ctrl+O','Ctrl+Shift+P','Ctrl+Shift+T','Ctrl+Shift+Enter'])assert(!shortcuts.has(taken),taken+' is taken');
+ for(const taken of ['Ctrl+Z','Ctrl+Y','Ctrl+S','Ctrl+Shift+S','Ctrl+F','Ctrl+H','Ctrl+M','F3','Shift+F3','F2','Shift+F2','Ctrl+F2','Ctrl+G','Ctrl+N','Ctrl+O','Ctrl+Shift+P','Ctrl+Shift+T','Ctrl+Shift+Enter'])assert(!shortcuts.has(taken),taken+' is taken');
 });
 
 test('the tools are general: no brand, product or one workflow in their names or descriptions',()=>{
@@ -44,19 +43,6 @@ test('Extended escapes in Find and Replace',()=>{
  assert.deepEqual(tools.decodeExtended('a\\nb\\tc\\\\d'),{text:'a\nb\tc\\d'});
  assert.deepEqual(tools.decodeExtended('\\r\\n|\\r|\\x41\\u00e9|\\q'),{text:'\n|\n|Aé|\\q'});
  for(const nul of ['\\0','\\x00','\\u0000'])assert.match(tools.decodeExtended(nul).error,/NUL/);
-});
-
-test('the Replace template expands as the engine does',()=>{
- const file=JSON.parse(fs.readFileSync(path.join(__dirname,'..','internal','editorbuffer','testdata','replace-template.json'),'utf8'));
- for(const c of file.cases){
-  const pattern=new RegExp(c.pattern),match=pattern.exec(c.text);
-  if(c.error){assert.throws(()=>tools.expandReplacement(c.replacement,match,pattern.source),/NUL/,c.replacement);continue;}
-  assert.equal(tools.expandReplacement(c.replacement,match,pattern.source),c.want,c.pattern+' with '+c.replacement);
-  // Replace All over page-held text, as the Find bar does it.
-  const all=c.text.replace(new RegExp(c.pattern,'g'),(...args)=>tools.expandReplacement(c.replacement,args.slice(0,typeof args.at(-1)==='object'?args.length-3:args.length-2),c.pattern));
-  assert.equal(all,c.text.slice(0,match.index)+c.want+c.text.slice(match.index+match[0].length));
- }
- assert.deepEqual(tools.groupNames('(a)(?:b)(?<name>c)[(]\\(d(?=e)'),['','','name']);
 });
 
 test('line tools widen a selection to whole lines with their line break; positions are lines and columns',()=>{

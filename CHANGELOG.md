@@ -1,3 +1,7 @@
+## 1.21.57 Beta 1 - Find window, search results and bookmarks
+
+- The Text Editor's Find bar becomes a movable Notepad++-style Find window (Find, Replace and Mark tabs, toggled by the toolbar's Find and Replace and Ctrl+F/H/M) with In selection, whole word, case, wrap and backward options and Normal, Extended and regular expression modes, all searched in the engine for documents of any size; a syntax guide and a line that explains the pattern at the cursor; Find All into a docked Search results panel whose rows the engine keeps; Replace All in All Opened Documents (one undo step per document); Mark All, Copy Marked Text and bookmarks; search history in memory only.
+
 ## 1.21.56 Beta 1 - General text tools, toggle buttons and dialog focus
 
 - Text tools are general with plain examples; Base64 decode and Hex to text offer Decode the part before it; the brand-specific readable copy (tool-detect, derive) is removed. Buttons that reveal a row or panel toggle it closed, without separate Hide/Close controls (Terminal Find and command bar, Hosts Find, packet capture panels, File Transfer settings). Dialogs keep the field they focus and return focus to their opener after a redraw or a stacked dialog. The live Terminal sidebar check is repaired and runs in CI.

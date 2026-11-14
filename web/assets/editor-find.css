@@ -1,0 +1,128 @@
+/* The Find window of the Text Editor, its Search results panel, marks and
+   bookmarks (editor-find.js). Colours come from the app and the editor
+   palette, so they follow light and dark themes and the Custom palette. */
+.nt-editor{--nt-find-mark:color-mix(in srgb,var(--nt-code-string,#e3b978) 42%,transparent);--nt-find-bookmark:var(--nt-code-keyword,#91b7ff)}
+[data-theme=light] .nt-editor{--nt-find-mark:color-mix(in srgb,var(--nt-code-string,#a06318) 30%,transparent)}
+.nt-editor[data-palette=dark],.nt-editor[data-palette=pastel],.nt-editor[data-palette=forest],.nt-editor[data-palette=highContrast]{--nt-find-mark:color-mix(in srgb,var(--nt-code-string) 42%,transparent)}
+.nt-editor[data-palette=light]{--nt-find-mark:color-mix(in srgb,var(--nt-code-string) 30%,transparent)}
+
+/* The window: movable inside the editor, above the text. */
+.nt-find-window{position:absolute;z-index:25;width:min(590px,calc(100% - 8px));max-height:calc(100% - 8px);display:flex;flex-direction:column;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:9px;box-shadow:var(--shadow,0 14px 40px #0006);font-size:12px;overflow:hidden;transition:opacity .12s}
+.nt-find-window.is-moving{transition:none;user-select:none}
+.nt-find-head{display:flex;align-items:flex-end;gap:6px;padding:5px 5px 0 8px;border-bottom:1px solid var(--border);background:var(--panel2,var(--panel));cursor:move;user-select:none;touch-action:none;flex:0 0 auto}
+.nt-find-tabs{display:flex;gap:2px;min-width:0}
+.nt-find-tabs button{border:1px solid transparent;border-bottom:0;border-radius:6px 6px 0 0;background:transparent;color:var(--muted);padding:5px 13px;margin-bottom:-1px;font:inherit;cursor:pointer}
+.nt-find-tabs button:hover{color:var(--text);background:var(--hover)}
+.nt-find-tabs button[aria-selected=true]{background:var(--panel);border-color:var(--border);color:var(--text);font-weight:600}
+.nt-find-tabs button:focus-visible,.nt-find-x:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.nt-find-x{margin-left:auto;align-self:center;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-bottom:3px;border:0;border-radius:5px;background:transparent;color:var(--muted);font-size:17px;line-height:1;cursor:pointer}
+.nt-find-x:hover{background:var(--hover);color:var(--text)}
+.nt-find-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,auto);grid-template-rows:auto auto 1fr auto;grid-template-areas:"main buttons" "mode buttons" "mode transparency" "guide guide";gap:8px 12px;padding:10px 12px;overflow:auto;min-height:0;align-items:start}
+.nt-find-main{grid-area:main;display:grid;gap:10px;min-width:0}
+.nt-find-fields{display:grid;gap:6px;min-width:0}
+.nt-find-field{display:grid;grid-template-columns:6.8em minmax(0,1fr) auto;align-items:center;gap:6px;min-width:0}
+.nt-find-field>span:first-child,.nt-find-field>label{color:var(--muted);white-space:nowrap}
+.nt-find-input{position:relative;display:block;min-width:0}
+.nt-find-input input{width:100%;min-width:0;min-height:27px;padding:3px 6px;font:12px var(--mono,Consolas,monospace)}
+.nt-find-swap{position:relative;display:inline-flex}
+.nt-find-swap .btn{min-height:26px;padding:2px 6px}
+.nt-find-swap-more{margin-left:-1px;padding:2px 4px!important}
+.nt-find-swap-list{position:absolute;right:0;top:calc(100% + 3px);z-index:2;display:flex;flex-direction:column;gap:2px;min-width:190px;padding:5px;border:1px solid var(--border);border-radius:7px;background:var(--panel);box-shadow:var(--shadow);font-size:11px}
+.nt-find-swap-list button{text-align:left;border:0;border-radius:5px;background:transparent;color:var(--text);padding:6px 8px;font:inherit;cursor:pointer}
+.nt-find-swap-list button:hover,.nt-find-swap-list button:focus{background:var(--hover);outline:0}
+.nt-find-options{display:grid;grid-template-columns:repeat(2,max-content);gap:3px 16px;min-width:0}
+.nt-find-check{display:flex;align-items:center;gap:6px;white-space:nowrap;min-width:0;cursor:pointer}
+.nt-find-check input{width:14px;height:14px;margin:0;flex:0 0 auto}
+.nt-find-check:has(input:disabled){color:var(--faint);cursor:default}
+.nt-find-mode,.nt-find-transparency{margin:0;padding:3px 9px 7px;border:1px solid var(--border);border-radius:7px;display:grid;gap:3px;min-width:0}
+.nt-find-mode{grid-area:mode}
+.nt-find-transparency{grid-area:transparency;align-self:stretch}
+.nt-find-mode legend,.nt-find-transparency legend{padding:0 4px;color:var(--muted);font-size:11px}
+.nt-find-transparency legend .nt-find-check{color:var(--muted)}
+.nt-find-transparency input[type=range]{width:100%;min-width:0;margin:3px 0 0;accent-color:var(--accent)}
+.nt-find-buttons{grid-area:buttons;display:flex;flex-direction:column;gap:5px;min-width:0}
+.nt-find-buttons .btn{width:100%;justify-content:center;text-align:center;min-height:27px;white-space:normal;line-height:1.2}
+.nt-find-in-selection{margin-bottom:2px}
+.nt-find-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:27px;padding:4px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);flex:0 0 auto}
+.nt-find-status [data-ed-find-message]{flex:1 1 180px;min-width:0;overflow-wrap:anywhere}
+.nt-find-status .error{color:var(--bad)}
+.nt-find-progress{display:inline-flex;align-items:center;gap:6px}
+.nt-find-progress .btn{min-height:22px;padding:1px 7px}
+/* Each tab shows its own fields, options and buttons. */
+.nt-find-window[data-tab=find] [data-tabs]:not([data-tabs~=find]),
+.nt-find-window[data-tab=replace] [data-tabs]:not([data-tabs~=replace]),
+.nt-find-window[data-tab=mark] [data-tabs]:not([data-tabs~=mark]){display:none}
+/* A narrow window (a detached editor at its minimum size). */
+@media(max-width:620px){
+ .nt-find-panel{grid-template-columns:minmax(0,1fr);grid-template-areas:"main" "buttons" "mode" "transparency" "guide"}
+ .nt-find-buttons{flex-flow:row wrap}
+ .nt-find-buttons .btn{width:auto;flex:1 1 auto}
+ .nt-find-in-selection{flex-basis:100%}
+}
+@media(max-height:520px){
+ .nt-find-panel{gap:5px 10px;padding:7px 10px}
+ .nt-find-buttons{gap:3px}
+ .nt-find-buttons .btn{min-height:23px;padding:2px 6px}
+ .nt-find-mode,.nt-find-transparency{padding:1px 8px 4px;gap:1px}
+}
+.nt-editor.is-comparing .nt-find-window{display:none}
+/* Find and Replace on the toolbar show that their tab is open. */
+.nt-editor-toolbar :is([data-ed="find"],[data-ed="replace"])[aria-pressed="true"]{background:var(--accentBg);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+/* The line under Find what and the syntax guide. */
+.nt-find-explain{margin:-2px 0 0 calc(6.8em + 6px);min-height:1.3em;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nt-find-explain.error{color:var(--bad)}
+.nt-find-guide-toggle{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-left:4px;padding:0;border:1px solid var(--border);border-radius:50%;background:transparent;color:var(--muted);font:600 11px/1 inherit;cursor:pointer;vertical-align:middle}
+.nt-find-guide-toggle:hover,.nt-find-guide-toggle[aria-expanded="true"]{background:var(--accentBg);color:var(--accent);border-color:var(--accent)}
+.nt-find-guide-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.nt-find-guide{grid-area:guide;max-height:170px;overflow:auto;padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--panel2,var(--panel));font-size:11px}
+.nt-find-guide p{margin:2px 0 5px;color:var(--muted)}
+.nt-find-guide p strong{color:var(--text)}
+.nt-find-guide-note{margin-top:6px!important}
+.nt-find-guide-rows{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1px 8px}
+.nt-find-guide-row{display:grid;grid-template-columns:7.2em minmax(0,1fr);grid-template-rows:auto auto;column-gap:6px;align-items:baseline;text-align:left;padding:3px 5px;border:0;border-radius:5px;background:transparent;color:var(--text);font:inherit;cursor:pointer}
+.nt-find-guide-row:hover,.nt-find-guide-row:focus-visible{background:var(--hover);outline:0}
+.nt-find-guide-row code{grid-row:1/3;font:600 12px var(--mono,Consolas,monospace);color:var(--nt-code-keyword,var(--accent));white-space:nowrap}
+.nt-find-guide-row small{color:var(--muted);font-size:10px;overflow-wrap:anywhere}
+@media(max-width:620px){.nt-find-guide-rows{grid-template-columns:minmax(0,1fr)}.nt-find-explain{margin-left:0}}
+/* The status bar's toggle of the Search results panel. */
+.nt-find-results-toggle{display:inline-flex;align-items:center;gap:5px;min-height:20px;padding:1px 7px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--muted);font:inherit;font-size:10px;cursor:pointer}
+.nt-find-results-toggle:hover{color:var(--text);background:var(--hover)}
+.nt-find-results-toggle.is-open{background:var(--accentBg);color:var(--accent);border-color:var(--accent)}
+.nt-find-results-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.nt-find-badge{min-width:1.6em;padding:0 5px;border-radius:8px;background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--text);font-weight:600;text-align:center}
+
+/* Marks: a layer behind the text, placed like the syntax colours. */
+.nt-editor-marks{position:absolute;inset:0;width:max-content;min-width:100%;height:auto;min-height:100%;margin:0;padding:10px 12px 20px;border:0;background:transparent;font:inherit;line-height:1.55;letter-spacing:0;tab-size:var(--nt-editor-tab,4);white-space:pre;overflow-wrap:normal;overflow:visible;pointer-events:none;color:transparent}
+.nt-editor-marks.is-wrapped{white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;min-width:0;right:auto;bottom:auto;box-sizing:border-box}
+.nt-editor-marks mark{color:transparent;background:var(--nt-find-mark);border-radius:2px;box-shadow:0 0 0 1px color-mix(in srgb,var(--nt-find-mark) 60%,transparent)}
+/* The match Find Next selected: the selection colour, also while the Find
+   window has the focus. */
+.nt-editor-marks mark.is-current{background:var(--accentBg,color-mix(in srgb,var(--accent) 35%,transparent));box-shadow:0 0 0 1px var(--accent)}
+/* Bookmarks: a dot in the line-number gutter. */
+.nt-editor-gutter .is-bookmarked{position:relative;color:var(--nt-code-fg,var(--text))}
+.nt-editor-gutter .is-bookmarked::after{content:'';position:absolute;left:4px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:var(--nt-find-bookmark);box-shadow:0 0 0 1px color-mix(in srgb,var(--nt-code-bg,var(--input)) 70%,transparent)}
+
+/* The Search results panel, docked at the bottom of the editor. */
+.nt-find-results{position:relative;display:flex;flex-direction:column;flex:0 0 var(--nt-find-results-height,180px);min-height:0;background:var(--panel);border-top:1px solid var(--border)}
+.nt-find-results-resize{flex:0 0 5px;cursor:row-resize}
+.nt-find-results-head{display:flex;align-items:center;gap:8px;min-height:27px;padding:2px 6px 2px 12px;border-bottom:1px solid var(--line);font-size:11px}
+.nt-find-results-head strong{font-size:12px}
+.nt-find-results-summary{color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nt-find-results-head .btn{min-height:22px;padding:1px 8px}
+.nt-find-results-head .nt-find-x{margin:0}
+.nt-find-results-scroll{position:relative;flex:1 1 0;min-height:0;overflow:auto;tab-size:4;background:var(--nt-code-bg,var(--input));color:var(--nt-code-fg,var(--text));font:12px/20px var(--mono,Consolas,monospace);outline:0}
+.nt-find-results-scroll:focus-visible{box-shadow:inset 0 0 0 2px var(--accent)}
+.nt-find-results-space{width:1px}
+.nt-find-results-rows{position:absolute;inset:0 auto auto 0;min-width:100%}
+.nt-find-row{position:absolute;left:0;min-width:100%;height:20px;padding:0 12px 0 8px;white-space:pre;cursor:default;box-sizing:border-box}
+.nt-find-row.is-search{font-weight:600;background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.nt-find-row.is-file{padding-left:24px;color:var(--nt-code-keyword,var(--accent))}
+.nt-find-row.is-line{padding-left:46px}
+.nt-find-row.is-pending{color:var(--muted)}
+.nt-find-row.is-selected{background:var(--accentBg,color-mix(in srgb,var(--accent) 25%,transparent))}
+.nt-find-results-scroll:focus .nt-find-row.is-focus{outline:1px solid var(--accent);outline-offset:-1px}
+.nt-find-row mark{color:inherit;background:var(--nt-find-mark);border-radius:2px}
+.nt-find-toggle{display:inline-block;width:1.3em;color:var(--muted);cursor:pointer}
+.nt-find-tag,.nt-find-note,.nt-find-line-number,.nt-find-cut{color:var(--muted);font-weight:400}
+.nt-find-note{color:var(--warn)}
+.nt-editor.is-comparing .nt-find-results{max-height:40%}

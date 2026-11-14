@@ -270,7 +270,7 @@ func replaceText(ctx context.Context, b *editorbuffer.Buffer, req editorDiskRequ
 	if s.Revision != req.Revision {
 		return nil, editorbuffer.ErrRevision
 	}
-	text, found, err := s.ReplaceText(ctx, req.Query, req.Replace, req.From, req.To, req.Regex, req.MatchCase, req.WholeWord)
+	text, found, err := s.ReplaceTextFor(ctx, req.findSearch(), req.Replace, req.From, req.To)
 	if err != nil {
 		return nil, err
 	}

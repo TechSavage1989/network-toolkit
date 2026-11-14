@@ -24,7 +24,7 @@ import (
 // selected, the editor guide's recipe for a one-line encoded settings file
 // (Base64 decode stops at the "&&" after the Base64 and offers Decode the
 // part before it; Split at text &; URL decode; Undo) on a synthetic 1.5 MB
-// file, the Find bar's Extended mode, and Undo. The script is
+// file, the Find window's Extended mode, and Undo. The script is
 // scripts/editor-text-tools.browser.cjs; afterwards the files on disk must be
 // exactly as they were written.
 func TestEditorSessionBrowserTextTools(t *testing.T) {

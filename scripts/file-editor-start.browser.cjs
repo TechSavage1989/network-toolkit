@@ -1,6 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const {handleFind}=require('./editor-find-fixture.cjs');
 const root=path.resolve(__dirname,'..'),version=require('../package.json').version,output=process.env.TOOLKIT_TEST_OUTPUT;
 const text='# START OF DOCUMENT\n'+Array.from({length:300},(_,i)=>'Line '+(i+2)+' '+ 'readable file contents '.repeat(12)).join('\n')+'\n# END OF DOCUMENT';
 (async()=>{
@@ -8,6 +9,7 @@ const text='# START OF DOCUMENT\n'+Array.from({length:300},(_,i)=>'Line '+(i+2)+
  page.on('pageerror',error=>errors.push(error.message));page.on('dialog',dialog=>dialog.accept());
  await page.route('https://toolkit.local/**',async route=>{
   const request=route.request(),p=new URL(request.url()).pathname;
+  if(await handleFind(route))return;
   if(p.startsWith('/api/')){
    const body=request.postData()?request.postDataJSON():null;let data={};
    if(p==='/api/status')data={version,os:'windows',arch:'amd64'};
@@ -53,7 +55,7 @@ const text='# START OF DOCUMENT\n'+Array.from({length:300},(_,i)=>'Line '+(i+2)+
    await bottom();await page.locator('[data-ed="reload"]').click();await page.waitForFunction(()=>document.querySelector('[data-ed-text]').selectionStart===0);await atStart('reload');assert.equal(await input().inputValue(),text);
    await bottom();await openLocal(file+'-second');await bottom();await openLocal(file);
    // Ordinary Find and manual navigation still reach the end of the file.
-   await page.locator('[data-ed="find"]').click();await page.fill('[data-ed-query]','END OF DOCUMENT');await settled();assert(await input().evaluate(el=>el.selectionStart>0&&el.scrollTop>0));await page.locator('[data-ed="hideFind"]').click();assert(await input().evaluate(el=>el.scrollTop>0));
+   await page.locator('[data-ed="find"]').click();await page.fill('[data-ed-query]','END OF DOCUMENT');/* Search as you type: a pause in typing selects the first match from the cursor (debounced). */await page.waitForFunction(()=>{const ta=document.querySelector('[data-ed-text]');return ta.value.slice(ta.selectionStart,ta.selectionEnd)==='END OF DOCUMENT';});await settled();assert(await input().evaluate(el=>el.selectionStart>0&&el.scrollTop>0));await page.locator('[data-ed="hideFind"],[data-ed-find-close]').click();assert(await input().evaluate(el=>el.scrollTop>0));
    layouts.push({width,theme,mode});await close();
   }
   await page.setViewportSize({width:1280,height:900});await page.evaluate(()=>navigate('editor'));

@@ -241,6 +241,11 @@ func TestEditorShowsBinaryFilesReadOnlyAndNeverWritesThem(t *testing.T) {
 				{"action": "edit-begin", "revision": revision, "from": 0, "to": 1, "requestId": "bulk-1"},
 				{"action": "replace-all", "revision": revision, "query": "P", "replacement": "Q", "matchCase": true},
 				{"action": "replace-text", "revision": revision, "query": "P", "replacement": "Q", "from": 0, "to": 1, "regex": true},
+				// The Find window's Replace All (editor_find.go), of the whole
+				// file and "In selection".
+				{"action": "find-start", "kind": "replace", "revision": revision, "search": map[string]any{"query": "P", "matchCase": true}, "replacement": "Q"},
+				{"action": "find-start", "kind": "replace", "revision": revision, "search": map[string]any{"query": ".", "regex": true, "dotAll": true}, "replacement": "Q", "within": []int64{0, 4}},
+				{"action": "replace-all", "revision": revision, "search": map[string]any{"query": "P"}, "replacement": "Q", "within": []int64{0, 4}},
 				{"action": "tool-start", "revision": revision, "tool": "upper"},
 				{"action": "tool-start", "revision": revision, "tool": "base64-encode", "from": 0, "to": 1},
 				// Decode the part before it: the same tool over a range.

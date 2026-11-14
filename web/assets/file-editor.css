@@ -5,17 +5,13 @@
 .nt-editor-title{display:flex;gap:10px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--border);min-height:42px}
 .nt-editor-title strong{white-space:nowrap}.nt-editor-title>button{margin-left:auto}
 .nt-editor-filetitle{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted)}
-.nt-editor-toolbar,.nt-editor-options,.nt-editor-find{display:flex;flex:0 0 auto;align-items:center;gap:5px;padding:6px 10px;flex-wrap:wrap;border-bottom:1px solid var(--line);min-height:39px}
+.nt-editor-toolbar,.nt-editor-options{display:flex;flex:0 0 auto;align-items:center;gap:5px;padding:6px 10px;flex-wrap:wrap;border-bottom:1px solid var(--line);min-height:39px}
 .nt-editor-toolbar .btn{min-height:26px;padding:3px 7px;font-size:11px}
 .nt-editor-rule{border-left:1px solid var(--border);height:19px;margin:0 4px}
 .nt-editor-options{font-size:10px;gap:13px;min-height:30px;padding:4px 12px;color:var(--muted)}
 .nt-editor-options label{display:flex;align-items:center;gap:5px;white-space:nowrap}
 .nt-editor-options select{width:auto;min-height:26px;padding:2px 5px;font-size:11px}
-.nt-editor-options input[type=checkbox],.nt-editor-find input[type=checkbox]{width:14px;height:14px;margin:0}
-.nt-editor-find{font-size:11px;gap:8px}
-.nt-editor-find label{display:flex;align-items:center;gap:5px}
-.nt-editor-find label input:not([type=checkbox]){width:min(24vw,240px);min-height:28px;padding:4px 6px}
-.nt-editor-replace-fields{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.nt-editor-options input[type=checkbox]{width:14px;height:14px;margin:0}
 .nt-editor-code{display:flex;flex:1 1 0;min-height:110px;min-width:0;overflow:hidden;background:var(--input);font:12px/1.55 Consolas,'Cascadia Code',monospace;}
 .nt-editor-code.nt-editor-disk{position:relative}
 .nt-editor-disk-scroll{flex:0 0 16px;overflow-y:scroll;overflow-x:hidden;min-height:0;scrollbar-width:auto}
@@ -172,7 +168,7 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 
 /* Accessible document tabs and local, editable side-by-side comparison. */
 .nt-editor-tabs{flex:0 0 auto}
-.nt-editor.is-comparing .nt-editor-code,.nt-editor.is-comparing .nt-editor-find{display:none}
+.nt-editor.is-comparing .nt-editor-code{display:none}
 .nt-editor-compare{display:flex;flex:1 1 0;flex-direction:column;min-height:220px;min-width:0;overflow:hidden;border-top:1px solid var(--border)}
 .nt-compare-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;flex:0 0 auto;border-bottom:1px solid var(--border);font-size:11px}
 .nt-compare-tools label{display:flex;gap:4px;align-items:center}.nt-compare-tools input{width:14px;height:14px;margin:0}.nt-compare-tools select{width:auto;min-height:27px;padding:3px 5px;font-size:11px}.nt-compare-tools strong{margin-right:auto}.nt-compare-tools button{font-size:11px;min-height:27px;padding:3px 7px}
@@ -488,8 +484,7 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 [data-compare-map-marks] .moved{fill:var(--info)}
 
 /* Text tools (editor-text-tools.js): the Tools menu, its descriptions and
-   shortcuts, progress of a tool that runs in the engine, and the Find bar's
-   search mode. */
+   shortcuts and progress of a tool that runs in the engine. */
 .nt-editor-context-menu .nt-editor-menu-text{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
 .nt-editor-context-menu .nt-editor-menu-text>small{font-size:10.5px;line-height:1.3;color:var(--muted);white-space:normal}
 .nt-editor-context-menu .nt-editor-submenu{max-width:min(380px,calc(100vw - 12px))}
@@ -501,7 +496,6 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 .nt-editor-tools-menu>.nt-editor-menu-root button>svg{margin-top:1px}
 .nt-editor-toolbar .nt-editor-tools-button[aria-expanded=true]{background:var(--accentBg)}
 .nt-editor-tool-bar progress{flex:0 1 160px;min-width:80px;height:8px;accent-color:var(--accent)}
-.nt-editor-find .nt-editor-search-mode select{width:auto;max-width:min(270px,60vw);min-height:28px;padding:2px 5px;font-size:11px}
 .nt-editor-dialog-card label.nt-editor-dialog-check{flex-direction:row;align-items:center;gap:6px;margin-top:8px}
 .nt-editor-dialog-card label.nt-editor-dialog-check input{width:auto}
 
