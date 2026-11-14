@@ -60,10 +60,18 @@ func TestWindowsLocalShellColorTranscript(t *testing.T) {
 			if _, err = tr.Write([]byte(command)); err != nil {
 				t.Fatal(err)
 			}
-			time.Sleep(800 * time.Millisecond)
-			mu.Lock()
-			raw := output.String()
-			mu.Unlock()
+			// The shell echoes the typing when it gets to it (PowerShell's line
+			// editor can take more than a second on a busy runner): wait for
+			// the echo, not a fixed pause.
+			var raw string
+			for echoed := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+				mu.Lock()
+				raw = output.String()
+				mu.Unlock()
+				if strings.Contains(raw, ">") && strings.Contains(raw, "NTK_COLOR_SAMPLE") || time.Now().After(echoed) {
+					break
+				}
+			}
 			if !strings.Contains(raw, ">") || !strings.Contains(raw, "NTK_COLOR_SAMPLE") {
 				t.Fatalf("native command line did not render: %q", raw)
 			}
