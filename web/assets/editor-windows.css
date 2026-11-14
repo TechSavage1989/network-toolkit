@@ -8,6 +8,9 @@
 .nt-editor-window-announcement{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 [data-editor-window-toggle][aria-expanded=true]{background:var(--accentBg);border-color:var(--accent)}
 [data-editor-window-indicator]{color:var(--accent);font-weight:700}
+[data-editor-window-indicator]:empty{display:none}
+/* With icon buttons, a pending move or a problem still shows its words. */
+.nt-editor:not([data-toolbar-labels="text"]) .nt-editor-toolbar [data-editor-window-toggle]:is([data-editor-window-status="pending"],[data-editor-window-status="attention"]) .nt-editor-tool-text{display:inline}
 body.editor-window #sidebar,body.editor-window .topbar,body.editor-window #sidebarBackdrop{display:none!important}
 body.editor-window .app{grid-template-columns:minmax(0,1fr)}
 body.editor-window .main{grid-column:1;min-width:0}

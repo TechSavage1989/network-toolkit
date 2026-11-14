@@ -3,10 +3,11 @@
 // side is the file location (local or remote); dock is where the sidebar sits.
 let dock='left',side='local',panel='files',protocol='ssh',width=300,accessTimer=null,requests=[],sourceBusy=false,navigationRevision=0,preferencesLoaded=false,wideCollapsed=false,compactOpen=false,compactLayout=null,documentList=null;
 const detached=()=>typeof EDITOR_WINDOW!=='undefined'&&EDITOR_WINDOW;
-// The rail's panels: Connect, Files and the Document List (owner request,
-// like Notepad++'s Document List). They share one sidebar: its width, side
-// and open/closed setting.
-const PANELS={connections:{label:'Connect',name:'Connections',icon:'connect',id:'ntEditorConnectionsTab'},files:{label:'Files',name:'Files',icon:'folder',id:'ntEditorFilesTab'},documents:{label:'Docs',name:'Documents',icon:'documents',id:'ntEditorDocumentsTab'}};
+// The rail's panels, in rail order: the Document List first (owner request
+// after v1.21.57; like Notepad++'s Document List), then Connect and Files.
+// They share one sidebar: its width, side and open/closed setting. The rail is
+// the only way to open and close it: the toolbar has no Files button.
+const PANELS={documents:{label:'Docs',name:'Documents',icon:'documents',id:'ntEditorDocumentsTab'},connections:{label:'Connect',name:'Connections',icon:'connect',id:'ntEditorConnectionsTab'},files:{label:'Files',name:'Files',icon:'folder',id:'ntEditorFilesTab'}};
 const panelName=value=>Object.hasOwn(PANELS,value)?value:'files';
 function readPreferences(){if(preferencesLoaded)return;preferencesLoaded=true;let v={};if(detached()){try{v=JSON.parse(root.sessionStorage?.getItem('ntk.editor.files')||'{}');}catch{}}else v=typeof state==='undefined'?{}:state.editorFilesPreferences||{};dock=v.dock==='right'?'right':'left';side=v.side==='remote'?'remote':'local';panel=panelName(v.panel);width=Number.isFinite(v.width)?Math.max(220,Math.min(600,v.width)):300;wideCollapsed=v.collapsed===true;return v;}
 function remember(host){const value={side,panel,width,collapsed:wideCollapsed,dock};if(detached()){try{root.sessionStorage?.setItem('ntk.editor.files',JSON.stringify(value));}catch{}}else if(typeof state!=='undefined'){state.editorFilesPreferences=value;if(typeof saveState==='function')saveState();}}
@@ -55,7 +56,7 @@ function syncRail(host){
  // The More menu's "Document list" box shows whether the list is open.
  const box=host.closest('#networkToolkitFileEditor')?.querySelector('[data-ed-document-list]');if(box)box.checked=panel==='documents'&&!host.hidden;
 }
-function visibility(editor,host,show){host.hidden=!show;editor.querySelector('[data-ed="files"]')?.setAttribute('aria-expanded',String(show));syncRail(host);if(!show)clearTimeout(accessTimer);else mount(host);}
+function visibility(editor,host,show){host.hidden=!show;syncRail(host);if(!show)clearTimeout(accessTimer);else mount(host);}
 function isCompact(){return (root.innerWidth||900)<=680;}
 function expandedIntent(show){compactLayout=isCompact();if(compactLayout)compactOpen=show;else wideCollapsed=!show;}
 function responsive(editor,host){const compact=isCompact();if(compactLayout!==compact){compactOpen=false;compactLayout=compact;}const show=compact?compactOpen:!wideCollapsed,focused=!show&&host.contains(document.activeElement);if(host.hidden===show)navigationRevision++;visibility(editor,host,show);if(focused)editor.querySelector('[data-editor-files-reopen]')?.focus?.({preventScroll:true});}
