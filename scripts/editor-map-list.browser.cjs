@@ -16,7 +16,7 @@
 //    area of a 16 MB page-held document is itself slow to scroll in Chromium,
 //    which is why the app keeps such files disk-backed; Part 2 checks long
 //    tasks there);
-//  - the Document List on the rail (Connect, Files, Docs): every tab in tab
+//  - the Document List on the rail (Docs, Connect, Files): every tab in tab
 //    order with its extension and unsaved marker, the active one highlighted;
 //    click, Up/Down and Enter activate; the right-click menu is the tab menu;
 //    left and right view groups in split view; the panel is restored after a
@@ -243,7 +243,7 @@ async function mainWindow(browser){
 
  // ---- Document List ----
  const rail=page.locator('#networkToolkitFileEditor [data-editor-files-panel="documents"]');
- assert.deepEqual(await page.locator('#networkToolkitFileEditor [data-editor-files-panel]').evaluateAll(list=>list.map(el=>[el.dataset.editorFilesPanel,el.textContent,el.getAttribute('aria-label')])),[['connections','Connect','Connections'],['files','Files','Files'],['documents','Docs','Documents']],'Docs is the third item of the editor rail');
+ assert.deepEqual(await page.locator('#networkToolkitFileEditor [data-editor-files-panel]').evaluateAll(list=>list.map(el=>[el.dataset.editorFilesPanel,el.textContent,el.getAttribute('aria-label')])),[['documents','Docs','Documents'],['connections','Connect','Connections'],['files','Files','Files']],'Docs is the first item of the editor rail');
  await rail.click();await frames(page);
  assert.equal(await page.locator('#networkToolkitFileEditor [data-editor-documents]').isVisible(),true,'the rail opens the document list');
  assert.equal(await page.locator('#networkToolkitFileEditor [data-editor-file-browser]').isVisible(),false,'the list replaces the file browser in the sidebar');

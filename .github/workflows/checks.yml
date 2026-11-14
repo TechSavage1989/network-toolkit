@@ -310,6 +310,9 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/large-editor
         run: go test -mod=vendor ./cmd/network-toolkit -run '^TestEditor(LargeFileBrowser|BrowserStorage)$' -count=1 -v -timeout=8m
+      # ^TestEditorSessionBrowser also runs the other real-engine editor page checks:
+      # any file, Find window, Document Map and List, text tools and the toolbar's
+      # icon and text buttons (scripts/editor-toolbar-icons.browser.cjs).
       - name: Keep and restore Text Editor sessions through the real editor handlers
         if: success() || failure()
         env:
