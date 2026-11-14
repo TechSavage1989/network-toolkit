@@ -108,6 +108,9 @@ type editorPreferences struct {
 	AppTheme                  string            `json:"appTheme,omitempty"`
 	Colors                    map[string]string `json:"colors"`
 	DocumentMap               *bool             `json:"documentMap,omitempty"` // the Document Map setting, for a new editor window
+	// ToolbarLabels is the Toolbar buttons setting (More menu): "icons" (the
+	// default, also when empty) or "text".
+	ToolbarLabels string `json:"toolbarLabels,omitempty"`
 	// FindTransparency is the Find window's Transparency setting
 	// (editor-find.js): on, "blur" (on losing focus) or "always", and the
 	// opacity in percent.
@@ -431,6 +434,11 @@ func validateEditorBatch(batch editorBatch) error {
 		}
 		if f := p.FindTransparency; f != nil && (f.Mode != "blur" && f.Mode != "always" || f.Level < 20 || f.Level > 95) {
 			return errors.New("Invalid Find window transparency.")
+		}
+		switch p.ToolbarLabels {
+		case "", "icons", "text":
+		default:
+			return errors.New("Invalid editor toolbar buttons setting.")
 		}
 		allowed := map[string]bool{"bg": true, "fg": true, "comment": true, "string": true, "keyword": true, "number": true, "property": true}
 		for k, v := range p.Colors {

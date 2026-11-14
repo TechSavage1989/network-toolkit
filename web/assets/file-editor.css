@@ -8,6 +8,15 @@
 .nt-editor-toolbar,.nt-editor-options{display:flex;flex:0 0 auto;align-items:center;gap:5px;padding:6px 10px;flex-wrap:wrap;border-bottom:1px solid var(--line);min-height:39px}
 .nt-editor-toolbar .btn{min-height:26px;padding:3px 7px;font-size:11px}
 .nt-editor-rule{border-left:1px solid var(--border);height:19px;margin:0 4px}
+/* Toolbar buttons hold an icon and a text and show one of them: the icon
+   unless More → Toolbar buttons is Text (data-toolbar-labels on the editor).
+   Their accessible names and tooltips are the same either way. */
+.nt-editor:not([data-toolbar-labels="text"]) .nt-editor-toolbar .nt-editor-tool-icon+.nt-editor-tool-text{display:none}
+.nt-editor[data-toolbar-labels="text"] .nt-editor-toolbar .nt-editor-tool-icon{display:none}
+.nt-editor[data-toolbar-labels="text"] .nt-editor-toolbar .nt-editor-icon-button{min-width:0}
+.nt-editor-toolbar .nt-editor-tool-text{white-space:nowrap}
+.nt-editor-more-actions .nt-editor-toolbar-labels{justify-content:space-between}
+.nt-editor-more-actions .nt-editor-toolbar-labels select{flex:0 0 auto;width:auto;min-width:78px;min-height:26px;padding:2px 5px;font-size:11px}
 .nt-editor-options{font-size:10px;gap:13px;min-height:30px;padding:4px 12px;color:var(--muted)}
 .nt-editor-options label{display:flex;align-items:center;gap:5px;white-space:nowrap}
 .nt-editor-options select{width:auto;min-height:26px;padding:2px 5px;font-size:11px}
@@ -233,7 +242,8 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-more-actions .btn{justify-content:flex-start;min-height:28px;padding:4px 8px;font-size:11px;text-align:left}
 .nt-editor-more-actions .nt-editor-close-preference{margin:0;padding:4px 8px}
 .nt-editor-more-actions .nt-editor-preference-hint{display:block;margin:-2px 0 2px;padding:0 8px 4px 27px;font-size:10px;line-height:1.35;color:var(--muted);white-space:normal}
-.nt-editor [data-ed="compare"][aria-pressed="true"]{background:var(--accentBg);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+/* Split is also pressed while comparing (it then returns to one view); only the comparison looks pressed then. */
+.nt-editor [data-ed="compare"][aria-pressed="true"],.nt-editor:not(.is-comparing) [data-ed="split"][aria-pressed="true"]{background:var(--accentBg);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .nt-editor.is-comparing :is([data-ed="find"],[data-ed="replace"],[data-ed="goto"]){display:none}
 /* Embedded tools retain the same natural toolbar wrapping at narrow widths. */
 .nt-editor-toolbar,.nt-editor-embedded .nt-editor-toolbar,.nt-editor.is-comparing .nt-editor-toolbar{max-height:none;overflow:visible;min-height:0;padding:5px 8px}

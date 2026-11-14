@@ -1,3 +1,19 @@
+# v1.21.58 Beta 1 - Icon toolbar in the Text Editor
+
+Owner request: "don't need a files button when the sidebar for files is already there. Docs should be at the top of the tab list in the text editor sidebar. Move/merge can be an icon instead of text. Save and save as can be icons. Open file can be an icon, in fact, make a configurable option to toggle between text and icon buttons in the ui toolbar for all relevant items". Scoped to the Text Editor toolbar (every Text Editor: main window, detached windows, the standalone Text Editor, the standalone Terminal's floating editor).
+
+v1.21.57 was published and verified: tag at merge commit 96cf71d (PR #186), release run 43532602768 green, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.57", stable channel still at v1.21.34. Its CI found a Chromium 151 bug that undid script-set textarea selections on a button click (fixed in that release with `keepScriptSelection`) and two checks that waited a fixed time shorter than what they waited for (PR #187: saved-order save, Windows PowerShell echo).
+
+What changed (rules in AGENTS.md; guide in docs/guide/editor.md "Toolbar" and "Files and Connect sidebar"):
+- `editorToolButton` (file-editor.js) builds each switchable toolbar button with both its icon and its text; `editorPreferences.toolbarLabels` (`icons`, the default, or `text`) decides which shows. Accessible names and tooltips (with shortcuts) are the same in both modes; Save keeps its primary look; Find, Replace, Compare and Split look pressed in both. The setting is More → View → Toolbar buttons. It is restored with the other editor preferences, shared between the apps, and carried to a new editor window (`ToolbarLabels` in the Go preference struct, `validateEditorBatch` refuses other values).
+- Switchable buttons: Open file, Save, Save as, Reload, Compare, Detach, Move / merge, Split, Undo, Redo, Find, Replace, Go to line, Send to terminal, Tools, Full editor, Close editor. More stays text (the setting lives in it); New tab (+) stays an icon. New glyphs: open folder, Save as, Move / merge, Replace, wrench.
+- Move / merge (editor-windows.js) is an icon; while a move is pending or a window needs attention its words show beside the icon in both modes.
+- The toolbar's Files button is gone; the rail is Docs, Connect, Files (keyboard: Up/Down/Home/End, Enter/Space shows or hides the sidebar), with three command palette entries and two F1 help rows. The panel shown by default is still Files.
+
+Checks: `TestEditorSessionBrowserToolbarButtons` (`scripts/editor-toolbar-icons.browser.cjs`, in the existing `^TestEditorSessionBrowser` step: no Files button, rail order, icons by default with names and tooltips, Text mode, reload, a detached 640×400 window, Move / merge menu and indicator, both themes, 1280 and 1024 px, the shared settings file), the updated toolbar, sidebar and standalone-apps checks on Chromium 151 and 153, `text-editor-compare.png` recaptured.
+
+Known limits: in Text mode the toolbar takes two rows at 1280 and 1024 px (one row with icons). Not tried on Windows by the owner yet.
+
 # v1.21.57 Beta 1 - Find window, search results and bookmarks
 
 Owner request (Notepad++ Find, Replace, Mark and Search results screenshots): "These features must be added." Owner decisions: a Find window with tabs; the Search results panel (the Document Map and Document List shipped in v1.21.55); Find in Files is not wanted. Later owner requests apply to it too: buttons that open a row or panel toggle it closed instead of a separate Hide/Close control, and a built-in, unobtrusive guide to the Extended and regular expression syntax.

@@ -75,7 +75,7 @@ const connectForm=async()=>{const frames=()=>page.evaluate(()=>new Promise(resol
  let previous=JSON.stringify(await connectFormNow());for(let attempt=0;attempt<100;attempt++){await frames();const form=await connectFormNow(),text=JSON.stringify(form);if(text===previous)return form;previous=text;}
  throw new Error('The connection form kept changing.');};
 
-const EDITOR_COMMANDS=['Application | Keyboard shortcuts and help','Application | Search tools and commands','Application | Window settings','Application | Reopen recently closed tab','Application | Switch light/dark theme','Text Editor | New Text Editor document','Text Editor | More actions for selected Editor tab','Text Editor | Show or hide the document map','Text Editor | Show the document list','Text Editor | Send to terminal','Text Editor | Open Network Toolkit Terminal'];
+const EDITOR_COMMANDS=['Application | Keyboard shortcuts and help','Application | Search tools and commands','Application | Window settings','Application | Reopen recently closed tab','Application | Switch light/dark theme','Text Editor | New Text Editor document','Text Editor | More actions for selected Editor tab','Text Editor | Show or hide the document map','Text Editor | Show the document list','Text Editor | Show the files sidebar','Text Editor | Show the connections sidebar','Text Editor | Show or hide the editor sidebar','Text Editor | Send to terminal','Text Editor | Open Network Toolkit Terminal'];
 const TERMINAL_COMMANDS=['Application | Keyboard shortcuts and help','Application | Search tools and commands','Application | Window settings','Application | Reopen recently closed tab','Application | Switch light/dark theme','Terminal | Open a new terminal tab','Terminal | Reconnect all terminal sessions','Terminal | More actions for selected Terminal tab','Terminal | Send output to Text Editor','Terminal | Open Network Toolkit Text Editor'];
 const GONE=['Welcome and quick starts','App settings','Update settings / Check for updates','Show or hide navigation'];
 
@@ -126,6 +126,20 @@ async function standaloneEditor(){
  await run('More actions for selected Editor tab');await page.getByRole('menuitem',{name:/^Save as/}).first().waitFor();await page.keyboard.press('Escape');
  {const shown=()=>page.evaluate(()=>!document.querySelector('#networkToolkitFileEditor [data-ed-map]').hidden);const before=await shown();await run('Show or hide the document map');await page.waitForFunction(value=>!document.querySelector('#networkToolkitFileEditor [data-ed-map]').hidden===value,!before);await run('Show or hide the document map');await page.waitForFunction(value=>!document.querySelector('#networkToolkitFileEditor [data-ed-map]').hidden===value,before);}
  await run('Show the document list');await page.locator(editor+' [data-editor-documents] [data-ed-doc-uid]').first().waitFor();assert.equal(await page.evaluate(()=>!!document.activeElement?.closest('[data-editor-documents]')),true,'the keyboard is on the document list');
+ // The toolbar has no Files button: the rail and these commands open the sidebar.
+ const sidebarState=()=>page.evaluate(()=>{const h=document.querySelector('#networkToolkitFileEditor [data-ed-files-sidebar]');return (h.hidden?'closed':'open')+':'+h.dataset.editorSidebarPanel+':'+(document.activeElement?.dataset?.editorFilesPanel||'');});
+ await run('Show the files sidebar');assert.equal(await sidebarState(),'open:files:files');
+ await run('Show the connections sidebar');assert.equal(await sidebarState(),'open:connections:connections');
+ await run('Show or hide the editor sidebar');assert.match(await sidebarState(),/^closed:connections/);
+ await run('Show or hide the editor sidebar');assert.match(await sidebarState(),/^open:connections/);
+ await run('Show the document list');await page.locator(editor+' [data-editor-documents] [data-ed-doc-uid]').first().waitFor();
+ assert.equal(await page.locator(editor+' .nt-editor-toolbar [data-ed="files"]').count(),0,'no Files button in the toolbar');
+ // More → Toolbar buttons: icons (default) or text, in this app too.
+ const labels=()=>page.evaluate(()=>{const b=document.querySelector('#networkToolkitFileEditor .nt-editor-toolbar [data-ed="save"]'),shown=el=>getComputedStyle(el).display!=='none';return document.querySelector('#networkToolkitFileEditor').dataset.toolbarLabels+':'+(shown(b.querySelector('svg'))?'icon':'')+(shown(b.querySelector('.nt-editor-tool-text'))?'text':'')+':'+b.getAttribute('aria-label');});
+ assert.equal(await labels(),'icons:icon:Save');
+ await page.locator(editor+' .nt-editor-more summary').click();await page.locator(editor+' [data-ed-toolbar-labels]').selectOption('text');
+ assert.equal(await labels(),'text:text:Save');assert.equal(await page.evaluate(()=>state.editorPreferences.toolbarLabels),'text','kept as an editor preference');
+ await page.locator(editor+' .nt-editor-more summary').click();await page.locator(editor+' [data-ed-toolbar-labels]').selectOption('icons');assert.equal(await labels(),'icons:icon:Save');
  await page.locator(editor+' [data-ed-text]').fill('show version');
  // Send to terminal with nothing running opens the Terminal app by itself (owner request; this used to
  // show "Network Toolkit Terminal is not open." and wait for the user). A new Terminal has no session yet.
@@ -179,7 +193,7 @@ async function standaloneTerminal(){
  const mainCommands=await palette();for(const label of GONE)assert(mainCommands.some(row=>row.endsWith('| '+label)),'main window keeps '+label);
  for(const label of ['Ping','Text Editor','Terminal','Reports'])assert(mainCommands.some(row=>row.endsWith('| '+label)),'main window keeps the '+label+' tool');
  assert.equal(mainCommands.some(row=>/Open Network Toolkit (Terminal|Text Editor)|\| Window settings$/.test(row)),false);
- const mainHelp=await helpRows();assert.deepEqual([...new Set(mainHelp.map(row=>row.split(' | ')[0]))],['Application','Text Editor','Terminal','File browser','Panels']);assert.equal(mainHelp.length,22);
+ const mainHelp=await helpRows();assert.deepEqual([...new Set(mainHelp.map(row=>row.split(' | ')[0]))],['Application','Text Editor','Terminal','File browser','Panels']);assert.equal(mainHelp.length,24);
  await page.evaluate(()=>navigate('editor'));await page.locator('#networkToolkitFileEditor button[aria-label="Connections"],#networkToolkitFileEditor button[title="Connections"]').first().click();
  await page.waitForFunction(()=>/Connect through Terminal or the SFTP \/ FTP \/ FTPS browser first\./.test(document.querySelector('#ntEditorRemoteHint')?.textContent||''));
  assert.equal(await page.evaluate(()=>[...document.querySelectorAll('#networkToolkitFileEditor [data-rb-action="openTerminal"]')].some(el=>getComputedStyle(el).display!=='none')),true,'the main window keeps Open terminal for file connections');
@@ -280,12 +294,18 @@ async function standaloneTerminal(){
  await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='hostname lab-switch-01\n');
  // The Document List and the Document Map need nothing but the editor: the
  // floating editor has them, through its own rail and More menu only.
- assert.deepEqual(await floating.locator('[data-editor-files-panel]').evaluateAll(list=>list.map(el=>el.dataset.editorFilesPanel)),['connections','files','documents']);
+ assert.deepEqual(await floating.locator('[data-editor-files-panel]').evaluateAll(list=>list.map(el=>el.dataset.editorFilesPanel)),['documents','connections','files']);
+ assert.equal(await floating.locator('.nt-editor-toolbar [data-ed="files"]').count(),0,'no Files button in the floating editor\'s toolbar');
+ // More → Toolbar buttons works in the floating editor too.
+ await floating.locator('.nt-editor-more summary').click();await floating.locator('[data-ed-toolbar-labels]').selectOption('text');
+ assert.equal(await floating.locator('.nt-editor-toolbar [data-ed="save"] .nt-editor-tool-text').isVisible(),true,'Text shows the words');
+ await floating.locator('.nt-editor-more summary').click();await floating.locator('[data-ed-toolbar-labels]').selectOption('icons');
+ assert.equal(await floating.locator('.nt-editor-toolbar [data-ed="save"] svg').isVisible(),true,'Icons shows the icons');
  await floating.locator('[data-editor-files-panel="documents"]').click();await floating.locator('[data-editor-documents] [data-ed-doc-uid]').first().waitFor();
  assert.deepEqual(await floating.locator('[data-editor-documents] [data-ed-doc-uid]').evaluateAll(list=>list.map(el=>el.textContent)),['running-configtxt']);
  await floating.locator('.nt-editor-more summary').click();await floating.locator('[data-ed-document-map]').check();await page.waitForFunction(()=>!document.querySelector('#networkToolkitFileEditor [data-ed-map]').hidden&&NetworkToolkitFileEditor.documentMap.layout);
  await floating.locator('.nt-editor-more summary').click();await floating.locator('[data-ed-document-map]').uncheck();
- assert.equal((await palette()).some(row=>/document (map|list)/i.test(row)),false,'the Terminal\'s palette lists terminal commands only');
+ assert.equal((await palette()).some(row=>/document (map|list)|editor sidebar|files sidebar|connections sidebar/i.test(row)),false,'the Terminal\'s palette lists terminal commands only');
  await shot('terminal-floating-editor');await floating.locator('[data-ed="close"]').click();
  pass('Terminal: the tab menu, the SFTP sidebar and the floating editor offer nothing that needs another Toolkit tool');
  // FTP/FTPS connections saved for the Toolkit's File Transfer tool are not listed in this app.

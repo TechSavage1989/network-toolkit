@@ -7,7 +7,33 @@ Open or create a document, review its source/connection, then edit. Save explici
 
 Hold **Ctrl** and roll the mouse wheel over editor text to change the font size. Wheel up enlarges the text and wheel down shrinks it. In Compare and Split View, both panes use the same size shown in the **Font size** control.
 
-Editor preferences (word wrap, highlighting, indent, font size, colors, compare options, the document map, and whether files are reopened) and the saved connections in the Files sidebar are the same in the main window's editor and in the separate **Network Toolkit Text Editor** window. See [One set of settings and saved data for all apps](settings-and-updates.md#one-set-of-settings-and-saved-data-for-all-apps).
+Editor preferences (word wrap, highlighting, indent, font size, colors, compare options, the document map, icon or text toolbar buttons, and whether files are reopened) and the saved connections in the Files sidebar are the same in the main window's editor and in the separate **Network Toolkit Text Editor** window. See [One set of settings and saved data for all apps](settings-and-updates.md#one-set-of-settings-and-saved-data-for-all-apps).
+
+## Toolbar
+The toolbar's buttons are icons. Point to one to see its name and shortcut. To see words instead, open **More** and set **Toolbar buttons** (under **View**) to **Text**; **Icons** switches back. The choice is kept when you restart, and it is the same in every Text Editor of the app: the main window, the Text Editor app, separate editor windows and the editor that opens from the Terminal app. The buttons do the same in both:
+
+| Icon | Button | Shortcut |
+| --- | --- | --- |
+| Open folder | **Open file** | Ctrl+O |
+| Floppy disk (highlighted) | **Save** | Ctrl+S |
+| Floppy disk with a pencil | **Save as** | Ctrl+Shift+S |
+| Two circling arrows | **Reload** | |
+| Two columns | **Compare** | |
+| Box with an arrow out | **Detach** (**Open separately** when no document is open) | |
+| Two windows with arrows between them | **Move / merge** | |
+| Window split in two | **Split** | |
+| Curved arrows | **Undo**, **Redo** | Ctrl+Z, Ctrl+Y |
+| Magnifier | **Find** | Ctrl+F |
+| Magnifier over an arrow | **Replace** | Ctrl+H |
+| Arrow to a line | **Go to line** | Ctrl+G |
+| Terminal with an arrow | **Send to terminal** | Ctrl+Shift+Enter |
+| Wrench | **Tools** (the [text tools](#text-tools)) | |
+| Four corners | **Full editor** (only in the editor that opens over another tool; it opens the Text Editor page) | |
+| × | **Close editor** | |
+
+**Find**, **Replace**, **Compare** and **Split** stay highlighted while what they opened is shown; press them again to close it. While a move to another window is pending, or a move needs your attention, **Move / merge** also says so in words beside its icon. **More** keeps its name, so the setting is always easy to find.
+
+The toolbar has no **Files** button: the icon strip at the edge of the sidebar opens **Docs**, **Connect** and **Files** (see [Files and Connect sidebar](#files-and-connect-sidebar)).
 
 ## Open any file
 The Text Editor opens whatever you give it, like Notepad++: a file of a type it knows, a type nobody knows, or a file with no extension at all. It never changes a file just by opening it, and a save changes only what you edited.
@@ -194,7 +220,7 @@ The **Search results** panel is docked at the bottom of the editor; **Find All**
 A search with millions of matches works in any document: the app keeps the rows and the panel reads and draws only the rows on screen. Count, Find All, Mark All, Copy Marked Text and Replace All of a large document run in the background with their progress in the window's status line, where **Cancel** stops them. A file that is not text can be searched, counted and marked, but nothing in it is replaced.
 
 ## Files and Connect sidebar
-The sidebar's Connect, Files and Docs buttons open saved connections, the file browser and the [Document List](#document-map-and-document-list). Drag its edge to resize it, or double-click the edge to hide it. The ⇄ button at the bottom of the sidebar's icon strip moves it to the other side of the editor; the side, width and open panel are kept when you restart.
+The sidebar's icon strip has three buttons, in this order: **Docs** (the [Document List](#document-map-and-document-list)), **Connect** (saved and open connections) and **Files** (the file browser). A button opens its panel, and the button of the panel that is open hides the sidebar; with the keyboard, Up and Down (or Home and End) move between them and Enter or Space hides or shows the sidebar. **Search tools and commands** (Ctrl+Shift+P) has *Show the files sidebar*, *Show the connections sidebar* and *Show or hide the editor sidebar*. Drag the sidebar's edge to resize it, or double-click the edge to hide it. The ⇄ button at the bottom of the sidebar's icon strip moves it to the other side of the editor; the side, width and open panel are kept when you restart.
 
 ## Document Map and Document List
 Like Notepad++, the Text Editor can show a **Document Map** and a **Document List**. Turn them on in **More** under **View**, or with **Search tools and commands** (Ctrl+Shift+P): *Show or hide the document map* and *Show the document list*. Both are kept when you restart, and they are the same in the main window, the Text Editor app and its separate windows. The editor that opens from the Terminal app has them too, in its **More** menu and sidebar.
@@ -207,14 +233,14 @@ The **Document Map** is a narrow strip at the right edge of the document that sh
 - A short document is drawn word by word in its syntax colors. A longer one is drawn as thin lines, and a very long one with one line for each row of the map, so the map stays quick for a document of any size.
 - A large file that the editor reads in sections is mapped by position, like its scroll bar: by line, or by character with **Wrap** on, so a file that is one long line (such as a Base64 export) is mapped from its first character to its last. The part you have read is drawn in detail; the rest is a light texture until you scroll there.
 
-The **Document List** is the **Docs** button on the sidebar's icon strip, under Connect and Files. It lists the open documents in tab order: an unsaved marker (●), the name, and the extension in a column of its own, with the selected document highlighted. In split view the documents of the left and right views are listed under their own headings.
+The **Document List** is the **Docs** button at the top of the sidebar's icon strip, above Connect and Files. It lists the open documents in tab order: an unsaved marker (●), the name, and the extension in a column of its own, with the selected document highlighted. In split view the documents of the left and right views are listed under their own headings.
 
 - Click a document, or move with Up and Down and press Enter, to switch to it. Escape returns to the text.
 - Right-click a document, or press Shift+F10, for the same menu as its tab: save, compare, move, copy the path or close.
 - The list shares the sidebar's width, side and open or closed state with Files. In a narrow window the sidebar covers the text, and it closes when you choose a document.
 
 ## Tabs and splitters
-Open a new document with the **+** at the end of the tab strip or Ctrl+N. When the tabs do not fit, scroll the tab row with the mouse wheel or the arrow buttons at its right end. Right-click editor text or press Shift+F10 for common editing and navigation commands. The [text tools](#text-tools) are grouped as **Lines**, **Encode / decode** and **Format**, the same groups as the toolbar's **Tools** menu, and **Compare** groups comparison commands. **More** on the toolbar keeps **Save copy**, **Text colors**, the **View** options (**Document map**, **Document list**) and the close and reopen preferences. Hover or click to open a submenu. With the keyboard, use Right Arrow to open it and Left Arrow to return to the main menu. To run text on a device, choose **Send to terminal** (the terminal-with-arrow button on the toolbar, the right-click menu, or Ctrl+Shift+Enter): pick the selection or the whole document and a connected Terminal session; the Terminal opens on that session and the text is entered like a paste, with your paste review settings. Each tab has a visible **More actions** menu with Move left, Move right and Move to separate window. Existing Alt+drag and Alt+Shift+Arrow shortcuts remain supported, as does tab dragging. Dividers can be resized and may support double-click reset or collapse.
+Open a new document with the **+** at the end of the tab strip or Ctrl+N. When the tabs do not fit, scroll the tab row with the mouse wheel or the arrow buttons at its right end. Right-click editor text or press Shift+F10 for common editing and navigation commands. The [text tools](#text-tools) are grouped as **Lines**, **Encode / decode** and **Format**, the same groups as the toolbar's **Tools** menu, and **Compare** groups comparison commands. **More** on the toolbar keeps **Save copy**, **Text colors**, the **View** options (**Document map**, **Document list**, **Toolbar buttons**: icons or text) and the close and reopen preferences. Hover or click to open a submenu. With the keyboard, use Right Arrow to open it and Left Arrow to return to the main menu. To run text on a device, choose **Send to terminal** (the terminal-with-arrow button on the toolbar, the right-click menu, or Ctrl+Shift+Enter): pick the selection or the whole document and a connected Terminal session; the Terminal opens on that session and the text is entered like a paste, with your paste review settings. Each tab has a visible **More actions** menu with Move left, Move right and Move to separate window. Existing Alt+drag and Alt+Shift+Arrow shortcuts remain supported, as does tab dragging. Dividers can be resized and may support double-click reset or collapse.
 
 ## The Text Editor app
 With the Windows setup installed, **Network Toolkit Text Editor** in the Start menu opens the editor in its own window, without the rest of the Toolkit. It is its own program, **Network_Toolkit_TextEditor.exe** (also in the portable folder), with its own taskbar button and name in Task Manager; a file opened from Explorer or `Network_Toolkit.exe --editor-standalone` opens in the same window. It contains what belongs to the editor: documents and tabs, compare and split view, the Files and Connect sidebar (files on your computer and on SFTP, FTP and SSH connections), text colors and **Send to terminal**. Diagnostics, the Toolkit's App settings and update controls stay in the main Toolkit window. **Open terminal** on a connected SFTP session is offered only in the main Toolkit window, because a signed-in connection cannot be handed to another app.

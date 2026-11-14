@@ -724,6 +724,32 @@ func TestEditorComparisonPreferencesOptionalBooleans(t *testing.T) {
 	if old.DocumentMap != nil {
 		t.Fatal("an older window's preferences gained a Document Map setting")
 	}
+	// The Toolbar buttons setting (icons or text) reaches a new editor window;
+	// an older window's batch has none (icons), and nothing else is accepted.
+	for _, value := range []string{"", "icons", "text"} {
+		batch := editorFixtureBatch()
+		batch.Preferences = &editorPreferences{FontSize: 13, Indent: 4, Palette: "auto", ToolbarLabels: value}
+		if err := validateEditorBatch(batch); err != nil {
+			t.Fatal(value, err)
+		}
+		if clone := editorCloneBatch(batch); clone.Preferences.ToolbarLabels != value {
+			t.Fatal("the Toolbar buttons setting was not carried to the new window", value)
+		}
+	}
+	if old.ToolbarLabels != "" {
+		t.Fatal("an older window's preferences gained a Toolbar buttons setting")
+	}
+	for _, value := range []string{"Icons", "both", "text "} {
+		batch := editorFixtureBatch()
+		batch.Preferences = &editorPreferences{FontSize: 13, Indent: 4, Palette: "auto", ToolbarLabels: value}
+		if err := validateEditorBatch(batch); err == nil {
+			t.Fatal("an unknown Toolbar buttons setting was accepted", value)
+		}
+	}
+	var strict editorPreferences
+	if err := json.Unmarshal([]byte(`{"toolbarLabels":true}`), &strict); err == nil {
+		t.Fatal("a non-string Toolbar buttons setting was accepted")
+	}
 	for _, field := range []string{"compareHorizontalSync", "compareUnderline", "compareIntralineHighlight", "documentMap"} {
 		var bad editorPreferences
 		if err := json.Unmarshal([]byte(`{"`+field+`":"false"}`), &bad); err == nil {

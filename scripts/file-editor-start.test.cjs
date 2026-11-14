@@ -155,9 +155,11 @@ test('navigation captures view before the mounted editor is hidden and restores 
  h.api.detachPage();assert.equal(doc.view.top,620);assert.equal(doc.view.left,35);ta.scrollTop=0;ta.scrollLeft=0;h.api.renderPage(mount);assert.equal(h.api.active,doc);assert.equal(ta.scrollTop,620);assert.equal(ta.scrollLeft,35);assert.equal(ta.selectionStart,600);assert.equal(ta.selectionEnd,609);
 });
 
-test('Files replaces redundant connection toolbar without recreating documents or storing content',async()=>{
+// The editor sidebar (its rail: Docs, Connect, Files) replaced the connection
+// toolbar; it opens from the rail only, so the toolbar has no Files button.
+test('the sidebar replaces the redundant connection toolbar and the toolbar has no Files button, without recreating documents or storing content',async()=>{
  const h=harness();h.c.OFFLINE=true;h.document.body.appendChild=h.document.body.append;await h.first();const mount=h.document.createElement('div');h.document.append(mount);h.api.renderPage(mount);
- assert.equal(h.document.querySelector('[data-ed-panel-toggle="remote"]'),null);assert.equal(h.document.querySelector('[data-ed-panel-toggle="local"]'),null);assert(h.document.querySelector('[data-ed="files"]'));
+ assert.equal(h.document.querySelector('[data-ed-panel-toggle="remote"]'),null);assert.equal(h.document.querySelector('[data-ed-panel-toggle="local"]'),null);assert.equal(h.document.querySelector('[data-ed="files"]'),null,'no Files button in the toolbar');assert(h.document.querySelector('[data-ed-files-sidebar]'),'the sidebar is still there');
  const doc=h.api.active,ta=h.document.querySelector('[data-ed-text]');ta.setSelectionRange(34,55);ta.scrollTop=123;await h.click('upper');const before={text:doc.content,undo:[...doc.undo],revision:doc.editRevision};
  h.api.detachPage();h.api.renderPage(mount);assert.equal(doc.content,before.text);assert.deepEqual([...doc.undo],before.undo);assert.equal(doc.editRevision,before.revision);assert.equal(ta.selectionStart,34);assert.equal(ta.scrollTop,123);assert(!JSON.stringify(h.c.state).includes('Line 299'));
 });
@@ -165,6 +167,30 @@ test('legacy disclosure preferences cannot restore a redundant toolbar or expose
  for(const value of [{localPanelOpen:true,remotePanelOpen:false},{localPanelOpen:false,remotePanelOpen:true},{localPanelOpen:'true',remotePanelOpen:1}]){
   const h=harness();h.c.OFFLINE=true;h.c.state.editorPreferences=value;await h.first();const mount=h.document.createElement('div');h.document.append(mount);h.api.renderPage(mount);
   assert.equal(h.document.querySelector('[data-ed-panel-toggle="local"]'),null);assert.equal(h.document.querySelector('[data-ed-panel-toggle="remote"]'),null);assert(h.document.querySelector('#ntEditorRemotePanel').hasAttribute('hidden'));assert.equal(h.api.active.loading,false);
+ }
+});
+// Toolbar buttons (More → Toolbar buttons): icons by default, or text. Each
+// button holds both; its accessible name and tooltip are the same either way.
+test('toolbar buttons are icons by default, switch to text, keep names and tooltips, and save the choice',async()=>{
+ const expected={browse:['Open file','Open file (Ctrl+O)','Open file'],save:['Save','Save (Ctrl+S)','Save'],saveAs:['Save as','Save as (Ctrl+Shift+S)','Save as'],reload:['Reload','Reload','Reload'],undo:['Undo','Undo (Ctrl+Z)','Undo'],redo:['Redo','Redo (Ctrl+Y)','Redo'],find:['Find',null,'Find'],replace:['Replace',null,'Replace'],goto:['Go to line','Go to line (Ctrl+G)','Go to line'],sendTerminal:['Send to terminal','Send to terminal: the selection or the whole document (Ctrl+Shift+Enter)','Send to terminal'],tools:['Text tools','Text tools: lines, encode and decode, format','Tools'],localTools:['Full editor','Open the full Text Editor in Tools','Full editor'],close:['Close text editor','Close the text editor','Close editor']};
+ for(const saved of [undefined,'icons','text','bogus']){
+  const h=harness(saved===undefined?{}:{toolbarLabels:saved});await h.first();const root=h.document.getElementById('networkToolkitFileEditor'),mode=saved==='text'?'text':'icons';
+  assert.equal(root.dataset.toolbarLabels,mode,'the editor shows '+mode+' for a saved '+saved);assert.equal(h.api.toolbarLabels,mode);
+  const select=root.querySelector('#ntEditorMoreActions [data-ed-toolbar-labels]');assert(select,'the choice is in More');assert.equal(select.value,mode);
+  assert.equal(root.querySelector('.nt-editor-toolbar [data-ed="files"]'),null);
+  for(const [action,[name,title,text]] of Object.entries(expected)){
+   const button=root.querySelector('.nt-editor-toolbar [data-ed="'+action+'"]');assert(button,action);
+   assert.equal(button.getAttribute('aria-label'),name,action);if(title)assert.equal(button.getAttribute('title'),title,action);
+   assert.equal(button.querySelector('.nt-editor-tool-text').textContent,text,action);assert.match(button.className,/nt-editor-icon-button/,action);
+  }
+  assert.match(root.querySelector('[data-ed="save"]').className,/\bprimary\b/,'Save keeps its emphasis');
+  for(const [action,keys] of [['browse','Control+O'],['save','Control+S'],['saveAs','Control+Shift+S']])assert.equal(root.querySelector('[data-ed="'+action+'"]').getAttribute('aria-keyshortcuts'),keys);
+  if(saved!==undefined)continue;
+  select.value='text';root.emit('change',select);assert.equal(root.dataset.toolbarLabels,'text');assert.equal(h.c.state.editorPreferences.toolbarLabels,'text','the choice is an editor preference');
+  for(const [action,[name]] of Object.entries(expected))assert.equal(root.querySelector('.nt-editor-toolbar [data-ed="'+action+'"]').getAttribute('aria-label'),name,'same name in Text: '+action);
+  h.api.windowAdapter.applyPreferences({...h.c.state.editorPreferences,toolbarLabels:'icons'});assert.equal(root.dataset.toolbarLabels,'icons','a preference from another app applies');assert.equal(select.value,'icons');
+  h.api.windowAdapter.applyPreferences({...h.c.state.editorPreferences,toolbarLabels:undefined});assert.equal(root.dataset.toolbarLabels,'icons','an older window without the setting shows icons');
+  h.api.setToolbarLabels('text');assert.equal(h.api.windowAdapter.checkpoint([]).preferences.toolbarLabels,'text','a new editor window gets the choice');
  }
 });
 test('compact Compare action retains its full accessible name and explanatory title',async()=>{

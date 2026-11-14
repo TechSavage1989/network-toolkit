@@ -1,0 +1,14 @@
+Network Toolkit 1.21.58
+
+## What's New
+
+- The Text Editor's toolbar buttons are icons, so the toolbar takes less room. Point to a button to see its name and shortcut.
+- To see words instead, open More and set Toolbar buttons to Text. The choice is kept and applies to every Text Editor window.
+- The sidebar lists Docs first, and the separate Files button is gone: the sidebar's own Files tab opens the file browser.
+
+## Additional Details
+
+- Open file, Save, Save as, Move / merge, Find, Replace, Tools and the other toolbar buttons switch between icons and text; More always shows its name.
+- Move / merge still shows "Move pending" or "Window needs attention" next to its icon while a move needs you.
+- Search tools and commands (Ctrl+Shift+P) can show the files sidebar, the connections sidebar, or show and hide the sidebar.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
