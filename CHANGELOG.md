@@ -1,3 +1,7 @@
+## 1.21.58 Beta 1 - Icon toolbar in the Text Editor
+
+- The Text Editor toolbar shows icons by default, with More → View → Toolbar buttons (Icons / Text) to show words instead (`editorPreferences.toolbarLabels`, shared, carried to detached windows); Open file, Save, Save as and Move / merge become icon buttons; the toolbar's Files button is removed (the sidebar rail opens Docs, Connect and Files, now in that order, with command palette entries for the sidebar).
+
 ## 1.21.57 Beta 1 - Find window, search results and bookmarks
 
 - The Text Editor's Find bar becomes a movable Notepad++-style Find window (Find, Replace and Mark tabs, toggled by the toolbar's Find and Replace and Ctrl+F/H/M) with In selection, whole word, case, wrap and backward options and Normal, Extended and regular expression modes, all searched in the engine for documents of any size; a syntax guide and a line that explains the pattern at the cursor; Find All into a docked Search results panel whose rows the engine keeps; Replace All in All Opened Documents (one undo step per document); Mark All, Copy Marked Text and bookmarks; search history in memory only.
