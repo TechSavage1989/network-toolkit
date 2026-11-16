@@ -612,8 +612,16 @@ function create(adapter){
   const service=root.NTKEditorLanguageService;if(!service||!text||text.length>SYNTAX_LIMIT)return;
   service.highlight(text,language,{channel:'map'}).then(value=>{
    if(samples!==found||found.colour!==want||!value||value.limited)return;
-   const runs=parseSyntax(value.html);
-   if(runs&&runs.length===text.length){found.runs=runs;found.starts=starts;found.stamp=++stamps;schedule();}
+   // Read in slices between frames, like a page-held document's colours:
+   // the samples of a wide map are a few hundred kilobytes of HTML.
+   const reader=syntaxReader(value.html);
+   const slice=()=>{
+    if(samples!==found||found.colour!==want)return;
+    if(!timed(()=>reader.step(now()+PARSE_SLICE))){root.setTimeout(slice,0);return;}
+    const runs=reader.result();
+    if(runs&&runs.length===text.length){found.runs=runs;found.starts=starts;found.stamp=++stamps;schedule();}
+   };
+   slice();
   }).catch(()=>{});
  }
  // Each sample at its place on the axis: its words as blocks.
