@@ -2,10 +2,12 @@ Network Toolkit 1.21.63
 
 ## What's New
 
+- Files of several thousand lines dropped into the Text Editor no longer stall while scrolling, and they open faster. A 350 KB configuration of 12,000 lines stalled on every scroll step with Highlight on; it now scrolls smoothly and opens in a fraction of the time.
 - Large files dropped into the Text Editor, or opened with Open file, open about two to three times faster.
 
 ## Additional Details
 
+- A dropped file over 4,000 lines is now handled like a file opened by its path: the app's engine holds it and the editor shows it in sections, instead of drawing every line number and color at once.
 - The file is now compressed before it is passed to the app's engine, and several parts are prepared at once. Text compresses well, and that step was the slow part of opening a large file.
 - Files opened by their path, from the Files sidebar or from Windows Explorer, were already fast and are unchanged.
 - Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

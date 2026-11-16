@@ -30,3 +30,19 @@ test('the wrap measure keeps its rows out of the page\'s style sheets',()=>{
  assert(body.includes('attachShadow'),'the measured rows live in a shadow tree');
  assert(/measure\.remove = \(\) => host\.remove\(\)/.test(body),'removing the measure removes its host');
 });
+
+test('a dropped file with more lines than a page-held document may have goes to the engine',async()=>{
+ const source=read('web/assets/file-editor.js');
+ const body=source.match(/async function moreLinesThan\(file,limit\)\{[\s\S]*?\n\}/);
+ assert(body,'moreLinesThan is in file-editor.js');
+ const moreLinesThan=new Function('return '+body[0])();
+ const file=text=>{const bytes=typeof text==='string'?new TextEncoder().encode(text):text;return {size:bytes.length,arrayBuffer:async()=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.length)};};
+ assert.equal(await moreLinesThan(file('a\n'.repeat(4000)),4000),false,'4,000 lines stay in the page');
+ assert.equal(await moreLinesThan(file('a\n'.repeat(4001)),4000),true,'4,001 lines go to the engine');
+ assert.equal(await moreLinesThan(file('a\r\n'.repeat(4001)),4000),true,'CRLF lines count once each');
+ assert.equal(await moreLinesThan(file('a\r\n'.repeat(3000)),4000),false);
+ assert.equal(await moreLinesThan(file('a\r'.repeat(4001)),4000),true,'a file that ends lines with CR alone');
+ assert.equal(await moreLinesThan(file('x'.repeat(3000)),4000),false,'too small to hold that many lines: not read');
+ // The rule is applied before a small dropped file is read into the page.
+ assert(/if\(diskAvailable\(\)&&\(file\.size>memoryEditorUnits\|\|await moreLinesThan\(file,memoryEditorLines\)\)\)\{/.test(source),'importFiles applies the line rule');
+});

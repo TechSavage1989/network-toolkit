@@ -1060,6 +1060,24 @@ async function engine(browser){
  await shot(page,'editor-map-list-base64-wrap-wide-dark');
  pass('1.7 MB single-line Base64 with Wrap on: the whole line in the map at the default and the widest width');
 
+ // A dropped file follows the rule of a file opened by its path (owner report
+ // on v1.21.62: a 350 KB configuration of 12,000 lines was held in the page
+ // and stalled on every scroll step): over 4,000 lines the engine holds it.
+ {
+  const drop=(name,lines)=>page.evaluate(async({name,lines})=>{
+   const text=Array.from({length:lines},(_,i)=>'set synthetic-'+i+' 192.0.2.'+(i%250)).join('\n')+'\n',file=new File([text],name,{type:'text/plain'}),transfer=new DataTransfer();transfer.items.add(file);
+   document.querySelector('#networkToolkitFileEditor').dispatchEvent(new DragEvent('drop',{dataTransfer:transfer,bubbles:true,cancelable:true}));
+   for(let i=0;i<600;i++){const d=NetworkToolkitFileEditor.active;if(d&&d.path===name&&!d.loading&&!d.diskOpening&&!d.diskSession?.pending&&document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]').value.length>100)return {size:file.size,disk:!!d.disk,lines:d.disk?d.diskMeta.lines:d.content.split('\n').length,gutter:document.querySelector('#networkToolkitFileEditor [data-ed-gutter-lines]').children.length};await new Promise(r=>setTimeout(r,25));}
+   return null;
+  },{name,lines});
+  const small=await drop('dropped-small.conf',300),large=await drop('dropped-large.conf',5000);
+  assert(small&&small.disk===false&&small.lines===301,'a 300-line dropped file is held in the page: '+JSON.stringify(small));
+  assert(large&&large.size<512*1024&&large.disk===true&&large.lines===5001,'a 5,000-line dropped file under 512 KiB is held by the engine: '+JSON.stringify(large));
+  assert(large.gutter<400,'and only the lines in view are drawn: '+large.gutter+' line numbers');
+  await page.evaluate(()=>{for(const d of NetworkToolkitFileEditor.documents.values())d.dirty=false;});
+ }
+ pass('Dropped files: over 4,000 lines the engine holds the document, like a file opened by its path');
+
  // The engine keeps the settings: reload. Connections is turned off first.
  await openMore(page);await page.locator('#ntEditorMoreActions [data-ed-sidebar-panel="connections"]').uncheck();await page.keyboard.press('Escape');
  await page.waitForFunction(()=>NetworkToolkitFileEditor.sidebarPanels.connections===false&&document.querySelector('#networkToolkitFileEditor [data-editor-files-panel="connections"]').hidden);

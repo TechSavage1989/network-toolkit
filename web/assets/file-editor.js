@@ -1156,9 +1156,23 @@ function encodeDesktopText(data){const e=data.encoding||'UTF-8',text=String(data
  const little=e==='UTF-16LE';if(!little&&e!=='UTF-16BE')throw Error('Unsupported encoding');const size=text.length*2+(data.bom?2:0);if(size>EDITOR_FILE_BYTES)limit();const bytes=new Uint8Array(size),view=new DataView(bytes.buffer);let i=0;if(data.bom){bytes[0]=little?255:254;bytes[1]=little?254:255;i=2;}for(const ch of text){const n=ch.codePointAt(0);if(n<65536){view.setUint16(i,n,little);i+=2;}else{const a=n-65536;view.setUint16(i,0xd800+(a>>10),little);i+=2;view.setUint16(i,0xdc00+(a&1023),little);i+=2;}}
  return bytes;
 }
+// Whether a small file has more than `limit` lines (line feeds, or carriage
+// returns in a file that ends its lines with those). Counted in the bytes:
+// UTF-16 can only count too many, which errs on the engine's side.
+async function moreLinesThan(file,limit){
+ if(file.size<=limit)return false;
+ const bytes=new Uint8Array(await file.arrayBuffer());let feeds=0,returns=0;
+ for(let i=0;i<bytes.length;i++){const b=bytes[i];if(b===10){if(++feeds>limit)return true;}else if(b===13&&++returns>limit&&!feeds)return true;}
+ return Math.max(feeds,feeds?0:returns)>limit;
+}
 async function importFiles(files,handles=[]){for(let i=0;i<Math.min(files.length,12);i++){const file=files[i],handle=handles[i]||null;try{
  const key='desktop:'+Date.now()+':'+i+':'+file.name;
- if(file.size>memoryEditorUnits&&diskAvailable()){
+ // The same rule as a file opened by its path: over 512 KiB or 4,000 lines the
+ // engine holds the document and the page shows it in sections. A page-held
+ // document draws line numbers and colours for every line at once, and a
+ // 350 KB configuration of 12,000 lines stalled on every scroll step (owner
+ // report on v1.21.62).
+ if(diskAvailable()&&(file.size>memoryEditorUnits||await moreLinesThan(file,memoryEditorLines))){
   await open({id:key,path:file.name,source:handle?'Desktop':'Desktop import',binding:{kind:'localDraft'},create:true,diskMode:'upload',diskFile:file,desktopHandle:handle,read:async()=>{throw Error('Use the imported document to save a local copy.');},write:async()=>{throw Error('Use Save As for this imported file.');}});
   setMessage(handle?'Opened writable desktop file.':'Opened '+file.name+'. Use Save As to choose a destination.');
   continue;

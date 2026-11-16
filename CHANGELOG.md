@@ -1,5 +1,6 @@
 ## 1.21.63 Beta 1 - Dropped and picked files open faster
 
+- A dropped or picked file over 4,000 lines is disk-backed like a path open (`moreLinesThan` in `importFiles`); before, only files over 512 KiB were, and a page-held 12,000-line document laid out and repainted 11,879 gutter rows and 23,476 highlight spans on every scroll step.
 - A browser file (drop, Open file) is sent to the engine in gzip-compressed 1 MiB chunks, read and compressed four ahead and sent in order; the engine expands each bounded to one chunk (`gunzipEditorChunk`). Measured: 16 MB 1.8 s to 0.73 s, 100 MB 10 s to 3.7 s.
 
 ## 1.21.62 Beta 1 - Large files scroll smoothly
