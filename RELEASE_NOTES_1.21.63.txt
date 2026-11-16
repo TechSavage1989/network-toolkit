@@ -1,0 +1,11 @@
+Network Toolkit 1.21.63
+
+## What's New
+
+- Large files dropped into the Text Editor, or opened with Open file, open about two to three times faster.
+
+## Additional Details
+
+- The file is now compressed before it is passed to the app's engine, and several parts are prepared at once. Text compresses well, and that step was the slow part of opening a large file.
+- Files opened by their path, from the Files sidebar or from Windows Explorer, were already fast and are unchanged.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

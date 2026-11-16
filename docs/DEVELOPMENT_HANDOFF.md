@@ -1,3 +1,21 @@
+# v1.21.63 Beta 1 - Dropped and picked files open faster
+
+Owner (after v1.21.61, "very large files load in slow"): files are opened by drag and drop, from a few KB up to 100 MB.
+
+v1.21.62 was published and verified: tag at merge commit ee7a152 (PR #193), release run 43907806755 green, both Checks runs green without a re-run, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.62", stable channel still at v1.21.34.
+
+Measured (standalone Text Editor on its real engine, Chromium 151): a dropped file took about 100 ms per MB, a file opened by path 16 MB in 0.4 s and 200 MB in 3 s. The engine handled a 1 MiB chunk in about 15 ms; the rest was the browser's upload of each chunk (about 70 ms for a 1.4 MB JSON body), whatever the chunk size.
+
+What changed (rule in AGENTS.md, "Browser file import"):
+- `sendBrowserFile` (file-editor.js) gzips each chunk with `CompressionStream` and sends it compressed when that is clearly smaller (`gzip:true`), reads and compresses four chunks ahead while sending in order, and sends 1 MiB per request (the engine's `MaxEditBytes`).
+- The buffer route expands a compressed chunk first (`gunzipEditorChunk`, editor_disk_upload.go): refused unless it is gzip, not empty and at most one chunk when expanded. `import-chunk` and `verify-chunk` are otherwise unchanged; plain chunks still work.
+
+Result here: 16 MB 1.8 s to 0.73 s, 100 MB 10 s to 3.7 s (a repetitive synthetic file; real text compresses less).
+
+Checks: `TestGunzipEditorChunkIsBounded` (the limit, a chunk that expands past it while tiny on the wire, not gzip, empty, truncated), `TestDiskEditorImportsCompressedChunks` (compressed, retried and plain chunks give the file that was sent), the editor's real-engine browser tests on Chromium 151.
+
+Known limits: not measured on Windows or in the main window. A dropped file is still slower than a path open (it must be copied to the engine); giving the engine the dropped file's path would need native WebView2 work. The duplicate branch `perf/editor-import-compressed` (first name of this branch; this checkout does not track that prefix) is removed by the cleanup workflow once main contains it.
+
 # v1.21.62 Beta 1 - Large files scroll smoothly
 
 Owner report on v1.21.61: "very large files load in slow, and are very laggy when scrolling", then "it's also slow with document map off".

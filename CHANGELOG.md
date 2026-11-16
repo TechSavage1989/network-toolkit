@@ -1,3 +1,7 @@
+## 1.21.63 Beta 1 - Dropped and picked files open faster
+
+- A browser file (drop, Open file) is sent to the engine in gzip-compressed 1 MiB chunks, read and compressed four ahead and sent in order; the engine expands each bounded to one chunk (`gunzipEditorChunk`). Measured: 16 MB 1.8 s to 0.73 s, 100 MB 10 s to 3.7 s.
+
 ## 1.21.62 Beta 1 - Large files scroll smoothly
 
 - Three costs paid on every scroll step of a disk-backed document are removed: `body:has(...)` rules in file-editor.css (now `<body>` classes kept by `syncEditorPageState`), input-clear.js laying out and rewriting every field on each scroll and gutter redraw, and the wrap measure's rows being matched against the page's style sheets (now in a shadow tree).
