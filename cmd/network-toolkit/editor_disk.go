@@ -556,7 +556,7 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		// (Reading it again from a browser file handle, "reload-start",
 		// "import-chunk", "import-finish" and "cancel", is answered above.)
 		switch req.Action {
-		case "status", "window", "find", "find-matches", "find-start", "reload":
+		case "status", "window", "map", "find", "find-matches", "find-start", "reload":
 			// find-start refuses Replace All (editor_find.go).
 		default:
 			jsonError(w, 409, editorbuffer.ErrBinary.Error())
@@ -586,6 +586,9 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		} else {
 			value, err = v.Buffer.Window(req.Start, req.Limit)
 		}
+	case "map":
+		// The Document Map's overview of the whole document (read-only).
+		value, err = v.Buffer.MapSamples(req.Limit, int(req.Size), req.Kind == "offsets")
 	case "edit", "undo", "redo":
 		value, err = disk.mutate(v.Buffer, req)
 	case "edit-begin", "edit-chunk", "edit-commit", "edit-abort":
