@@ -130,16 +130,24 @@ async function gzipChunk(bytes){
  try{return new Uint8Array(await new root.Response(new root.Blob([bytes]).stream().pipeThrough(new root.CompressionStream('gzip'))).arrayBuffer());}catch{return null;}
 }
 async function sendBrowserFile(d,file,action,label){
- const chunkBytes=512*1024;
+ const chunkBytes=1024*1024,ahead=4; // one chunk is at most editorbuffer.MaxEditBytes
+ // The upload is the slow part of opening a large file this way, and text
+ // compresses several times over: a chunk is sent compressed when that makes
+ // it clearly smaller (the engine expands it, bounded to one chunk). Chunks
+ // are read and compressed a few ahead, off the main thread, and sent in order.
+ const prepare=async offset=>{
+  const bytes=new Uint8Array(await file.slice(offset,offset+chunkBytes).arrayBuffer());
+  const packed=await gzipChunk(bytes),sent=packed&&packed.length<bytes.length*0.8?packed:bytes;
+  return {length:bytes.length,body:{offset,data:base64Of(sent),...(sent===packed?{gzip:true}:{})}};
+ };
+ const ready=[];let next=0;
+ const fill=()=>{while(ready.length<ahead&&next<file.size){const chunk=prepare(next);chunk.catch(()=>{});ready.push(chunk);next+=chunkBytes;}};
  for(let offset=0;offset<file.size;offset+=chunkBytes){
   if(documents.get(d.id)!==d)throw Error('The file was closed.');
-  const bytes=new Uint8Array(await file.slice(offset,offset+chunkBytes).arrayBuffer());
-  // The upload is the slow part of opening a large file this way, and text
-  // compresses several times over: send the chunk compressed when that makes
-  // it clearly smaller (the engine expands it, bounded to one chunk).
-  const packed=await gzipChunk(bytes),sent=packed&&packed.length<bytes.length*0.8?packed:bytes;
-  await diskCall(d,action,{offset,data:base64Of(sent),...(sent===packed?{gzip:true}:{})});
-  if(current()===d)setMessage(label+' '+nameOf(d.path)+' · '+Math.floor(100*(offset+bytes.length)/file.size)+'%');
+  fill();
+  const chunk=await ready.shift();
+  await diskCall(d,action,chunk.body);
+  if(current()===d)setMessage(label+' '+nameOf(d.path)+' · '+Math.floor(100*(offset+chunk.length)/file.size)+'%');
  }
 }
 
