@@ -1,3 +1,19 @@
+# v1.21.60 Beta 1 - The Document Map shows the whole document
+
+Owner report on v1.21.59 (a 603,110 character, 18,934 line configuration with Wrap on): "the document map is broken now and doesn't show the colors of text, individual spaces or anything, and when expanded only show a very small portion of the document, which is antithetical to the purpose of it".
+
+v1.21.59 was published and verified: tag at merge commit 831dd9b (PR #189), release run 43803215649 green, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.59", stable channel still at v1.21.34. Its pull_request run had two Windows jobs fail once and pass on their one re-run: the Setup check's copy over a just-written program (fixed in PR #190, `Copy-OverProgram`) and a detached Terminal workspace that never answered (the intermittent native child start, cause still not found).
+
+Cause: that file is disk-backed (over 4,000 lines), and a disk-backed document's map drew only width bars for the pages the reader had seen (so since v1.21.55); v1.21.59's text mode then showed about 110 rows of the loaded page in a wide map, scrolling inside the map.
+
+What changed (rules in AGENTS.md, the Document Map bullet):
+- The map always shows the whole document and never scrolls inside itself. Text mode needs every row to fit: `zoomFor` lowers the font to the largest at which they do, down to `TEXT_FIT` (4 px); below that the map is blocks at any width.
+- Disk-backed documents: new read-only buffer action `map` (`editorbuffer.MapSamples`, at most 4,096 rows of 512 units; by line, or by wrapped row with Wrap). The map asks for one sample per pixel row (250 ms after a change, keeping the last samples meanwhile) and draws each as word blocks in the syntax colours (`sampled`, `drawSamples`). The disk text-mode drawing (`drawPageLines`, `drawPageFlow`) is removed.
+
+Checks: `TestMapSamplesCoverTheWholeDocument`; `scripts/editor-map-list.browser.cjs` rewritten for the rule (a 706-line document is blocks at every width with all 20 bands painted in three or more hues; a 60-line document shows every line as text when wide and blocks when narrow; 16 MB page-held at the widest map; 16 MB disk-backed and the 1.7 MB single line fully painted from samples at the default and widest widths, no long task over 50 ms), run with the real engine on Chromium 151.
+
+Known limits: a sampled row that does not start its line (Wrap on) gets no keyword or comment colour; samples refresh 250 ms after typing stops. Not tried on Windows by the owner yet.
+
 # v1.21.59 Beta 1 - Sidebar tabs and a resizable Document Map
 
 Owner requests (on the v1.21.58 More menu): "when document list is unchecked, it should be removed from the sidebar." / "also add similar tick boxes for connect and files, and have them behave the same." / "the document [map] must be resizeable, and if sized large enough, actual text must be shown in it". The owner's screenshot also showed an empty editor that still reported "3,932 chars, 116 lines" and Aruba AOS-CX.

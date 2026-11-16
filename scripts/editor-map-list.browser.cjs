@@ -186,6 +186,10 @@ function mapSize(page){
    controls:host.id,limits:map.limits(),mode:l?.mode||'',font:l?.zoom?.font||0,mapColumns:l?.zoom?.columns||0,columns:l?.columns||0,
    // What text mode should be for this width: the module's rule over the text area's own metrics.
    expected:NTKEditorDocumentMap.textZoom({width:host.getBoundingClientRect().width,columns:l?.columns||0,charWidth:ctx.measureText('0').width,fontSize:parseFloat(style.fontSize)}),
+   // The font the map should draw text at: the width's font, or the largest
+   // at which every row of the document fits the map's height; 0 (blocks)
+   // below the width threshold or below 4 px.
+   fit:(()=>{const size=parseFloat(style.fontSize),zoom=NTKEditorDocumentMap.textZoom({width:host.getBoundingClientRect().width,columns:l?.columns||0,charWidth:ctx.measureText('0').width,fontSize:size});if(!zoom)return 0;if(ta.scrollHeight*zoom.scale<=host.clientHeight)return zoom.font;const font=Math.floor(size*host.clientHeight/ta.scrollHeight*4)/4;return font>=4?font:0;})(),
    pref:state.editorPreferences?.documentMapWidth,text:box(ta),textClient:ta.clientWidth,scrollTop:ta.scrollTop};
  });
 }
@@ -194,6 +198,21 @@ async function dragSeparator(page,dx,steps=8){
  await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx,y,{steps});await page.mouse.up();await frames(page);
 }
 async function pressSeparator(page,key){await page.locator(SEP).focus();await page.keyboard.press(key);await frames(page);}
+// What the map's canvas holds over the document's height: how many of 20
+// bands have anything drawn, and how many hues (directions from the
+// background colour, so the shades of one translucent colour count once).
+const mapPaint=page=>page.evaluate(()=>{
+ const canvas=document.querySelector('#networkToolkitFileEditor [data-ed-map] canvas'),ctx=canvas.getContext('2d'),l=NetworkToolkitFileEditor.documentMap.layout;
+ const used=Math.max(1,Math.floor(l.g.used*devicePixelRatio)),data=ctx.getImageData(0,0,canvas.width,used).data,counts=new Map();
+ for(let i=0;i<data.length;i+=4){const key=data[i]<<16|data[i+1]<<8|data[i+2];counts.set(key,(counts.get(key)||0)+1);}
+ const bg=[...counts].sort((a,b)=>b[1]-a[1])[0][0],base=[bg>>16,bg>>8&255,bg&255],hues=new Set(),bands=new Set();
+ for(let y=0;y<used;y++)for(let x=0;x<canvas.width;x++){
+  const i=(y*canvas.width+x)*4,d=[data[i]-base[0],data[i+1]-base[1],data[i+2]-base[2]],size=Math.hypot(...d);
+  if(size<24)continue;
+  bands.add(Math.floor(y*20/used));hues.add(d.map(v=>Math.round(v/size*3)).join(','));
+ }
+ return {bands:bands.size,hues:hues.size,mode:l.mode,sampled:!!l.sampled,offset:l.g.offset,used:l.g.used};
+});
 const textRows=page=>page.evaluate(()=>NetworkToolkitFileEditor.documentMap.textRows.map(row=>({...row})));
 // A row as the map draws it (rowCells): tabs to the next stop from the row
 // start, carriage returns as nothing, other control characters as a blank,
@@ -638,143 +657,74 @@ async function mainWindow(browser){
  assert.equal((await mapSize(page)).width,96,'a double-click resets the default width');await kept(undefined,'and forgets the saved width');
  pass('Resizing: the separator drags (the text never scrolls), stops at the default and at half of the space, takes Left/Right/Home/End/Enter, a double-click resets, and the width is saved');
 
- // ---- Text mode: the threshold ----
- await setActiveScroll(page,0);
- const steps=[];
- await page.locator(SEP).focus();
+ // ---- The map always shows the whole document (owner request after v1.21.59) ----
+ // At every width all of the document is in the map and nothing scrolls inside
+ // it: its real text when every row fits at 4 px or more, else blocks.
+ const whole=async label=>{
+  const [info,size,ta]=await Promise.all([mapInfo(page),mapSize(page),activeArea(page)]),g=info.layout.g;
+  assert.equal(g.offset,0,label+': nothing scrolls inside the map');
+  assert(g.used<=info.height+0.5&&Math.abs(g.total-ta.scrollHeight)<=1,label+': the whole document is in the map');
+  assert.equal(size.font,size.fit,label+': '+(size.fit?'text at '+size.fit+' px':'blocks')+' at '+size.width+' px');
+  assert.equal(size.mode,size.fit?'text':'blocks',label);
+  const height=Math.max(10,ta.clientHeight*g.scale),top=Math.min(ta.scrollTop*g.scale,g.used-Math.min(g.used,height));
+  assert(Math.abs(info.box.top-top)<=1&&Math.abs(info.box.height-Math.min(g.used,height))<=1,label+': the box is the part on screen');
+  return {info,size,ta};
+ };
+ // A long document (706 lines): blocks at every width, all of it.
+ await setActiveScroll(page,0.4);
+ await pressSeparator(page,'Home');
+ const widths=[];
  for(;;){
-  size=await mapSize(page);steps.push({width:size.width,mode:size.mode,font:size.font,expected:size.expected?.font||0});
-  assert.equal(size.mode,size.expected?'text':'blocks','at '+size.width+' px the map shows '+(size.expected?'text ('+size.expected.font+' px)':'blocks'));
-  if(size.width>=size.limits.max)break;
-  await page.keyboard.press('ArrowLeft');await frames(page);
+  const {size:step}=await whole('long document');widths.push(step.width+':'+step.mode);
+  if(step.width>=step.limits.max)break;
+  await pressSeparator(page,'ArrowLeft');
  }
- const firstText=steps.findIndex(step=>step.mode==='text');
- assert(firstText>0,'blocks at the default width, text once it is wide enough: '+JSON.stringify(steps.map(step=>step.width+':'+step.mode)));
- assert(steps.slice(firstText).every(step=>step.mode==='text'),'and text from then on');
- assert(steps[firstText].font>=6&&steps[firstText].font<=7.8,'text starts at a legible 6 px or more: '+steps[firstText].font);
- report.threshold={blocksUpTo:steps[firstText-1].width,textFrom:steps[firstText].width,font:steps[firstText].font,largest:steps.at(-1)};
- // And back: blocks again below the threshold.
- await page.keyboard.press('Home');await frames(page);assert.equal((await mapSize(page)).mode,'blocks','narrow again: blocks');
- for(let i=0;i<40&&(await mapSize(page)).mode!=='text';i++){await page.keyboard.press('ArrowLeft');await frames(page);}
- assert.equal((await mapSize(page)).mode,'text');assert.equal((await mapSize(page)).width,steps[firstText].width,'the switch happens at the same width both ways');
- pass('Text mode: blocks up to '+report.threshold.blocksUpTo+' px, the document\'s text from '+report.threshold.textFrom+' px ('+report.threshold.font+' px font), on its own as the width crosses it');
+ assert(widths.length>5&&widths.every(step=>step.endsWith(':blocks')),'a long document is blocks at every width: '+widths.join(' '));
+ {const paint=await mapPaint(page);assert.equal(paint.bands,20,'every part of the long document is drawn');assert(paint.hues>=3,'in the syntax colours: '+JSON.stringify(paint));}
+ await shot(page,'editor-map-wide-blocks-dark');
+ pass('The whole document at every width: a long document stays blocks in its colours, the box the part on screen');
 
- // ---- Text mode: the real text, the box and the pointer ----
- await page.keyboard.press('End');await frames(page);
- let content=await page.evaluate(()=>NetworkToolkitFileEditor.active.content);
- size=await mapSize(page);
- assert(size.mapColumns>=40,'a wide map shows many columns: '+size.mapColumns);
- assertRows(await textRows(page),content,{columns:size.mapColumns,label:'top'});
- assert.equal((await textRows(page))[0].text,shownRow(content.split('\n')[0],size.mapColumns),'the first row is the first line');
- // The box tracks the scroll; the row at its top is the first line on screen.
- let read;
- for(const fraction of [0,0.25,0.5,0.75,1]){await setActiveScroll(page,fraction);read=await assertTextBox(page,'text '+fraction);assertRows(read.rows,content,{columns:size.mapColumns,label:'text '+fraction});}
- assert(read.ta.scrollHeight*read.info.layout.g.scale>read.info.height*2,'a long document scrolls inside the map');
- // A click centres the view on the line under the pointer.
- await setActiveScroll(page,0.2);
- for(const pick of [g=>g.used-15,()=>8]){
-  const {info,rows,height}=await assertTextBox(page,'before a click'),y=pick(info.layout.g),row=rows.find(r=>r.y<=y&&r.y+height>y);
-  assert(y<info.box.top||y>info.box.top+info.box.height,'the click is outside the box');
-  await page.mouse.click(info.left+info.width/2,info.top+y);await frames(page);
-  const ta=await activeArea(page),middle=Math.floor((ta.scrollTop+ta.clientHeight/2-ta.paddingTop)/ta.pitch);
-  assert(Math.abs(middle-row.line)<=1,'a click on line '+row.line+' shows it in the middle ('+middle+')');
-  await assertTextBox(page,'after a click');
- }
- // Dragging the box: it follows the pointer, the text follows the box.
- {
-  const {info}=await assertTextBox(page,'before a drag'),start=await activeArea(page),x=info.left+info.width/2,y=info.top+info.box.top+info.box.height/2;
-  await page.mouse.move(x,y);await page.mouse.down();for(let step=1;step<=5;step++)await page.mouse.move(x,y+step*8);await page.mouse.up();await frames(page);
-  const after=await activeArea(page),moved=after.scrollTop-start.scrollTop,expected=40/info.layout.g.drag;
-  assert(Math.abs(moved-expected)<=2/info.layout.g.drag,'dragging the box 40 px scrolls '+expected.toFixed(1)+' px ('+moved+')');
-  const read=await assertTextBox(page,'after a drag');assert(Math.abs(read.info.box.top-info.box.top-40)<=1.5,'and the box moved with the pointer');
- }
- // The wheel over the map scrolls the document.
- {
-  const {info}=await assertTextBox(page,'before the wheel'),start=await activeArea(page);
-  await page.mouse.move(info.left+info.width/2,info.top+20);await page.mouse.wheel(0,300);await frames(page);
-  assert(Math.abs((await activeArea(page)).scrollTop-start.scrollTop-300)<=1,'the wheel over the text map scrolls 300 px');
-  await assertTextBox(page,'after the wheel');
- }
- // Typing: the rows follow the edit.
- await text.focus();await page.keyboard.press('Control+End');await page.keyboard.type('interface Loopback99');await frames(page);
- content=await page.evaluate(()=>NetworkToolkitFileEditor.active.content);
- read=await assertTextBox(page,'after typing');assertRows(read.rows,content,{columns:size.mapColumns,label:'after typing'});
- assert.equal(read.rows.at(-1).text,'interface Loopback99','the new line is drawn');
- pass('Text mode: the rows are the document\'s lines; the box tracks the scroll with the first line on screen at its top; a click centres its line, the box drags, the wheel scrolls, typing redraws');
-
- // The editor's own syntax colours, light and dark, on the editor background.
- const colours=()=>page.evaluate(()=>{
-  const c=document.querySelector('#networkToolkitFileEditor [data-ed-map] canvas'),r=devicePixelRatio||1,x=c.getContext('2d').getImageData(0,0,c.width,Math.min(c.height,Math.round(160*r))).data,set=new Set();
-  for(let i=0;i<x.length;i+=4)set.add(x[i]+','+x[i+1]+','+x[i+2]);return set.size;
- });
- await setActiveScroll(page,0);
- for(const theme of ['light','dark']){
-  await page.evaluate(theme=>setTheme(theme),theme);await frames(page);
-  const i=await mapInfo(page);assert.deepEqual(await canvasPixel(page,i.width-2,i.height-2),await background(),theme+': text mode is drawn on the editor background');
-  assert(await colours()>12,theme+': the text is drawn in several colours (syntax and anti-aliasing)');
-  await shot(page,'editor-map-text-'+theme);
- }
- assert.equal(await page.evaluate(()=>[...NetworkToolkitFileEditor.documentMap.textRows].length>0&&!!NetworkToolkitFileEditor.active.syntaxCache),true,'the editor has painted its syntax colours for the map to use');
- await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.colored===true);
- // A Custom palette: text mode is drawn on its background too.
- await page.locator('#networkToolkitFileEditor [data-ed-palette]').selectOption('custom');
- await page.evaluate(()=>{const input=document.querySelector('#networkToolkitFileEditor [data-ed-color-hex="bg"]');input.value='#123456';input.dispatchEvent(new Event('change',{bubbles:true}));});await frames(page);
- {const i=await mapInfo(page);assert.deepEqual(await canvasPixel(page,i.width-2,i.height-2),[0x12,0x34,0x56],'Custom: text mode has the custom background');}
- await page.locator('#networkToolkitFileEditor [data-ed-palette]').selectOption('auto');await frames(page);
- await page.locator('#networkToolkitFileEditor [data-ed-custom-palette] [data-ed="colors"]').click();await frames(page);
- pass('Text mode: drawn in the editor\'s syntax colours on its background, light, dark and a Custom palette');
-
- // Word wrap: rows are pieces of the text area's columns; resizing keeps the line at the top.
+ // A short document (60 lines): wide enough, its real text, every line of it.
  await page.evaluate(()=>NetworkToolkitFileEditor.activateDocument([...NetworkToolkitFileEditor.documents.keys()][3]));await frames(page);
- await page.locator('#networkToolkitFileEditor [data-ed-wrap]').check();await frames(page);
- content=await page.evaluate(()=>NetworkToolkitFileEditor.active.content);
- for(const fraction of [0,0.5,1]){
-  await setActiveScroll(page,fraction);const read=await assertTextBox(page,'wrapped '+fraction),columns=read.info.layout.columns;
-  assert(read.rows.some(row=>row.row>0),'wrapped rows are drawn');
-  assertLineStarts(read.rows,content,'wrapped '+fraction);
-  for(const row of read.rows){const lineStart=content.lastIndexOf('\n',row.offset-1)+1;assert.equal((row.offset-lineStart)%columns,0,'a wrapped row starts on the wrap grid');assert.equal(row.text,shownRow(content.slice(row.offset,Math.min(row.offset+columns,content.indexOf('\n',row.offset)<0?content.length:content.indexOf('\n',row.offset))),(await mapSize(page)).mapColumns),'wrapped row '+row.line+'.'+row.row);}
+ await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.mode==='text');
+ let content=await page.evaluate(()=>NetworkToolkitFileEditor.active.content);
+ {
+  const {size:wideSize,info}=await whole('short document');
+  assert(wideSize.font>=4&&wideSize.font<=9,'a legible font: '+wideSize.font);
+  const rows=await textRows(page),lines=content.split('\n');
+  assertRows(rows,content,{columns:wideSize.mapColumns,label:'short document'});
+  assert(rows.length>=60&&rows.length<=lines.length,'every line of the document is drawn: '+rows.length);
+  for(const at of [0,29,59])assert.equal(rows[at].text,shownRow(lines[at],wideSize.mapColumns),'row '+at+' is line '+at);
+  assert(rows[59].y<info.layout.g.used,'the last line is inside the map');
+  for(const fraction of [0.5,1,0])await setActiveScroll(page,fraction),await whole('short document at '+fraction);
+  // A click centres the view; typing redraws the text.
+  await page.mouse.click(info.left+info.width/2,info.top+info.layout.g.used-4);await frames(page);
+  const ta=await activeArea(page);assert(ta.scrollTop>=ta.scrollHeight-ta.clientHeight-2,'a click at the end of the map shows the end');
+  await text.focus();await page.keyboard.press('Control+End');await page.keyboard.type('interface Loopback99');await frames(page);
+  content=await page.evaluate(()=>NetworkToolkitFileEditor.active.content);
+  await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.textRows.at(-1)?.text==='interface Loopback99');
+  await whole('after typing');
+  await shot(page,'editor-map-text-dark');
+  // Narrower than the threshold: blocks again, still all of it.
+  await pressSeparator(page,'Home');const {size:narrow}=await whole('short document, narrow');assert.equal(narrow.mode,'blocks');
+  await pressSeparator(page,'End');await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.mode==='text');
+  // Wrap on: still the whole document.
+  await page.locator('#networkToolkitFileEditor [data-ed-wrap]').check();await frames(page);await frames(page);
+  await whole('short document, wrapped');
+  await page.locator('#networkToolkitFileEditor [data-ed-wrap]').uncheck();await frames(page);
  }
- const topLine=()=>page.evaluate(()=>{const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]'),rows=[...document.querySelectorAll('#networkToolkitFileEditor [data-ed-gutter-lines]>div')];let y=parseFloat(getComputedStyle(ta).paddingTop)||0;for(let i=0;i<rows.length;i++){const h=rows[i].getBoundingClientRect().height;if(y+h>ta.scrollTop+1)return i;y+=h;}return rows.length;});
- await setActiveScroll(page,0.6);
- const readingLine=await topLine();
- await dragSeparator(page,120);assert.equal(await topLine(),readingLine,'narrowing the map rewraps the text and keeps line '+readingLine+' at the top');
- await dragSeparator(page,-120);assert.equal(await topLine(),readingLine,'and widening it again');
- await pressSeparator(page,'Shift+ArrowRight');assert.equal(await topLine(),readingLine,'and a key press');
- await assertTextBox(page,'wrapped after resizing');
- await shot(page,'editor-map-text-wrapped-dark');
- await page.locator('#networkToolkitFileEditor [data-ed-wrap]').uncheck();await frames(page);
- pass('Text mode with Wrap on: rows are pieces of the text area\'s columns, as the blocks wrap; resizing keeps the line at the top in place');
+ pass('A short document, wide enough: its real text, every line, the box the part on screen; blocks again when narrow');
 
- // Split view: the map follows the active pane; hidden in the comparison view.
- await pressSeparator(page,'End');
- await page.locator('#networkToolkitFileEditor [data-ed="split"]').click();await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor.is-split'));await frames(page);
- for(const side of ['left','right']){
-  const uid=(await page.evaluate(side=>NetworkToolkitFileEditor.viewGroups.groups.find(g=>g.side===side)?.uid,side));
-  await page.locator('#networkToolkitFileEditor [data-ed-doc-uid="'+uid+'"]').click();await frames(page);
-  assert.equal((await activeArea(page)).side,side);
-  const paneText=await page.evaluate(()=>NetworkToolkitFileEditor.active.content);
-  await setActiveScroll(page,0.4);const read=await assertTextBox(page,side+' pane');assertRows(read.rows,paneText,{columns:read.info.layout.zoom.columns,label:side+' pane'});
-  // The pane's own syntax colours reach the map (a configuration or JSON is coloured, plain text is not).
-  const coloured=await page.evaluate(()=>/\.(cfg|json)$/.test(NetworkToolkitFileEditor.active.path));
-  await page.waitForFunction(coloured=>NetworkToolkitFileEditor.documentMap.layout?.colored===coloured,coloured);
- }
- await page.locator('#networkToolkitFileEditor [data-ed="compare"]').click();await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor.is-comparing'));await frames(page);
- size=await mapSize(page);assert.equal(size.hidden,true,'the map is hidden in the comparison view');assert.equal(size.sep.hidden,true,'and so is its separator');
- await page.locator('#networkToolkitFileEditor [data-ed="compare"]').click();await page.waitForFunction(()=>!document.querySelector('#networkToolkitFileEditor.is-comparing'));await frames(page);
- size=await mapSize(page);assert.equal(size.hidden,false);assert.equal(size.sep.hidden,false);assert.equal(size.width,size.limits.max,'and back at its width');
- await page.locator('#networkToolkitFileEditor [data-ed="split"]').click();await page.waitForFunction(()=>!document.querySelector('#networkToolkitFileEditor.is-split'));await frames(page);
- pass('Text mode in split view follows the active pane; the map and its separator hide in the comparison view');
-
- // A reload keeps the width and the text.
+ // A reload keeps the width.
  await page.evaluate(()=>NetworkToolkitFileEditor.activateDocument([...NetworkToolkitFileEditor.documents.keys()][0]));
  const wide=Math.round((await mapSize(page)).width);await kept(wide,'the largest width is saved');
  await page.evaluate(()=>{for(const d of NetworkToolkitFileEditor.documents.values())d.dirty=false;});
  await start();
  for(const file of FILES.keys())assert.equal(await page.evaluate(file=>NetworkToolkitFileEditor.openLocalPath(file).then(()=>'',error=>error.message),file),'');
  await page.evaluate(()=>NetworkToolkitFileEditor.activateDocument([...NetworkToolkitFileEditor.documents.keys()][0]));await frames(page);
- await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.mode==='text');
- size=await mapSize(page);assert.equal(Math.round(size.width),wide,'the width is restored after a reload');assert.equal(size.mode,'text');
- pass('Reload: the map keeps its width ('+wide+' px) and its text');
+ await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout);
+ size=await mapSize(page);assert.equal(Math.round(size.width),wide,'the width is restored after a reload');
+ pass('Reload: the map keeps its width ('+wide+' px)');
  // The batch a new editor window gets from this one (editor-windows.js move):
  // its preferences carry the width.
  const batch=await page.evaluate(()=>NetworkToolkitFileEditor.windowAdapter.checkpoint([...NetworkToolkitFileEditor.documents.values()].slice(0,2).map(d=>d.uid)));
@@ -814,37 +764,18 @@ async function mainWindow(browser){
  }
  pass('16 MB page-held document: down-sampled overview, map work '+JSON.stringify(report.large16MiB.stats));
 
- // The same document in text mode: only the rows in the map are drawn.
- await pressSeparator(page,'End');
- await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.mode==='text');
- const pageRows=()=>page.evaluate(()=>{const d=NetworkToolkitFileEditor.active;return NetworkToolkitFileEditor.documentMap.textRows.map(row=>{const end=d.content.indexOf('\n',row.offset);return {...row,line:d.content.slice(row.offset,end<0?undefined:end)};});});
- const checkRows=async label=>{const rows=await pageRows(),columns=(await mapSize(page)).mapColumns;assert(rows.length>=5&&rows.length<=200,label+': only the rows in the map are drawn ('+rows.length+')');for(const row of rows)assert.equal(row.text,shownRow(row.line,columns),label+': row at '+row.offset);return rows;};
- // Building the 16 MB text and typing into it (above) leave 16 MB strings
- // behind; their garbage collection could land in any later frame, the map's
- // too. Collect it before measuring, so the map's own work is what is timed.
- const textWork=async typed=>{
-  await collectGarbage(page);
-  await page.evaluate(()=>{const map=NetworkToolkitFileEditor.documentMap;Object.assign(map.stats,{updates:0,draws:0,maxUpdate:0,maxDraw:0,textDraws:0,maxTextDraw:0});});
-  for(const fraction of [0.5,1,0.25])await setActiveScroll(page,fraction),await assertTextBox(page,'16 MB text '+fraction),await checkRows('16 MB text '+fraction);
-  const i=await mapInfo(page),x=i.left+i.width/2;
-  await page.mouse.click(x,i.top+i.height*0.25);await frames(page);
-  await assertTextBox(page,'16 MB text after a click');
-  const box=(await mapInfo(page)).box;
-  await page.mouse.move(x,i.top+box.top+5);await page.mouse.down();for(let step=1;step<=8;step++)await page.mouse.move(x,i.top+box.top+5+step*20);await page.mouse.up();
-  await page.mouse.wheel(0,600);await frames(page);
-  await assertTextBox(page,'16 MB text after a drag and the wheel');await checkRows('16 MB text after a drag and the wheel');
-  await text.focus();await page.keyboard.press('Control+Home');for(let k=0;k<6;k++)await page.keyboard.type(typed);
-  await page.waitForFunction(typed=>NetworkToolkitFileEditor.documentMap.textRows[0]?.text.startsWith(typed.repeat(6)),typed);
-  const stats=(await mapInfo(page)).stats;
-  assert(stats.textDraws>5,'text mode drew while scrolling: '+JSON.stringify(stats));
-  return stats;
- };
+ // The same document with the map at its widest: still all of it, as blocks.
+ await pressSeparator(page,'End');await frames(page);
+ await collectGarbage(page);
+ await page.evaluate(()=>{const map=NetworkToolkitFileEditor.documentMap;Object.assign(map.stats,{updates:0,draws:0,maxUpdate:0,maxDraw:0,textDraws:0,maxTextDraw:0});});
+ for(const fraction of [0.5,1,0.25])await setActiveScroll(page,fraction),await assertBoxMatches(page,'16 MB wide '+fraction);
  {
-  const stats=await textWork('y');
-  assert(stats.maxUpdate<50&&stats.maxDraw<50&&stats.maxTextDraw<50,'the map work stays under 50 ms on a 16 MB document in text mode: '+JSON.stringify(stats));
-  report.large16MiBText={pageHeld:true,width:(await mapSize(page)).width,font:(await mapSize(page)).font,stats};
+  const i=await mapInfo(page),paint=await mapPaint(page);
+  assert.equal(i.layout.mode,'blocks');assert.equal(i.layout.g.used,i.height,'the whole document is fitted to the wide map');assert.equal(paint.bands,20);
+  assert(i.stats.maxUpdate<50&&i.stats.maxDraw<50,'the map work stays under 50 ms on a 16 MB document at the widest map: '+JSON.stringify(i.stats));
+  report.large16MiBWide={pageHeld:true,width:(await mapSize(page)).width,stats:i.stats};
  }
- pass('16 MB page-held document in text mode: the rows in view only, map work '+JSON.stringify(report.large16MiBText.stats));
+ pass('16 MB page-held document at the widest map: the whole document as blocks, map work '+JSON.stringify(report.large16MiBWide.stats));
  await page.evaluate(()=>NetworkToolkitFileEditor.active.dirty=false);
  await context.close();
  return batch;
@@ -867,12 +798,10 @@ async function detachedWindow(browser,batch){
   assert.equal(size.limits.min,64,'a narrow window\'s default is 64 px');
   assert(size.limits.max>=250&&size.limits.max<=330,'and at most half of its 640 px: '+size.limits.max);
   assert.equal(Math.round(size.width),Math.min(batch.preferences.documentMapWidth,size.limits.max),'the main window\'s width ('+batch.preferences.documentMapWidth+' px) within this window\'s limit');
-  assert.equal(size.mode,'text','wide enough for text in a 640 px window too');
   assert(size.textClient>=240,'the text keeps a usable width: '+size.textClient);
   assert(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)<=0,'no horizontal page scroll');
   const content=await page.evaluate(()=>NetworkToolkitFileEditor.active.content);
-  assertRows(await textRows(page),content,{columns:size.mapColumns,label:'detached'});
-  await assertTextBox(page,'detached text');
+  assert.equal((await mapInfo(page)).layout.g.offset,0,'the whole document is in the map');
   await shot(page,'editor-map-text-detached-640x400-dark');
   // Resizing in the small window: the same clamps, the text stays usable.
   await dragSeparator(page,-1000);size=await mapSize(page);
@@ -882,7 +811,7 @@ async function detachedWindow(browser,batch){
   await page.locator(SEP).dblclick();await frames(page);
   size=await mapSize(page);assert.equal(size.width,64,'a double-click resets the narrow default');assert.equal(size.mode,'blocks');
  }
- pass('Detached window at 640 x 400: the move batch carries the map\'s width; text mode, the clamps and the reset work there');
+ pass('Detached window at 640 x 400: the move batch carries the map\'s width; the clamps and the reset work there');
  for(const file of ['C:\\lab\\core-router.cfg','C:\\lab\\notes.txt'])assert.equal(await page.evaluate(file=>NetworkToolkitFileEditor.openLocalPath(file).then(()=>'',error=>error.message),file),'');
  await page.evaluate(()=>NetworkToolkitFileEditor.activateDocument([...NetworkToolkitFileEditor.documents.keys()][0]));
  await openMore(page);await page.locator('#ntEditorMoreActions [data-ed-document-map]').check();await frames(page);
@@ -1001,62 +930,29 @@ async function engine(browser){
  await shot(page,'editor-map-list-disk-16mb-dark');
  pass('16 MB disk-backed document: mapped by line; clicks, a drag and the wheel move the view with no long task over 50 ms');
 
- // The same file in text mode: the loaded page's lines; the rest a texture.
- await pressSeparator(page,'End');
- await page.waitForFunction(()=>{const m=NetworkToolkitFileEditor.documentMap,l=m.layout;return l?.kind==='lines'&&l.mode==='text'&&m.textRows.length>0;});
- const fileLines=fs.readFileSync(path.join(engineFiles,'large.cfg'),'utf8').split('\n');
- const diskRows=async label=>{
-  const [info,rows,size]=await Promise.all([mapInfo(page),textRows(page),mapSize(page)]),l=info.layout,height=l.g.scale;
-  assert(rows.length>=5&&rows.length<=200,label+': the rows in the map ('+rows.length+')');
-  for(const row of rows)assert.equal(row.text,shownRow(fileLines[row.line],size.mapColumns),label+': line '+row.line);
-  const at=rows.find(row=>row.y<=info.box.top+0.5&&row.y+height>info.box.top+0.5);
-  if(at)assert(Math.abs(at.line-Math.floor(l.start))<=1,label+': the row at the box top is line '+at.line+', the view starts at '+l.start);
-  return {info,rows,at};
- };
- await page.evaluate(()=>{mapLongTasks.length=0;const map=NetworkToolkitFileEditor.documentMap;Object.assign(map.stats,{updates:0,draws:0,maxUpdate:0,maxDraw:0,textDraws:0,maxTextDraw:0});});
+ // The whole file in the map, in colour, from the engine's samples; at the
+ // widest map too (never only the part that was read).
+ for(const key of ['Home','End']){
+  await pressSeparator(page,key);
+  await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l?.kind==='lines'&&l.sampled;},null,{timeout:15000});
+  await frames(page);
+  const paint=await mapPaint(page);info=await mapInfo(page);
+  assert.equal(paint.mode,'blocks');assert.equal(paint.offset,0);assert.equal(info.layout.g.total,d.lines,'the map covers every line');
+  assert.equal(paint.bands,20,'every part of the 16 MB file is drawn ('+key+'): '+JSON.stringify(paint));
+  assert(paint.hues>=3,'in the syntax colours: '+JSON.stringify(paint));
+ }
+ await page.evaluate(()=>{mapLongTasks.length=0;});
  info=await mapInfo(page);
- assert.equal(info.layout.g.total,d.lines,'text mode still covers every line');
- assert(info.layout.g.offset>0||info.layout.start===0,'a 16 MB file scrolls inside the map');
+ await page.mouse.click(info.left+info.width/2,info.top+info.layout.g.used*0.7);
+ await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&Math.abs((l.g.box.top+l.g.box.height/2)/l.g.used-0.7)<0.02;},null,{timeout:15000});
+ await frames(page);await page.waitForTimeout(300);
  {
-  const {at}=await diskRows('16 MB text');assert(at,'the view\'s top line is drawn at the box top');
-  // A click centres the view on the line under the pointer, near the bottom and near the top of the map.
-  for(const pick of [g=>g.used-12,()=>10]){
-   const {info,rows}=await diskRows('16 MB text before a click'),y=pick(info.layout.g),row=rows.find(r=>r.y<=y&&r.y+info.layout.g.scale>y);
-   assert(row&&(y<info.box.top||y>info.box.top+info.box.height),'a click outside the box on a drawn line');
-   await page.mouse.click(x,info.top+y);
-   await page.waitForFunction(line=>{const l=NetworkToolkitFileEditor.documentMap.layout,s=NetworkToolkitFileEditor.active;return l&&l.mode==='text'&&Math.abs(l.start+l.g.span/2-line)<=2&&!s.diskSession?.pending;},row.line,{timeout:15000});
-   await settled();await page.waitForFunction(()=>{const m=NetworkToolkitFileEditor.documentMap,l=m.layout;return m.textRows.some(r=>r.y<=l.g.box.top+0.5&&r.y+l.g.scale>l.g.box.top+0.5);},null,{timeout:15000});
-   const after=await diskRows('16 MB text after a click');assert(after.at,'the line at the box top is drawn after the click');
-  }
-  // Drag the box down, then the wheel over the map and over the text.
-  info=await mapInfo(page);
-  await page.mouse.move(x,info.top+info.box.top+info.box.height/2);await page.mouse.down();
-  for(let step=1;step<=8;step++){await page.mouse.move(x,info.top+info.box.top+info.box.height/2+step*10);await page.waitForTimeout(16);}
-  await page.mouse.up();
-  await page.waitForFunction(top=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&l.g.box.top>top+60;},info.box.top,{timeout:15000});
-  const draggedTo=(await mapInfo(page)).layout.start;
-  assert(draggedTo>info.layout.start+(80/info.layout.g.drag)*0.9,'dragging the box 80 px moves the view by the thumb\'s scale: '+info.layout.start+' to '+draggedTo);
-  await page.mouse.move(x,info.top+20);for(let i=0;i<20;i++){await page.mouse.wheel(0,400);await page.waitForTimeout(16);}
-  await page.waitForFunction(line=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&l.start>line;},draggedTo,{timeout:15000});
-  await editorArea.hover();for(let i=0;i<20;i++){await page.mouse.wheel(0,-400);await page.waitForTimeout(16);}
-  await settled();await frames(page);await page.waitForTimeout(300);
-  await diskRows('16 MB text after the drag and the wheel');
-  // Resizing the map on the 16 MB file: narrower, then wider again.
-  const wide=(await mapSize(page)).width;
-  await dragSeparator(page,80,10);await settled();
-  assert.equal(Math.round((await mapSize(page)).width),Math.round(wide)-80,'the separator narrows the map over a 16 MB file');
-  await dragSeparator(page,-200,10);await settled();await frames(page);
-  assert.equal(Math.round((await mapSize(page)).width),Math.round(wide),'and widens it to the largest width again');
-  await diskRows('16 MB text after resizing');
+  const longTasks=await page.evaluate(()=>mapLongTasks);
+  assert(longTasks.every(ms=>ms<=50),'no long task over 50 ms at the widest map on a 16 MB file: '+JSON.stringify(longTasks));
+  report.disk16MiBWide={longTasks,stats:(await mapInfo(page)).stats};
  }
- {
-  const longTasks=await page.evaluate(()=>mapLongTasks),stats=(await mapInfo(page)).stats;
-  assert(longTasks.every(ms=>ms<=50),'no long task over 50 ms in text mode on a 16 MB disk-backed document: '+JSON.stringify(longTasks));
-  assert(stats.textDraws>5&&stats.maxUpdate<50&&stats.maxDraw<50,'the map drew text and its work stays far under 50 ms: '+JSON.stringify(stats));
-  report.disk16MiBText={lines:d.lines,width:(await mapSize(page)).width,font:(await mapSize(page)).font,longTasks,stats};
- }
- await shot(page,'editor-map-list-disk-16mb-text-dark');
- pass('16 MB disk-backed document in text mode: the loaded page\'s lines, the top line at the box top; clicks, a drag and the wheel with no long task over 50 ms '+JSON.stringify(report.disk16MiBText.stats));
+ await shot(page,'editor-map-list-disk-16mb-wide-dark');
+ pass('16 MB disk-backed document: the whole file in the map in colour, at the default and the widest width, with no long task over 50 ms');
  await pressSeparator(page,'Home');
 
  // 1.7 MB on one line (a Base64 export) with Wrap on: mapped by offset.
@@ -1086,47 +982,17 @@ async function engine(browser){
  await shot(page,'editor-map-list-base64-wrap-dark');
  pass('1.7 MB single-line Base64 with Wrap on: mapped by character offset; the map reaches the middle, the end and the start');
 
- // The same line in text mode: rows of the wrap columns, the view's row at the box top.
- const base64=fs.readFileSync(path.join(engineFiles,'export.b64'),'utf8');
- await pressSeparator(page,'End');
- await page.waitForFunction(()=>{const m=NetworkToolkitFileEditor.documentMap,l=m.layout;return l?.kind==='offsets'&&l.mode==='text'&&m.textRows.length>0;});
- const flowRows=async label=>{
-  const [info,rows,size]=await Promise.all([mapInfo(page),textRows(page),mapSize(page)]),l=info.layout,columns=l.columns;
-  assert(rows.length>=5,label+': rows are drawn');
-  for(const [k,row] of rows.entries()){
-   assert.equal(row.text,base64.slice(row.offset,row.offset+Math.min(columns,size.mapColumns)),label+': the row at '+row.offset+' is the file\'s text there');
-   if(k)assert.equal(row.offset,rows[k-1].offset+columns,label+': rows follow each other by the wrap columns');
-  }
-  const at=rows.find(row=>row.offset<=l.start&&l.start<row.offset+columns);
-  assert(at&&Math.abs(at.y-info.box.top)<=1,label+': the row holding the view\'s first character ('+l.start+') is at the box top');
-  return {info,rows};
- };
- await page.evaluate(()=>{mapLongTasks.length=0;});
- await flowRows('Base64 text at the start');
- info=await mapInfo(page);
- await page.mouse.click(x,info.top+info.layout.g.used-10);
- await page.waitForFunction(start=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&l.start>start;},info.layout.start,{timeout:15000});
- await settled();await page.waitForFunction(()=>{const m=NetworkToolkitFileEditor.documentMap,l=m.layout;return m.textRows.some(r=>r.offset<=l.start&&l.start<r.offset+l.columns);},null,{timeout:15000});
- await flowRows('Base64 text after a click');
- // Drag the box to the very end: the last characters, in the last row.
- info=await mapInfo(page);
- await page.mouse.move(x,info.top+info.box.top+info.box.height/2);await page.mouse.down();await page.mouse.move(x,info.top+info.height+40,{steps:12});await page.mouse.up();
- await page.waitForFunction(units=>{const s=NetworkToolkitFileEditor.active.diskSession.state().page;const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]');return s.start+s.text.length>=units&&ta.scrollTop+ta.clientHeight>=ta.scrollHeight-2;},d.units,{timeout:15000});
- await page.waitForFunction(units=>NetworkToolkitFileEditor.documentMap.textRows.some(r=>r.offset+r.text.length>=units),d.units,{timeout:15000});
- {const {rows}=await flowRows('Base64 text at the end');assert.equal(rows.at(-1).text,base64.slice(rows.at(-1).offset),'the last row ends with the file\'s last characters');}
- // And back to the start.
- info=await mapInfo(page);
- await page.mouse.move(x,info.top+info.box.top+info.box.height/2);await page.mouse.down();await page.mouse.move(x,info.top-40,{steps:12});await page.mouse.up();
- await page.waitForFunction(()=>{const s=NetworkToolkitFileEditor.active.diskSession.state().page;const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]');return s.start===0&&ta.scrollTop<2;},null,{timeout:15000});
- await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.textRows[0]?.offset===0);
- {const {rows}=await flowRows('Base64 text back at the start');assert.equal(rows[0].offset,0);}
- {
-  const longTasks=await page.evaluate(()=>mapLongTasks);
-  assert(longTasks.every(ms=>ms<=50),'no long task over 50 ms in text mode on the 1.7 MB line: '+JSON.stringify(longTasks));
-  report.base64Text={units:d.units,longTasks,stats:(await mapInfo(page)).stats};
+ // The whole line in the map from the engine's samples, at the widest map too.
+ for(const key of ['Home','End']){
+  await pressSeparator(page,key);
+  await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l?.kind==='offsets'&&l.sampled;},null,{timeout:15000});
+  await frames(page);
+  const paint=await mapPaint(page);
+  assert.equal(paint.mode,'blocks');assert.equal(paint.offset,0);
+  assert.equal(paint.bands,20,'every part of the 1.7 MB line is drawn ('+key+'): '+JSON.stringify(paint));
  }
- await shot(page,'editor-map-list-base64-wrap-text-dark');
- pass('1.7 MB single-line Base64 with Wrap on in text mode: rows are the file\'s text by the wrap columns, the view\'s row at the box top, from the start to the end');
+ await shot(page,'editor-map-list-base64-wrap-wide-dark');
+ pass('1.7 MB single-line Base64 with Wrap on: the whole line in the map at the default and the widest width');
 
  // The engine keeps the settings: reload. Connections is turned off first.
  await openMore(page);await page.locator('#ntEditorMoreActions [data-ed-sidebar-panel="connections"]').uncheck();await page.keyboard.press('Escape');

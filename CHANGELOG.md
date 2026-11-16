@@ -1,3 +1,7 @@
+## 1.21.60 Beta 1 - The Document Map shows the whole document
+
+- The Document Map never scrolls inside itself: text is drawn only when every row of the document fits at 4 px or more (a smaller font for a taller document), otherwise blocks at any width. A disk-backed document (over 512 KiB or 4,000 lines) is drawn from the engine's samples of the whole document (buffer action `map`, `editorbuffer.MapSamples`), in colour with word gaps, instead of bars for the pages that were read.
+
 ## 1.21.59 Beta 1 - Sidebar tabs, resizable Document Map
 
 - More → View → Document list, Connections and Files show or remove the editor sidebar's rail tabs (`editorPreferences.sidebarPanels`, shared, carried to detached windows; with all three off there is no sidebar; an explicit request for a hidden panel turns it back on). The Document Map is resizable (`editorPreferences.documentMapWidth`) and draws the document's text in its syntax colours once wide enough, bounded to the rows in view. An editor left with no document clears the last document's status, size and language (`showNoDocuments`).

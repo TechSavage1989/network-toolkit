@@ -176,7 +176,7 @@ function helpText(){
  ['Text Editor','Ctrl+Shift+U / Ctrl+U','Change the selection or the document to UPPERCASE / lowercase'],
  ['Text Editor','Ctrl+J / Ctrl+Shift+L','Join lines / Split lines at a text'],
  ['Text Editor','Ctrl+Shift+B','Base64 decode the selection or the document'],
- ['Text Editor','More > Document map','Show a miniature of the whole document at the right edge; click or drag in it to move. Drag its left edge to widen it: wide enough, it shows the text'],
+ ['Text Editor','More > Document map','Show a miniature of the whole document at the right edge; click or drag in it to move. Drag its left edge to widen it: wide enough, a short document shows its text'],
  ['Text Editor','Documents (sidebar)','List the open documents; Up / Down and Enter switch, Shift+F10 opens the tab menu'],
  ['Text Editor','More > Document list / Connections / Files','Show or remove Docs, Connect or Files on the sidebar rail; with all three off there is no sidebar'],
  ['Text Editor','Docs / Connect / Files (sidebar rail)','Open that panel of the editor sidebar; the open one closes the sidebar. Up / Down move between them'],

@@ -27,11 +27,11 @@
    columns, at most TEXT_REFERENCE of them, fill the map, as the blocks do).
    Once that zoom gives a font of TEXT_FONT px or more, the map draws the document's characters instead of
    blocks, at most TEXT_FONT_MAX px (or TEXT_SHARE of the editor's font) so it
-   stays an overview; rows are as tall as the scaled line height. A document
-   taller than the map scrolls inside it: the box moves like a scroll bar thumb
-   over the map and the text under it is the text on screen. Only the rows the
-   map shows are drawn, each at most TEXT_COLUMNS characters (TEXT_ROWS rows at
-   most). The colours are the editor's own: the HTML its language worker made
+   stays an overview; rows are as tall as the scaled line height. The map
+   always shows the whole document and never scrolls inside itself (owner
+   report on v1.21.59): a document too tall for that font is drawn at the
+   largest font at which every row fits, down to TEXT_FIT px, and below that
+   as blocks, at any width. The colours are the editor's own: the HTML its language worker made
    for a page-held document (read in slices, never in one long task), and the
    same worker on its own channel for the loaded page of a disk-backed one;
    without them (Highlight off, plain text, past the editor's limit) the text
@@ -41,9 +41,10 @@
    the box is exactly the visible share. A disk-backed document (only one page
    is in the page) is mapped by position like its scroll bar: by line without
    word wrap, by character offset with word wrap (the v1.21.53 scroll model;
-   editor-disk-view.js). Detail (blocks or text) is drawn for the loaded page
-   only; the rest is a position overview that fills in with the pages the
-   reader has seen at the current revision (in text mode, a light texture).
+   editor-disk-view.js). It is drawn as blocks from samples the engine reads
+   over the whole document (one per map pixel row), so every part shows in
+   colour whichever pages were read; until the first samples arrive, from
+   the pages the reader has seen.
 
    The comparison view has its own change map, so this one is hidden there. */
 (function(root){
@@ -65,6 +66,12 @@ const WIDTH=96,NARROW_WIDTH=64,NARROW='(max-width:680px)',WIDTH_MAX=640,WIDTH_SH
 // A text area wider than TEXT_REFERENCE columns is zoomed as if it had that
 // many, so a very wide window reaches text mode too (longer rows are cut).
 const TEXT_FONT=6,TEXT_FONT_MAX=9,TEXT_SHARE=0.6,TEXT_REFERENCE=120,TEXT_COLUMNS=320,TEXT_ROWS=400;
+// The map always shows the whole document (owner request after v1.21.59): a
+// document too tall for the text font is drawn smaller, down to TEXT_FIT px,
+// and below that as blocks. A document that is not all in the page is drawn
+// from samples the engine reads over the whole of it (SAMPLE_ROWS rows of
+// SAMPLE_COLUMNS characters at most), SAMPLE_DELAY ms after an edit.
+const TEXT_FIT=4,SAMPLE_ROWS=4096,SAMPLE_COLUMNS=512,SAMPLE_DELAY=250;
 const SYNTAX_LIMIT=200000; // a disk page coloured for the map at most
 const SYNTAX_DELAY=150;    // milliseconds before a disk page is coloured
 const PARSE_SLICE=4;       // milliseconds of one slice of reading the editor's colours
@@ -257,8 +264,8 @@ function rowCells(text,begin,end,{tab=4,columns=TEXT_COLUMNS,kindAt=null}={}){
 
 // ---- The panel ----
 function create(adapter){
- let host=null,handle=null,canvas=null,view=null,frame=0,timer=0,drawn='',drawnContent='',drawnDoc='',colors=null,colorKey='',drag=null,seen=null,widths=new Map(),pageCache=null,wrapCache=null,flowCache=null,shown=null,lastLayout=null,pending=null,seekFrame=0;
- let inner=null,resize=null,dragWidth=null,range=null,textRows=[],stamps=0,parsing=null,diskSyntaxState=null,diskTimer=0;
+ let host=null,handle=null,canvas=null,view=null,frame=0,timer=0,drawn='',drawnContent='',drawnDoc='',colors=null,colorKey='',drag=null,seen=null,widths=new Map(),pageCache=null,wrapCache=null,shown=null,lastLayout=null,pending=null,seekFrame=0;
+ let inner=null,resize=null,dragWidth=null,range=null,textRows=[],stamps=0,parsing=null,diskSyntaxState=null,diskTimer=0,samples=null,sampleWant='',sampleFailed='',sampleTimer=0;
  const parsed=new WeakMap();
  const document=root.document;
 
@@ -373,8 +380,11 @@ function create(adapter){
 
  // Text mode for this map width, with the font the canvas draws, its
  // character width and the columns that fit; or null (blocks).
- function zoomFor(m,width,columns,editorChar){
-  const zoom=textZoom({width,columns,charWidth:editorChar||m.charWidth,fontSize:m.fontSize});if(!zoom)return null;
+ function zoomFor(m,width,columns,editorChar,rows,height){
+  let zoom=textZoom({width,columns,charWidth:editorChar||m.charWidth,fontSize:m.fontSize});if(!zoom)return null;
+  // The whole document stays in the map: when its rows do not fit at this
+  // font, the largest font at which they do, or blocks below TEXT_FIT.
+  if(rows*m.lineHeight*zoom.scale>height){const font=Math.floor(m.fontSize*height/(rows*m.lineHeight)*4)/4;if(font<TEXT_FIT)return null;zoom={font,scale:font/m.fontSize};}
   const weight=m.weight&&!['400','normal'].includes(m.weight)?m.weight+' ':'',css=weight+zoom.font+'px '+m.family,cw=charWidth(css);
   return {...zoom,css,cw,columns:Math.max(1,Math.min(TEXT_COLUMNS,Math.floor(width/Math.max(0.1,cw))))};
  }
@@ -461,8 +471,8 @@ function create(adapter){
   const m=textMetrics(textarea),wrapped=textarea.wrap==='soft';
   if(!starts){if(pageCache?.text!==text)pageCache={text,starts:lineStarts(text)};starts=pageCache.starts;}
   const total=Math.max(1,textarea.scrollHeight),start=textarea.scrollTop,end=start+textarea.clientHeight,rows=total/m.lineHeight;
-  const zoom=zoomFor(m,width,m.columns);
-  const g=zoom?geometry({total,rows,height,start,end,row:m.lineHeight*zoom.scale,scroll:true}):geometry({total,rows,height,start,end});
+  const zoom=zoomFor(m,width,m.columns,0,rows,height);
+  const g=zoom?geometry({total,rows,height,start,end,row:m.lineHeight*zoom.scale}):geometry({total,rows,height,start,end});
   const syntax=!zoom?null:page?diskSyntax(d,page):pageSyntax(d,text);
   const content=[d.uid+':'+(d.disk?'p':'t'),revision,text.length].join('|');
   const rest=[total,textarea.clientWidth,m.lineHeight,m.columns,wrapped,common(d,height,width),zoom?'text:'+zoom.font+':'+zoom.columns+':'+(syntax?.stamp||0):'blocks'].join('|');
@@ -564,18 +574,53 @@ function create(adapter){
  }
  function texture(ctx,c,g,width,estimate){ctx.fillStyle=c.band;ctx.globalAlpha=0.16;ctx.fillRect(0,0,Math.max(1,clamp(estimate,0,1)*width),g.used);ctx.globalAlpha=1;}
 
+ // ---- The whole of a disk-backed document, from the engine's samples ----
+ // The samples for this document, axis, revision and size; while newer ones
+ // are on their way (asked SAMPLE_DELAY ms after the last change) the map
+ // keeps the ones it has, and before the first arrive it draws what the
+ // reader has seen.
+ function sampled(d,kind,revision,count,columns){
+  const key=[d.uid,kind,revision,count,columns].join('|');
+  if(adapter.samples&&samples?.key!==key&&sampleWant!==key&&sampleFailed!==key){
+   sampleWant=key;root.clearTimeout(sampleTimer);
+   sampleTimer=root.setTimeout(()=>{
+    Promise.resolve(adapter.samples(d,{kind,limit:count,size:columns})).then(value=>{
+     if(sampleWant!==key)return;
+     sampleWant='';
+     if(!Array.isArray(value?.rows)){sampleFailed=key;return;}
+     samples={key,doc:d.uid,kind,columns,rows:value.rows,stamp:++stamps};schedule();
+    }).catch(()=>{if(sampleWant===key){sampleWant='';sampleFailed=key;}});
+   },samples?.doc===d.uid?SAMPLE_DELAY:0);
+  }
+  return samples?.doc===d.uid&&samples.kind===kind?samples:null;
+ }
+ // One sample per map row: its words as blocks in the syntax colours.
+ function drawSamples(ctx,d,found,g,width){
+  textRows=[];
+  const c=palette(),{markers,keywords}=markersFor(d),tab=adapter.tabSize(),rows=found.rows,columns=found.columns,cw=width/columns;
+  const pitch=g.used/Math.max(1,rows.length),detail=pitch>=2,block=detail?Math.max(1,Math.min(pitch-0.5,pitch*0.7)):Math.max(1,pitch),alpha=detail?1:0.7;
+  ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);
+  for(let k=0;k<rows.length;k++){
+   const row=rows[k],text=row.text||'',y=k*pitch,first=!row.column;
+   for(const [col,length,kind] of lineRuns(text,0,text.length,{tab,limit:columns,markers:first?markers:[],keywords:keywords&&first})){
+    ctx.fillStyle=c.kinds[kind];ctx.globalAlpha=alpha*(kind===TEXT?0.75:1);ctx.fillRect(col*cw,y,Math.max(0.6,Math.min(length,columns-col)*cw),block);
+   }
+  }
+  ctx.globalAlpha=1;
+ }
+
  // A disk-backed document without word wrap: the axis is the line number.
  function lineLayout(d,textarea,state,height,width,paged){
   const m=textMetrics(textarea),cw=state.characterWidth||m.charWidth,columns=Math.max(16,Math.floor(textarea.clientWidth/Math.max(1,cw)));
-  const start=state.top+(state.fraction||0),end=start+state.rows,zoom=zoomFor(m,width,columns,cw);
-  const g=zoom?geometry({total:state.lines,rows:state.lines,height,start,end,row:(state.rowHeight||m.lineHeight)*zoom.scale,scroll:true}):geometry({total:state.lines,rows:state.lines,height,start,end});
+  const start=state.top+(state.fraction||0),end=start+state.rows;
+  const g=geometry({total:state.lines,rows:state.lines,height,start,end});
   const page=state.page;if(pageCache?.text!==page.text)pageCache={text:page.text,starts:lineStarts(page.text)};
-  const syntax=zoom?diskSyntax(d,page):null;
+  const found=sampled(d,'lines',state.revision,clamp(Math.min(Math.ceil(g.used),state.lines),1,SAMPLE_ROWS),Math.min(SAMPLE_COLUMNS,columns));
   const base=[d.uid+':l',state.revision,state.lines,common(d,height,width),columns].join('|'),content=[base,page.start,page.text.length].join('|');
-  return {kind:'lines',mode:zoom?'text':'blocks',zoom,g,start,columns,colored:!!syntax,deferred:false,doc:d.uid,content,
-   key:content+'|'+(zoom?'text:'+zoom.font+':'+zoom.columns+':'+(syntax?.stamp||0)+'#'+Math.round(g.offset):'blocks#'),
+  return {kind:'lines',mode:'blocks',zoom:null,g,start,columns,sampled:!!found,colored:false,deferred:false,doc:d.uid,content,
+   key:found?[d.uid+':l',common(d,height,width),columns,'samples',found.stamp].join('|'):content+'|blocks#',
    label:()=>Math.round(clamp(state.top/Math.max(1,state.lines-state.rows),0,1)*100),
-   draw:ctx=>zoom?drawPageLines(ctx,d,state,g,width,zoom,syntax):drawLines(ctx,d,state,g,width,columns,base),
+   draw:ctx=>found?drawSamples(ctx,d,found,g,width):drawLines(ctx,d,state,g,width,columns,base),
    seek:value=>paged.mapSeek({line:value}),
    scroll:delta=>paged.wheelBy(delta),
    step:{line:1,page:Math.max(1,state.rows-1)}};
@@ -599,36 +644,18 @@ function create(adapter){
    ctx.globalAlpha=1;
   }
  }
- // Text mode without word wrap: the loaded page's lines in the map's window;
- // the rest of the document is a light texture as wide as its average line.
- function drawPageLines(ctx,d,state,g,width,zoom,syntax){
-  timedText(()=>{
-   const page=state.page,c=palette(),tab=adapter.tabSize(),starts=pageCache.starts,text=page.text,n=starts.length,height=g.scale,out=[];
-   const end=i=>i+1<n?starts[i+1]-1:text.length,kindAt=syntax?syntaxCursor(syntax.runs):null;
-   ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);texture(ctx,c,g,width,(state.units/Math.max(1,state.lines)-1)/zoom.columns);
-   const top=page.line*height-g.offset,bottom=top+n*height;
-   if(Math.min(g.used,bottom)>Math.max(0,top)){ctx.fillStyle=c.bg;ctx.fillRect(0,Math.max(0,top),width,Math.min(g.used,bottom)-Math.max(0,top));}
-   textStart(ctx,zoom);
-   for(let i=clamp(Math.floor(-top/height),0,n),count=0;i<n&&count<TEXT_ROWS;i++){
-    const y=top+i*height;if(y>g.used)break;if(y+height<0)continue;
-    textRow(ctx,c,text,starts[i],end(i),y,height,zoom,tab,kindAt,page.line+i,0,out,page.start);count++;
-   }
-   textRows=out;
-  });
- }
-
  // A disk-backed document with word wrap: the axis is the character offset,
  // and the map is as tall as the document's estimated wrapped rows.
  function offsetLayout(d,textarea,state,height,width,paged){
-  const m=textMetrics(textarea),columns=Math.max(1,state.wrapColumns||80),zoom=zoomFor(m,width,columns,state.characterWidth||m.charWidth);
-  const start=state.offset,end=start+state.visible,rowHeight=state.rowHeight||m.lineHeight;
-  const g=zoom?geometry({total:state.units,rows:state.estimatedRows,height,start,end,row:rowHeight*zoom.scale,scroll:true}):geometry({total:state.units,rows:state.estimatedRows,height,start,end});
+  const m=textMetrics(textarea),columns=Math.max(1,state.wrapColumns||80);
+  const start=state.offset,end=start+state.visible;
+  const g=geometry({total:state.units,rows:state.estimatedRows,height,start,end});
+  const found=sampled(d,'offsets',state.revision,clamp(Math.ceil(g.used),1,SAMPLE_ROWS),Math.min(SAMPLE_COLUMNS,columns));
   const page=state.page,base=[d.uid+':o',state.revision,state.units,common(d,height,width),state.wrapColumns].join('|'),content=[base,page.start,page.text.length].join('|');
-  const syntax=zoom?diskSyntax(d,page):null;
-  return {kind:'offsets',mode:zoom?'text':'blocks',zoom,g,start,columns,colored:!!syntax,deferred:false,doc:d.uid,content,
-   key:content+'|'+(zoom?'text:'+zoom.font+':'+zoom.columns+':'+(syntax?.stamp||0)+':'+start+'#'+Math.round(g.offset):'blocks#'),
+  return {kind:'offsets',mode:'blocks',zoom:null,g,start,columns,sampled:!!found,colored:false,deferred:false,doc:d.uid,content,
+   key:found?[d.uid+':o',common(d,height,width),columns,'samples',found.stamp].join('|'):content+'|blocks#',
    label:()=>Math.round(clamp(start/Math.max(1,state.units-state.visible),0,1)*100),
-   draw:ctx=>zoom?drawPageFlow(ctx,d,state,g,width,zoom,columns,rowHeight*zoom.scale,syntax):drawOffsets(ctx,state,g,width,base),
+   draw:ctx=>found?drawSamples(ctx,d,found,g,width):drawOffsets(ctx,state,g,width,base),
    seek:value=>paged.mapSeek({offset:value}),
    scroll:delta=>paged.wheelBy(delta),
    step:{line:state.rowHeight||20,page:Math.max(20,textarea.clientHeight-(state.rowHeight||20))}};
@@ -648,37 +675,6 @@ function create(adapter){
   }
   ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);drawSeen(ctx,c,record,g,width,(state.units-state.lines+1)/Math.max(1,state.estimatedRows*columns));
  }
- // Wrapped rows of the loaded page (characters per row, as the blocks wrap):
- // the first row of each line. Cached per page and width.
- function pageRows(text,starts,columns){
-  if(flowCache?.text===text&&flowCache.columns===columns)return flowCache.cumulative;
-  const n=starts.length,cumulative=new Float64Array(n+1);let sum=0;
-  for(let i=0;i<n;i++){cumulative[i]=sum;const length=(i+1<n?starts[i+1]-1:text.length)-starts[i];sum+=Math.max(1,Math.ceil(length/columns));}
-  cumulative[n]=sum;flowCache={text,columns,cumulative};return cumulative;
- }
- // Text mode with word wrap: the row at the top of the view is drawn at the
- // top of the box, the page's other rows around it; elsewhere the texture.
- function drawPageFlow(ctx,d,state,g,width,zoom,columns,height,syntax){
-  timedText(()=>{
-   const page=state.page;
-   if(pageCache?.text!==page.text)pageCache={text:page.text,starts:lineStarts(page.text)};
-   const c=palette(),tab=adapter.tabSize(),text=page.text,starts=pageCache.starts,n=starts.length,cumulative=pageRows(text,starts,columns),out=[];
-   const end=i=>i+1<n?starts[i+1]-1:text.length,kindAt=syntax?syntaxCursor(syntax.runs):null;
-   const at=clamp(state.offset-page.start,0,text.length),line=clamp(before(starts,at)-1,0,n-1),anchor=cumulative[line]+Math.floor((at-starts[line])/columns);
-   const rowY=j=>g.box.top+(j-anchor)*height;
-   ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);texture(ctx,c,g,width,(state.units-state.lines+1)/Math.max(1,state.estimatedRows*columns));
-   const top=rowY(0),bottom=rowY(cumulative[n]);
-   if(Math.min(g.used,bottom)>Math.max(0,top)){ctx.fillStyle=c.bg;ctx.fillRect(0,Math.max(0,top),width,Math.min(g.used,bottom)-Math.max(0,top));}
-   textStart(ctx,zoom);
-   for(let j=Math.max(0,Math.floor(anchor-g.box.top/height)-1),count=0;j<cumulative[n]&&count<TEXT_ROWS;j++){
-    const y=rowY(j);if(y>g.used)break;if(y+height<0)continue;
-    const i=findRow(cumulative,j),row=j-cumulative[i],stop=end(i),from=Math.min(stop,starts[i]+row*columns),to=Math.min(stop,from+columns);
-    textRow(ctx,c,text,from,to,y,height,zoom,tab,kindAt,page.line+i,row,out,page.start);count++;
-   }
-   textRows=out;
-  });
- }
-
  function draw(layout){
   const started=now();
   try{paint(layout);}finally{const spent=now()-started;stats.draws++;if(spent>stats.maxDraw)stats.maxDraw=spent;}
@@ -822,7 +818,7 @@ function create(adapter){
   get width(){return host&&!host.hidden?host.getBoundingClientRect().width:0;},
   limits:()=>host?limits():null,
   redraw(){drawn='';colors=null;schedule();},
-  dispose(){if(frame)root.cancelAnimationFrame(frame);root.clearTimeout(timer);root.clearTimeout(diskTimer);parsing=null;host=null;}});
+  dispose(){if(frame)root.cancelAnimationFrame(frame);root.clearTimeout(timer);root.clearTimeout(diskTimer);root.clearTimeout(sampleTimer);sampleWant='';parsing=null;host=null;}});
 }
 
 const api={create,commentMarkers,lineRuns,lineShape,lineStarts,geometry,targetAt,dragTarget,widthLimits,storedWidth,shownWidth,textZoom,parseSyntax,syntaxReader,syntaxCursor,rowCells,

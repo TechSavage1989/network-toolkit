@@ -1,0 +1,13 @@
+Network Toolkit 1.21.60
+
+## What's New
+
+- The Document Map shows the whole document again, in its colors with the gaps between words, for large files too. Before, a large file (such as a full firewall configuration) showed only gray bars for the parts you had scrolled through.
+- Making the map wider no longer zooms in on a small part of the document. The map always shows the whole document: a wider map shows more detail of each line.
+- A short document still shows its real text in a wide map.
+
+## Additional Details
+
+- Large files (over about 500 KB or 4,000 lines) are read in sections; the map now samples the whole file from the app's engine, so every part is drawn without scrolling there first.
+- When a document has too many lines for readable text in the map, the text is drawn smaller, and below about 4 pixels the map uses colored blocks instead.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
