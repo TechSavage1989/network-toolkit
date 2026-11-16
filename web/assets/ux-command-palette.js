@@ -49,6 +49,7 @@ function buttons(){
 // and former tool names are left out; the main window is unchanged.
 const standalone=()=>root.NetworkToolkitStandalone?.mode?.()?root.NetworkToolkitStandalone:null;
 // Opens a panel of the editor sidebar and puts the keyboard on its rail tab.
+// A tab turned off in More → View is turned back on (selectPanel).
 function showEditorSidebar(name){
  root.NetworkToolkitEditorFiles?.selectPanel?.(name);
  doc.querySelector('#networkToolkitFileEditor [data-editor-files-panel="'+name+'"]')?.focus({preventScroll:true});
@@ -118,9 +119,13 @@ function catalog(){
  // standalone Terminal's palette lists terminal commands only.
  if(allowedTool('editor')&&editor?.toggleDocumentMap&&editorShown&&!editorShown.hidden&&standalone()?.mode?.()!=='terminal')global.push(
   {id:'document-map',label:'Show or hide the document map',group:'Text Editor',keywords:'minimap overview miniature navigate scroll view',run:()=>editor.toggleDocumentMap()},
-  {id:'document-list',label:'Show the document list',group:'Text Editor',keywords:'open documents tabs switch files view',run:()=>root.NetworkToolkitEditorFiles?.showDocuments?.(true,{focus:true})},
+  // Document list in More → View: Docs on the sidebar rail or not. Turning it
+  // on shows the list with the keyboard on the active document.
+  {id:'document-list',label:'Show or hide the document list',group:'Text Editor',keywords:'docs open documents tabs rail sidebar view more',run:()=>editor.toggleSidebarPanel?.('documents',{focus:true})},
   // The editor sidebar opens from its rail (Docs, Connect, Files); the
-  // toolbar has no Files button.
+  // toolbar has no Files button. Each of these turns its tab back on if it
+  // was off in More → View.
+  {id:'editor-documents',label:'Show the documents sidebar',group:'Text Editor',keywords:'docs document list open documents tabs switch',run:()=>root.NetworkToolkitEditorFiles?.showDocuments?.(true,{focus:true})},
   {id:'editor-files',label:'Show the files sidebar',group:'Text Editor',keywords:'file browser explorer local folders drives sftp ftp remote open',run:()=>showEditorSidebar('files')},
   {id:'editor-connect',label:'Show the connections sidebar',group:'Text Editor',keywords:'connect sftp ftp ftps ssh session saved remote',run:()=>showEditorSidebar('connections')},
   {id:'editor-sidebar',label:'Show or hide the editor sidebar',group:'Text Editor',keywords:'files connect docs documents panel rail',run:()=>root.NetworkToolkitEditorFiles?.toggle?.(editorShown)}
@@ -173,6 +178,7 @@ function helpText(){
  ['Text Editor','Ctrl+Shift+B','Base64 decode the selection or the document'],
  ['Text Editor','More > Document map','Show a miniature of the whole document at the right edge; click or drag in it to move'],
  ['Text Editor','Documents (sidebar)','List the open documents; Up / Down and Enter switch, Shift+F10 opens the tab menu'],
+ ['Text Editor','More > Document list / Connections / Files','Show or remove Docs, Connect or Files on the sidebar rail; with all three off there is no sidebar'],
  ['Text Editor','Docs / Connect / Files (sidebar rail)','Open that panel of the editor sidebar; the open one closes the sidebar. Up / Down move between them'],
  ['Text Editor','More > Toolbar buttons','Show the toolbar buttons as icons or as text'],
  ['Terminal','Alt+Shift+Left / Right','Reorder a terminal tab'],

@@ -111,10 +111,22 @@ type editorPreferences struct {
 	// ToolbarLabels is the Toolbar buttons setting (More menu): "icons" (the
 	// default, also when empty) or "text".
 	ToolbarLabels string `json:"toolbarLabels,omitempty"`
+	// SidebarPanels says which tabs the editor sidebar's rail shows (More →
+	// View: Document list, Connections, Files). Absent, null or a missing
+	// member means shown, so an older window's batch keeps all three.
+	SidebarPanels *editorSidebarPanels `json:"sidebarPanels,omitempty"`
 	// FindTransparency is the Find window's Transparency setting
 	// (editor-find.js): on, "blur" (on losing focus) or "always", and the
 	// opacity in percent.
 	FindTransparency *editorFindTransparency `json:"findTransparency,omitempty"`
+}
+// editorSidebarPanels: each member false hides that rail tab and its panel;
+// the move batch is strict JSON, so another member or a non-boolean value is
+// refused when the batch is read.
+type editorSidebarPanels struct {
+	Documents   *bool `json:"documents,omitempty"`
+	Connections *bool `json:"connections,omitempty"`
+	Files       *bool `json:"files,omitempty"`
 }
 type editorFindTransparency struct {
 	Enabled bool   `json:"enabled"`
@@ -607,6 +619,10 @@ func editorCloneBatch(b editorBatch) editorBatch {
 		if b.Preferences.FindTransparency != nil {
 			f := *b.Preferences.FindTransparency
 			v.FindTransparency = &f
+		}
+		if b.Preferences.SidebarPanels != nil {
+			s := *b.Preferences.SidebarPanels
+			v.SidebarPanels = &s
 		}
 		if b.Preferences.Colors != nil {
 			v.Colors = make(map[string]string, len(b.Preferences.Colors))

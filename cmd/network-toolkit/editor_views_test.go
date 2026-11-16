@@ -750,6 +750,52 @@ func TestEditorComparisonPreferencesOptionalBooleans(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"toolbarLabels":true}`), &strict); err == nil {
 		t.Fatal("a non-string Toolbar buttons setting was accepted")
 	}
+	// The sidebar rail's tabs (More → View: Document list, Connections,
+	// Files). An older window's batch has no setting, and a missing member
+	// means shown; false is carried to the new window member by member.
+	if old.SidebarPanels != nil {
+		t.Fatal("an older window's preferences gained a sidebar panels setting")
+	}
+	off, on := false, true
+	for _, panels := range []editorSidebarPanels{{}, {Documents: &off}, {Connections: &off, Files: &on}, {Documents: &off, Connections: &off, Files: &off}} {
+		batch := editorFixtureBatch()
+		batch.Preferences = &editorPreferences{FontSize: 13, Indent: 4, Palette: "auto", SidebarPanels: &panels}
+		if err := validateEditorBatch(batch); err != nil {
+			t.Fatal(err)
+		}
+		clone := editorCloneBatch(batch)
+		if clone.Preferences.SidebarPanels == nil || clone.Preferences.SidebarPanels == batch.Preferences.SidebarPanels {
+			t.Fatal("the sidebar panels setting was not copied to the new window")
+		}
+		got, want := *clone.Preferences.SidebarPanels, panels
+		same := func(a, b *bool) bool { return a == nil && b == nil || a != nil && b != nil && *a == *b }
+		if !same(got.Documents, want.Documents) || !same(got.Connections, want.Connections) || !same(got.Files, want.Files) {
+			t.Fatalf("the sidebar panels setting changed on its way: %+v", got)
+		}
+	}
+	// The move batch arrives through the strict decoder: false is read as
+	// false, an absent member stays absent (shown), and anything but a
+	// boolean member of the three is refused.
+	decode := func(body string) (editorTransferRequest, error) {
+		var request editorTransferRequest
+		r := httptest.NewRequest(http.MethodPost, "/api/editor-views/transfers", strings.NewReader(body))
+		return request, decodeEditorBody(httptest.NewRecorder(), r, 1<<20, &request)
+	}
+	request, err := decode(`{"id":"a","batch":{"documents":[],"active":"","compare":null,"preferences":{"wordWrap":false,"syntax":true,"indent":4,"fontSize":13,"palette":"auto","colors":{},"sidebarPanels":{"documents":false,"files":true}}}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := request.Batch.Preferences.SidebarPanels; p == nil || p.Documents == nil || *p.Documents || p.Connections != nil || p.Files == nil || !*p.Files {
+		t.Fatalf("the strict decoder read the sidebar panels as %+v", p)
+	}
+	if request, err = decode(`{"id":"a","batch":{"documents":[],"active":"","compare":null,"preferences":{"wordWrap":false,"syntax":true,"indent":4,"fontSize":13,"palette":"auto","colors":{}}}}`); err != nil || request.Batch.Preferences.SidebarPanels != nil {
+		t.Fatal("a batch without the setting gained one", err)
+	}
+	for _, bad := range []string{`{"documents":"false"}`, `{"files":0}`, `{"terminal":false}`, `[false,false,false]`, `false`} {
+		if _, err := decode(`{"id":"a","batch":{"documents":[],"active":"","compare":null,"preferences":{"wordWrap":false,"syntax":true,"indent":4,"fontSize":13,"palette":"auto","colors":{},"sidebarPanels":` + bad + `}}}`); err == nil {
+			t.Fatal("an invalid sidebar panels setting was accepted", bad)
+		}
+	}
 	for _, field := range []string{"compareHorizontalSync", "compareUnderline", "compareIntralineHighlight", "documentMap"} {
 		var bad editorPreferences
 		if err := json.Unmarshal([]byte(`{"`+field+`":"false"}`), &bad); err == nil {

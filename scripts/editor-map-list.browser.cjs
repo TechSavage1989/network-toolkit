@@ -21,14 +21,25 @@
 //    click, Up/Down and Enter activate; the right-click menu is the tab menu;
 //    left and right view groups in split view; the panel is restored after a
 //    reload; command palette and F1 help rows;
+//  - the sidebar tabs (owner request after v1.21.58: More → View → Document
+//    list, Connections, Files): ticked by default; unticking one removes its
+//    rail button and panel and the sidebar falls back to the first remaining
+//    tab in rail order (keyboard too), keeping its open state, side and width;
+//    with all three off there is no sidebar and the text takes the full width;
+//    ticking one brings it back in its place, open; a saved Docs panel falls
+//    back while Docs is off and returns when it is ticked; explicit requests
+//    (the palette, Choose a connection, Use) turn a hidden tab back on, a
+//    setting synced from another app does not open anything; kept after a
+//    reload;
 //  - a detached editor window at its native minimum size (640 x 400) stays
-//    usable with both.
+//    usable with both, and with the sidebar tabs turned off.
 // Part 2, when NTK_EDITOR_STANDALONE_URL is set (TestEditorSessionBrowserMapList
 // in editor_map_list_browser_test.go runs the standalone Text Editor against
 // its production engine): a 16 MB disk-backed document is mapped by line and
 // scrolled through the map with no long task over 50 ms; a 1.7 MB single-line
 // Base64 document with Wrap on is mapped by character offset and the map
-// reaches its first and last characters; both settings are kept by the engine.
+// reaches its first and last characters; both settings, and a sidebar tab
+// turned off, are kept by the engine.
 // Screenshots (light and dark, device scale 1) go to TOOLKIT_TEST_OUTPUT.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
@@ -124,6 +135,15 @@ async function assertBoxMatches(page,label){
 }
 const canvasSum=page=>page.evaluate(()=>{const c=document.querySelector('#networkToolkitFileEditor [data-ed-map] canvas'),x=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let sum=0;for(let i=0;i<x.length;i+=7)sum=(sum*31+x[i])>>>0;return sum;});
 const canvasPixel=(page,x,y)=>page.evaluate(([x,y])=>{const c=document.querySelector('#networkToolkitFileEditor [data-ed-map] canvas'),r=devicePixelRatio||1;return [...c.getContext('2d').getImageData(Math.round(x*r),Math.round(y*r),1,1).data].slice(0,3);},[x,y]);
+// The sidebar: which rail buttons show, the selected one, the open panel and
+// the More menu boxes.
+const railState=page=>page.evaluate(()=>{
+ const ed=document.querySelector('#networkToolkitFileEditor'),shell=ed.querySelector('.nt-editor-files-shell'),host=ed.querySelector('[data-ed-files-sidebar]'),visible=el=>!!el&&getComputedStyle(el).display!=='none'&&el.getClientRects().length>0;
+ return {rail:[...ed.querySelectorAll('[data-editor-files-panel]')].filter(visible).map(el=>el.dataset.editorFilesPanel),selected:ed.querySelector('[data-editor-files-panel][aria-selected="true"]')?.dataset.editorFilesPanel||'',
+  shell:visible(shell),dock:visible(ed.querySelector('[data-editor-files-dock]')),open:visible(host),panel:host?.dataset.editorSidebarPanel||'',width:shell?Math.round(shell.getBoundingClientRect().width):0,right:!!shell?.classList.contains('dock-right'),
+  list:visible(ed.querySelector('[data-editor-documents]')),connect:visible(ed.querySelector('#ntEditorRemotePanel')),files:visible(ed.querySelector('.nt-editor-files-locations')),
+  boxes:Object.fromEntries([...ed.querySelectorAll('[data-ed-sidebar-panel]')].map(box=>[box.dataset.edSidebarPanel,box.checked])),pref:NetworkToolkitFileEditor.sidebarPanels};
+});
 const listRows=page=>page.evaluate(()=>[...document.querySelectorAll('#networkToolkitFileEditor [data-editor-documents] [data-ed-doc-uid]')].map(row=>({uid:row.dataset.edDocUid,name:row.querySelector('.nt-editor-documents-name').textContent,ext:row.querySelector('.nt-editor-documents-ext').textContent,mark:row.querySelector('.nt-editor-documents-mark').textContent,active:row.getAttribute('aria-selected')==='true',label:row.getAttribute('aria-label'),focused:row===document.activeElement,group:row.closest('[role="group"]')?.querySelector('.nt-editor-documents-group')?.textContent||''})));
 const tabOrder=page=>page.evaluate(()=>[...NetworkToolkitFileEditor.documents.values()].map(d=>d.uid));
 const activeUID=page=>page.evaluate(()=>NetworkToolkitFileEditor.active?.uid||'');
@@ -151,8 +171,10 @@ async function mainWindow(browser){
  let info=await mapInfo(page);
  assert.equal(info.hidden,true,'the document map is off by default');
  await openMore(page);
- const mapBox=page.locator('#ntEditorMoreActions [data-ed-document-map]'),listBox=page.locator('#ntEditorMoreActions [data-ed-document-list]');
- assert.equal(await mapBox.isChecked(),false);assert.equal(await listBox.isChecked(),false);
+ const mapBox=page.locator('#ntEditorMoreActions [data-ed-document-map]'),listBox=page.locator('#ntEditorMoreActions [data-ed-sidebar-panel="documents"]');
+ const panelBox=name=>page.locator('#ntEditorMoreActions [data-ed-sidebar-panel="'+name+'"]');
+ assert.equal(await mapBox.isChecked(),false);
+ assert.deepEqual(await page.locator('#ntEditorMoreActions [data-ed-sidebar-panel]').evaluateAll(list=>list.map(box=>[box.dataset.edSidebarPanel,box.closest('label').textContent.trim(),box.checked])),[['documents','Document list',true],['connections','Connections',true],['files','Files',true]],'the sidebar tab boxes, in rail order, ticked by default');
  assert.equal(await page.locator('#ntEditorMoreActions .nt-editor-more-heading').textContent(),'View');
  await mapBox.check();await frames(page);
  info=await mapInfo(page);
@@ -247,7 +269,7 @@ async function mainWindow(browser){
  await rail.click();await frames(page);
  assert.equal(await page.locator('#networkToolkitFileEditor [data-editor-documents]').isVisible(),true,'the rail opens the document list');
  assert.equal(await page.locator('#networkToolkitFileEditor [data-editor-file-browser]').isVisible(),false,'the list replaces the file browser in the sidebar');
- assert.equal(await page.evaluate(()=>document.querySelector('#ntEditorMoreActions [data-ed-document-list]').checked),true,'the More menu shows the list is open');
+ assert.equal(await page.evaluate(()=>document.querySelector('#ntEditorMoreActions [data-ed-sidebar-panel="documents"]').checked),true,'the Document list box shows Docs is on the rail');
  let rows=await listRows(page);
  assert.deepEqual(rows.map(row=>row.uid),await tabOrder(page),'every tab, in tab order');
  assert.deepEqual(rows.map(row=>row.name+'|'+row.ext),['core-router|cfg','notes|txt','inventory|json','long-lines|txt']);
@@ -311,15 +333,16 @@ async function mainWindow(browser){
  await paletteRun(page,'Show or hide the document map');assert.equal((await mapInfo(page)).hidden,true,'the palette hides the map');
  await paletteRun(page,'Show or hide the document map');assert.equal((await mapInfo(page)).hidden,false,'and shows it');
  await page.locator('#networkToolkitFileEditor [data-editor-files-panel="files"]').click();
- await paletteRun(page,'Show the document list');
+ await paletteRun(page,'Show the documents sidebar');
  assert.equal(await page.locator('#networkToolkitFileEditor [data-editor-documents]').isVisible(),true,'the palette opens the list');
  assert.equal((await listRows(page)).find(row=>row.focused)?.active,true,'with the keyboard on the active row');
  await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>document.activeElement?.matches('[data-ed-text]')),true,'Escape returns to the text');
  await page.keyboard.press('F1');await page.locator('[aria-label="Keyboard shortcuts and help"][role="dialog"]').waitFor();
  const help=await page.locator('#uxCommandOverlay .ux-help-row').allInnerTexts();
  assert(help.some(row=>/Document map/.test(row)),'F1 help explains the document map');assert(help.some(row=>/List the open documents/.test(row)),'and the document list');
+ assert(help.some(row=>/More > Document list \/ Connections \/ Files/.test(row)&&/Show or remove Docs, Connect or Files on the sidebar rail; with all three off there is no sidebar/.test(row)),'and the sidebar tab boxes');
  await page.keyboard.press('Escape');
- pass('Command palette and F1 help: Document map and Document list');
+ pass('Command palette and F1 help: Document map, Document list and the sidebar tab boxes');
 
  // A reload keeps both.
  await page.waitForTimeout(400);
@@ -332,12 +355,146 @@ async function mainWindow(browser){
  await openMore(page);assert.equal(await mapBox.isChecked(),true);assert.equal(await listBox.isChecked(),true);await page.keyboard.press('Escape');
  assert.equal(await page.locator('#networkToolkitFileEditor [data-editor-documents]').isVisible(),true,'the Document List is still open after a reload');
  assert.equal((await listRows(page)).length,4);
- // Turning the list off from the More menu closes the sidebar.
- await openMore(page);await listBox.uncheck();await frames(page);
- assert.equal(await page.locator('#networkToolkitFileEditor [data-ed-files-sidebar]').isVisible(),false,'unchecking Document list closes it');
- await openMore(page);await listBox.check();await frames(page);
- assert.equal(await page.locator('#networkToolkitFileEditor [data-editor-documents]').isVisible(),true);
  pass('Reload: the map and the Document List are restored');
+
+ // ---- Sidebar tabs: More → View → Document list, Connections, Files ----
+ const settled=async(check,label)=>{for(let i=0;i<60;i++){const r=await railState(page);if(check(r))return r;await frames(page);}assert.fail(label+': '+JSON.stringify(await railState(page)));};
+ const saved=()=>state.saved.editorPreferences?.sidebarPanels;
+ const waitSaved=async(want,label)=>{for(let i=0;i<60&&JSON.stringify(saved())!==JSON.stringify(want);i++)await page.waitForTimeout(50);assert.deepEqual(saved(),want,label);};
+ const tick=async(name,on)=>{await openMore(page);if(on)await panelBox(name).check();else await panelBox(name).uncheck();await frames(page);};
+ const textBox=()=>page.evaluate(()=>{const area=document.querySelector('#networkToolkitFileEditor .nt-editor-document-area').getBoundingClientRect(),work=document.querySelector('#networkToolkitFileEditor .nt-editor-workspace').getBoundingClientRect(),map=document.querySelector('#networkToolkitFileEditor [data-ed-map]').getBoundingClientRect();return {left:area.left-work.left,width:area.width,room:work.width-map.width};});
+ let bar=await railState(page);
+ assert.deepEqual([bar.rail,bar.selected,bar.open,bar.list],[['documents','connections','files'],'documents',true,true],'Docs, Connect and Files on the rail, the list open');
+ const width=bar.width;
+ // Unticking Document list removes Docs and its panel; the sidebar stays open
+ // on the first remaining tab, Connect, at the same width.
+ const postsBefore=state.posts;
+ await tick('documents',false);
+ bar=await settled(r=>!r.rail.includes('documents'),'Docs leaves the rail');
+ assert.deepEqual({rail:bar.rail,selected:bar.selected,open:bar.open,panel:bar.panel,list:bar.list,connect:bar.connect,width:bar.width,boxes:bar.boxes},{rail:['connections','files'],selected:'connections',open:true,panel:'connections',list:false,connect:true,width,boxes:{documents:false,connections:true,files:true}},'unticked: no Docs button or panel; the sidebar falls back to Connect and keeps its width');
+ assert.deepEqual(bar.pref,{documents:false,connections:true,files:true});
+ await waitSaved({documents:false,connections:true,files:true},'the setting is saved with the editor preferences');
+ assert(state.posts>postsBefore);
+ assert.equal(state.saved.editorFilesPreferences?.panel,'documents','the saved panel choice is not rewritten by the fallback');
+ await page.keyboard.press('Escape');
+ // The keyboard on the rail skips the hidden Docs.
+ await page.locator('#networkToolkitFileEditor [data-editor-files-panel="connections"]').focus();
+ await page.keyboard.press('ArrowUp');assert.equal((await railState(page)).selected,'files','Up from Connect wraps to Files, past the hidden Docs');
+ await page.keyboard.press('Home');assert.equal((await railState(page)).selected,'connections','Home is Connect');
+ await page.keyboard.press('End');await page.keyboard.press('ArrowDown');assert.equal((await railState(page)).selected,'connections','Down from Files wraps to Connect');
+ assert.equal(await page.evaluate(()=>document.activeElement?.dataset?.editorFilesPanel),'connections');
+ // A reload with Docs off and the Docs panel saved as the choice shows the
+ // first remaining tab and keeps the stored choice for when Docs returns.
+ await page.waitForTimeout(700);
+ await page.evaluate(()=>{state.editorFilesPreferences={...state.editorFilesPreferences,panel:'documents'};saveState();});
+ for(let i=0;i<40&&state.saved.editorFilesPreferences?.panel!=='documents';i++)await page.waitForTimeout(50);
+ await start();
+ for(const file of FILES.keys())assert.equal(await page.evaluate(file=>NetworkToolkitFileEditor.openLocalPath(file).then(()=>'',error=>error.message),file),'');
+ bar=await settled(r=>r.open,'the sidebar after a reload');
+ assert.deepEqual({rail:bar.rail,selected:bar.selected,list:bar.list,boxes:bar.boxes},{rail:['connections','files'],selected:'connections',list:false,boxes:{documents:false,connections:true,files:true}},'after a reload Docs is still off and a saved Docs panel falls back to Connect');
+ assert.equal(state.saved.editorFilesPreferences.panel,'documents','the stored choice is kept');
+ // Ticking it brings Docs back first, with its panel open.
+ await tick('documents',true);
+ bar=await settled(r=>r.list,'Docs returns');
+ assert.deepEqual({rail:bar.rail,selected:bar.selected,open:bar.open,boxes:bar.boxes,width:bar.width},{rail:['documents','connections','files'],selected:'documents',open:true,boxes:{documents:true,connections:true,files:true},width},'ticked: Docs is first again and its panel shows');
+ assert.equal((await listRows(page)).length,4);
+ await waitSaved({documents:true,connections:true,files:true},'saved on again');
+ await page.keyboard.press('Escape');
+ pass('Sidebar tabs: Document list on by default; unticked, Docs and its panel leave the rail, the sidebar falls back to Connect (keyboard too) and a reload keeps it; ticked, Docs is first again and open');
+
+ // Each box on its own, then all three off: no sidebar, the text takes the width.
+ await tick('connections',false);
+ bar=await settled(r=>!r.rail.includes('connections'),'Connect leaves the rail');
+ assert.deepEqual([bar.rail,bar.selected,bar.open],[['documents','files'],'documents',true],'Connections unticked: Connect is gone, the open Docs panel stays');
+ await page.keyboard.press('Escape');await page.locator('#networkToolkitFileEditor [data-editor-files-panel="files"]').click();
+ bar=await settled(r=>r.files,'Files opens');
+ await tick('files',false);
+ bar=await settled(r=>!r.rail.includes('files'),'Files leaves the rail');
+ assert.deepEqual([bar.rail,bar.selected,bar.open,bar.list],[['documents'],'documents',true,true],'Files unticked while showing: the sidebar falls back to Docs');
+ await tick('connections',true);
+ bar=await settled(r=>r.connect,'Connect returns');
+ assert.deepEqual([bar.rail,bar.selected,bar.open],[['documents','connections'],'connections',true],'Connections ticked: Connect returns in its place and opens');
+ const sidebarText=await textBox();
+ await tick('connections',false);await tick('documents',false);
+ bar=await settled(r=>!r.shell,'the sidebar disappears');
+ assert.deepEqual({shell:bar.shell,dock:bar.dock,rail:bar.rail,open:bar.open,boxes:bar.boxes},{shell:false,dock:false,rail:[],open:false,boxes:{documents:false,connections:false,files:false}},'all three off: no rail, no side button, no sidebar');
+ const full=await textBox();
+ assert(full.left<=1&&Math.abs(full.width-full.room)<=1,'the text takes the full width: '+JSON.stringify(full));
+ assert(full.width>sidebarText.width+200,'wider than beside the sidebar: '+JSON.stringify({full,sidebarText}));
+ await waitSaved({documents:false,connections:false,files:false},'all three off is saved');
+ await page.keyboard.press('Escape');
+ assert.match(await page.locator('#networkToolkitFileEditor [data-ed-message]').textContent(),/The editor sidebar is hidden/,'the status line says how to bring it back');
+ await shot(page,'editor-sidebar-tabs-all-off-dark');
+ // Ticking any box brings the rail back with that tab open.
+ await tick('files',true);
+ bar=await settled(r=>r.files,'Files returns');
+ assert.deepEqual([bar.shell,bar.dock,bar.rail,bar.selected,bar.open,bar.width],[true,true,['files'],'files',true,width],'Files ticked: the rail is back with Files open at the same width');
+ await page.keyboard.press('Escape');
+ pass('Sidebar tabs: Connections and Files on their own; with all three off there is no rail and the text takes the full width; ticking one brings the rail back open on it');
+
+ // Explicit requests turn a hidden tab back on; a synced setting opens nothing.
+ // Files off, palette "Show the files sidebar":
+ await tick('connections',true);await tick('files',false);await page.keyboard.press('Escape');
+ bar=await settled(r=>r.rail.join()==='connections','only Connect');
+ await paletteRun(page,'Show the files sidebar');
+ bar=await settled(r=>r.files,'the palette shows Files');
+ assert.deepEqual([bar.rail,bar.selected,bar.boxes.files],[['connections','files'],'files',true],'Show the files sidebar turns Files back on (its box is ticked) and shows it');
+ // Connect off, the Files panel's "Choose a connection ›" (its SFTP side):
+ await tick('connections',false);await page.keyboard.press('Escape');
+ bar=await settled(r=>r.rail.join()==='files'&&r.files,'only Files');
+ await page.locator('#networkToolkitFileEditor [data-editor-files-side="remote"]').click();
+ const choose=page.locator('#networkToolkitFileEditor [data-ed-files-sidebar] [data-rb-editor-connections]').first();await choose.waitFor();
+ await choose.click();
+ bar=await settled(r=>r.connect,'Choose a connection shows Connect');
+ assert.deepEqual([bar.rail,bar.selected,bar.boxes.connections],[['connections','files'],'connections',true],'Choose a connection in Files turns Connect back on (its box is ticked) and shows it');
+ // Connect off again, palette "Show the connections sidebar":
+ await tick('connections',false);await page.keyboard.press('Escape');
+ await paletteRun(page,'Show the connections sidebar');
+ bar=await settled(r=>r.connect,'the palette shows Connect');
+ assert.deepEqual([bar.rail,bar.selected,bar.boxes.connections],[['connections','files'],'connections',true],'Show the connections sidebar turns Connect back on and shows it');
+ // Files off, Connect's Use on a connected file client (a synthetic one).
+ await tick('files',false);await page.keyboard.press('Escape');
+ bar=await settled(r=>r.rail.join()==='connections'&&r.connect,'only Connect');
+ await page.evaluate(()=>{const b=NetworkToolkitRemoteBrowser,c=b.configurations.ssh;Object.assign(c,{host:'192.0.2.10',port:22,username:'operator'});b.get('ssh').connected=true;return NetworkToolkitFileEditor.refreshConnectedSources();});
+ await page.waitForFunction(()=>[...document.querySelectorAll('#ntEditorRemoteSource option')].some(o=>o.value==='client:ssh'));
+ await page.locator('#ntEditorRemoteSource').selectOption('client:ssh');
+ await page.locator('#ntEditorOpenRemote').click();
+ bar=await settled(r=>r.selected==='files'&&r.open,'Use shows Files');
+ assert.deepEqual([bar.rail,bar.boxes.files],[['connections','files'],true],'Use turns Files back on (its box is ticked) and shows the connection\'s files');
+ await page.evaluate(()=>{NetworkToolkitRemoteBrowser.get('ssh').connected=false;});
+ // Docs off, palette "Show or hide the document list" turns it on with the keyboard on the list.
+ await tick('documents',false);await page.keyboard.press('Escape');
+ await paletteRun(page,'Show or hide the document list');
+ bar=await settled(r=>r.list,'the palette shows the list');
+ assert.deepEqual([bar.rail,bar.selected,bar.boxes.documents],[['documents','connections','files'],'documents',true],'Show or hide the document list turns Docs on');
+ assert.equal(await page.evaluate(()=>!!document.activeElement?.closest('[data-editor-documents]')),true,'with the keyboard on the list');
+ await paletteRun(page,'Show or hide the document list');
+ bar=await settled(r=>!r.rail.includes('documents'),'and off');
+ assert.equal(bar.boxes.documents,false);
+ // All off, palette "Show or hide the editor sidebar" brings back the last panel.
+ await tick('connections',false);await tick('files',false);await page.keyboard.press('Escape');
+ bar=await settled(r=>!r.shell,'no sidebar');
+ await paletteRun(page,'Show or hide the editor sidebar');
+ bar=await settled(r=>r.shell&&r.open,'the palette brings the sidebar back');
+ assert.equal(bar.rail.length,1,'one tab comes back: '+JSON.stringify(bar));assert.equal(bar.boxes[bar.selected],true);
+ // A setting synced from another app removes and adds tabs but opens nothing
+ // and writes nothing.
+ for(const name of ['documents','connections','files'])await tick(name,true);
+ await page.keyboard.press('Escape');
+ await page.evaluate(()=>NetworkToolkitEditorFiles.selectPanel('connections'));
+ bar=await settled(r=>r.connect,'Connect shows');
+ await page.waitForTimeout(700);
+ const quiet=state.posts,keptPanel=state.saved.editorFilesPreferences.panel;
+ await page.evaluate(()=>NetworkToolkitFileEditor.windowAdapter.applyPreferences({...state.editorPreferences,sidebarPanels:{documents:true,connections:false,files:true}}));
+ bar=await settled(r=>!r.rail.includes('connections'),'a synced setting removes Connect');
+ assert.deepEqual([bar.rail,bar.selected,bar.open],[['documents','files'],'documents',true],'the sidebar falls back to Docs');
+ await page.evaluate(()=>NetworkToolkitFileEditor.windowAdapter.applyPreferences({...state.editorPreferences,sidebarPanels:{documents:true,connections:true,files:true}}));
+ bar=await settled(r=>r.rail.includes('connections'),'a synced setting adds Connect');
+ assert.deepEqual([bar.rail,bar.selected],[['documents','connections','files'],'documents'],'Connect returns to the rail without taking over the sidebar');
+ await page.waitForTimeout(700);
+ assert.equal(state.posts,quiet,'a synced setting writes nothing');assert.equal(state.saved.editorFilesPreferences.panel,keptPanel);
+ pass('Sidebar tabs: Show the files sidebar and Show the connections sidebar (palette), Choose a connection (Files) and Use (Connect) turn a hidden tab back on; the palette toggles Docs and brings back a sidebar with no tabs; a synced setting opens nothing');
+
 
  // A 16 MB page-held document: a down-sampled overview, bounded map work.
  await page.evaluate(()=>{const map=NetworkToolkitFileEditor.documentMap;Object.assign(map.stats,{updates:0,draws:0,maxUpdate:0,maxDraw:0});});
@@ -412,6 +569,30 @@ async function detachedWindow(browser){
  assert.equal(await page.evaluate(()=>document.activeElement?.matches('[data-ed-text]')),true,'and returns to the text');
  assert.equal(JSON.parse(await page.evaluate(()=>sessionStorage.getItem('ntk.editor.files'))).panel,'documents','the detached window keeps its sidebar choice like Files');
  pass('Detached window at 640 x 400: the map and the Document List stay usable');
+ // The sidebar tabs at 640 x 400: the setting a new window gets in its batch
+ // (TestEditorSessionBrowserToolbarButtons sends a real one through the
+ // engine), then the boxes of this window's More menu.
+ const settledBar=async(check,label)=>{for(let i=0;i<60;i++){const r=await railState(page);if(check(r))return r;await frames(page);}assert.fail(label+': '+JSON.stringify(await railState(page)));};
+ await page.evaluate(()=>NetworkToolkitFileEditor.windowAdapter.applyPreferences({...state.editorPreferences,documentMap:true,sidebarPanels:{documents:false}}));
+ let bar=await settledBar(r=>!r.rail.includes('documents'),'the batch removes Docs');
+ assert.deepEqual([bar.rail,bar.boxes],[['connections','files'],{documents:false,connections:true,files:true}],'a batch with Document list off: Connect and Files only');
+ assert.equal(JSON.parse(await page.evaluate(()=>sessionStorage.getItem('ntk.editor.files'))).panel,'documents','the window\'s own panel choice is kept');
+ await page.locator('#networkToolkitFileEditor [data-editor-files-panel="files"]').click();
+ bar=await settledBar(r=>r.open&&r.files,'Files opens over the text');
+ await shot(page,'editor-sidebar-tabs-detached-640x400-dark');
+ await page.keyboard.press('Escape');bar=await settledBar(r=>!r.open,'Escape closes the narrow sidebar');
+ for(const name of ['connections','files']){await openMore(page);await page.locator('#ntEditorMoreActions [data-ed-sidebar-panel="'+name+'"]').uncheck();await frames(page);}
+ await page.keyboard.press('Escape');
+ bar=await settledBar(r=>!r.shell,'no sidebar in the small window');
+ assert.deepEqual([bar.rail,bar.dock,bar.open],[[],false,false],'all three off at 640 x 400: no rail and no side button');
+ g=await geometry();
+ const full=await page.evaluate(()=>{const area=document.querySelector('#networkToolkitFileEditor .nt-editor-document-area').getBoundingClientRect(),work=document.querySelector('#networkToolkitFileEditor .nt-editor-workspace').getBoundingClientRect(),map=document.querySelector('#networkToolkitFileEditor [data-ed-map]').getBoundingClientRect();return {left:area.left-work.left,width:area.width,room:work.width-map.width};});
+ assert(full.left<=1&&Math.abs(full.width-full.room)<=1&&g.overflow<=0,'the text takes the full width at 640 x 400: '+JSON.stringify({full,g}));
+ await shot(page,'editor-sidebar-tabs-detached-all-off-640x400-dark');
+ await openMore(page);await page.locator('#ntEditorMoreActions [data-ed-sidebar-panel="connections"]').check();await frames(page);
+ bar=await settledBar(r=>r.shell&&r.open&&r.connect,'Connections brings the rail back');
+ assert.deepEqual([bar.rail,bar.selected],[['connections'],'connections'],'ticked: the rail is back with Connect open');
+ pass('Detached window at 640 x 400: the sidebar tabs follow the batch and the More menu; with all three off the text takes the full width');
  await context.close();
 }
 
@@ -490,12 +671,15 @@ async function engine(browser){
  await shot(page,'editor-map-list-base64-wrap-dark');
  pass('1.7 MB single-line Base64 with Wrap on: mapped by character offset; the map reaches the middle, the end and the start');
 
- // The engine keeps the settings: reload.
+ // The engine keeps the settings: reload. Connections is turned off first.
+ await openMore(page);await page.locator('#ntEditorMoreActions [data-ed-sidebar-panel="connections"]').uncheck();await page.keyboard.press('Escape');
+ await page.waitForFunction(()=>NetworkToolkitFileEditor.sidebarPanels.connections===false&&document.querySelector('#networkToolkitFileEditor [data-editor-files-panel="connections"]').hidden);
  await page.waitForTimeout(600);
  await start();
  assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.documentMapOn),true,'the map setting is restored by the engine');
  assert.equal(await page.evaluate(()=>NetworkToolkitEditorFiles.panel),'documents','the Document List is restored by the engine');
- pass('Standalone Text Editor: the engine keeps the map and the Document List after a reload');
+ assert.deepEqual(await page.evaluate(()=>[NetworkToolkitFileEditor.sidebarPanels,[...document.querySelectorAll('#networkToolkitFileEditor [data-editor-files-panel]')].filter(b=>!b.hidden).map(b=>b.dataset.editorFilesPanel)]),[{documents:true,connections:false,files:true},['documents','files']],'Connections stays off after a reload');
+ pass('Standalone Text Editor: the engine keeps the map, the Document List and Connections off after a reload');
  await context.close();
 }
 

@@ -23,7 +23,8 @@ import (
 // production engine: a 16 MB disk-backed file is mapped by line and scrolled
 // through the map with no long task over 50 ms, a 1.7 MB single-line Base64
 // export with Wrap on is mapped by character offset, and after a reload the
-// engine has kept both settings in the data folder's shared settings.
+// engine has kept both settings, and the sidebar tab turned off in More → View
+// (editorPreferences.sidebarPanels), in the data folder's shared settings.
 func TestEditorSessionBrowserMapList(t *testing.T) {
 	if os.Getenv("NTK_EDITOR_SESSION_BROWSER") != "1" {
 		t.Skip("requires the isolated Playwright browser")
@@ -122,6 +123,10 @@ func TestEditorSessionBrowserMapList(t *testing.T) {
 	sidebar, _ := disk["editorFilesPreferences"].(map[string]any)
 	if prefs["documentMap"] != true || sidebar["panel"] != "documents" {
 		t.Fatalf("the shared settings do not keep the map and the list: editorPreferences=%v editorFilesPreferences=%v", prefs, sidebar)
+	}
+	// The script turns Connections (More → View) off before its last reload.
+	if panels, _ := prefs["sidebarPanels"].(map[string]any); panels["connections"] != false || panels["documents"] != true || panels["files"] != true {
+		t.Fatalf("the shared settings do not keep the sidebar tabs: sidebarPanels=%v", prefs["sidebarPanels"])
 	}
 	for name, text := range contents {
 		if got, err := os.ReadFile(filepath.Join(files, name)); err != nil || string(got) != text {
