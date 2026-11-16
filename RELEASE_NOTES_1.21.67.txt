@@ -1,0 +1,11 @@
+Network Toolkit 1.21.67
+
+## What's New
+
+- The Document Map starts scrolling as soon as the view box you drag reaches its top or bottom edge, and it gets very fast the further past the edge you pull.
+
+## Additional Details
+
+- The edge is now measured at the dragged box itself, not at the pointer, so scrolling starts as soon as the box gets within 24 pixels of the map's top or bottom.
+- The map starts at about 500 pixels a second and rises quickly to about 30,000 pixels a second when you pull the pointer well past the edge.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

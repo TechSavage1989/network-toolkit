@@ -69,12 +69,14 @@ const TEXT_FONT=6,TEXT_FONT_MAX=9,TEXT_SHARE=0.6,TEXT_REFERENCE=120,TEXT_COLUMNS
 // are drawn as the document's own characters, as small as SAMPLE_FONT of the
 // row (owner request after v1.21.63: real text, like Notepad++'s map), and a
 // row longer than the map is squeezed by at most SAMPLE_SQUEEZE, then cut.
-// Dragging the box into the top or bottom AUTO_EDGE px of a map that scrolls
-// scrolls the map: AUTO_SPEED px a second times depth + depth squared, depth
-// being how far into the edge the pointer is (1 at the map's end, at most
-// AUTO_REACH past it).
-const AUTO_EDGE=48,AUTO_SPEED=300,AUTO_REACH=4;
-const autoSpeed=depth=>AUTO_SPEED*(depth+depth*depth);
+// Dragging the box of a map that scrolls: once the box's own top or bottom
+// edge comes within AUTO_EDGE px of the map's edge, the map scrolls at once
+// (owner request after v1.21.66: start sooner, end very fast). Its speed in
+// px a second grows from AUTO_START with the square of how far the box is
+// pushed in, up to AUTO_MAX once it is AUTO_REACH edge widths in (the box
+// reaching the map's edge is one width; the rest is past it).
+const AUTO_EDGE=24,AUTO_START=500,AUTO_MAX=30000,AUTO_REACH=4;
+const autoSpeed=depth=>AUTO_START+(AUTO_MAX-AUTO_START)*Math.min(1,depth/AUTO_REACH)**2;
 const SAMPLE_PITCH=2.5,SAMPLE_FONT=1.35,SAMPLE_SQUEEZE=0.5;
 const TEXT_FIT=4,CHUNK=1024,CHUNKS=64,COLOUR_COLUMNS=190,SAMPLE_COLUMNS=512,SAMPLE_DELAY=250;
 const SYNTAX_LIMIT=200000; // a disk page coloured for the map at most
@@ -951,9 +953,9 @@ function create(adapter){
  }
  // Dragging the box in a map that scrolls (owner request after v1.21.65):
  // the map stays where it is, so the box follows the pointer row for row,
- // and with the pointer in the top or bottom AUTO_EDGE px of the map (or
- // past it) the map scrolls by itself, faster the further in the pointer
- // is, the box staying under the pointer.
+ // and once the box's own edge is in the top or bottom AUTO_EDGE px of the
+ // map (or past it) the map scrolls by itself, faster the further in the
+ // box is pushed, the box staying under the pointer.
  function dragHeld(layout){
   if(!layout.g.own)own={doc:layout.doc,offset:layout.g.offset,start:layout.start,hold:Infinity};
   else own.hold=Infinity;
@@ -971,11 +973,12 @@ function create(adapter){
   else if(target>=g.total-g.span)own.offset=clamp(Math.max(own.offset,top+g.box.height-g.used),0,g.max);
   seekTo(layout,target);
  }
- // How far into an edge the pointer is, as a share of the edge (negative at
- // the top; past the map's end it keeps growing, up to AUTO_REACH).
+ // How far the dragged box's own edge is into the map's edge, as a share of
+ // the edge (negative at the top; past the map's end it keeps growing, up
+ // to AUTO_REACH).
  function autoDepth(g){
-  const edge=Math.min(AUTO_EDGE,g.used/4),y=drag.last;
-  return clamp(y<edge?(y-edge)/edge:y>g.used-edge?(y-(g.used-edge))/edge:0,-AUTO_REACH,AUTO_REACH);
+  const edge=Math.min(AUTO_EDGE,g.used/4),top=drag.last-drag.grab,bottom=top+g.box.height;
+  return clamp(top<edge?(top-edge)/edge:bottom>g.used-edge?(bottom-(g.used-edge))/edge:0,-AUTO_REACH,AUTO_REACH);
  }
  function autoStep(time){
   autoFrame=0;
