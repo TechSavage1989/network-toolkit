@@ -321,6 +321,22 @@ async function standaloneTerminal(){
  await floating.locator('[data-editor-files-panel="documents"]').click();await floating.locator('[data-editor-documents] [data-ed-doc-uid]').first().waitFor();
  assert.deepEqual(await floating.locator('[data-editor-documents] [data-ed-doc-uid]').evaluateAll(list=>list.map(el=>el.textContent)),['running-configtxt']);
  await floating.locator('.nt-editor-more summary').click();await floating.locator('[data-ed-document-map]').check();await page.waitForFunction(()=>!document.querySelector('#networkToolkitFileEditor [data-ed-map]').hidden&&NetworkToolkitFileEditor.documentMap.layout);
+ // The map's separator works here too: wider (up to half of the space beside
+ // the text, the text of the document once wide enough), then reset.
+ {
+  const map=()=>page.evaluate(()=>{const m=NetworkToolkitFileEditor.documentMap,host=document.querySelector('#networkToolkitFileEditor [data-ed-map]'),ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]');return {width:host.getBoundingClientRect().width,max:m.limits().max,mode:m.layout?.mode,rows:m.textRows.map(r=>r.text),text:ta.clientWidth,pref:state.editorPreferences.documentMapWidth};});
+  const separator=floating.locator('[data-ed-map-resize]');assert.equal(await separator.getAttribute('role'),'separator');
+  const before=await map(),b=await separator.boundingBox();
+  await page.mouse.move(b.x+b.width/2,b.y+40);await page.mouse.down();await page.mouse.move(b.x-2000,b.y+40,{steps:6});await page.mouse.up();
+  await page.waitForFunction(width=>document.querySelector('#networkToolkitFileEditor [data-ed-map]').getBoundingClientRect().width>width,before.width);
+  const wide=await map();
+  assert.equal(wide.width,wide.max,'the floating editor\'s map widens to half of the space beside the text');assert(wide.text>=wide.width-80,'and the text keeps about half');
+  assert.equal(wide.pref,Math.round(wide.width),'the width is an editor preference');
+  assert.equal(wide.mode,'text','wide enough, the map shows the document\'s text');assert.equal(wide.rows[0],'hostname lab-switch-01');
+  await separator.dblclick();await page.waitForFunction(width=>document.querySelector('#networkToolkitFileEditor [data-ed-map]').getBoundingClientRect().width<width,wide.width);
+  assert.equal((await map()).width,before.width,'a double-click resets the width');
+  report.floatingMap={before:before.width,wide:wide.width,mode:wide.mode};
+ }
  await floating.locator('.nt-editor-more summary').click();await floating.locator('[data-ed-document-map]').uncheck();
  // Its More menu has the sidebar tab boxes too: the same rule on the same three tabs.
  const floatingRail=()=>floating.evaluate(ed=>[...ed.querySelectorAll('[data-editor-files-panel]')].filter(b=>!b.hidden&&b.getClientRects().length).map(b=>b.dataset.editorFilesPanel).join(',')+'|'+[...ed.querySelectorAll('[data-ed-sidebar-panel]')].map(b=>b.checked?1:0).join(''));

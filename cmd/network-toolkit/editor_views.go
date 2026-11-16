@@ -108,6 +108,9 @@ type editorPreferences struct {
 	AppTheme                  string            `json:"appTheme,omitempty"`
 	Colors                    map[string]string `json:"colors"`
 	DocumentMap               *bool             `json:"documentMap,omitempty"` // the Document Map setting, for a new editor window
+	// DocumentMapWidth is the Document Map's width in CSS pixels, chosen on its
+	// separator (editor-document-map.js); 0 (absent) is the default width.
+	DocumentMapWidth int `json:"documentMapWidth,omitempty"`
 	// ToolbarLabels is the Toolbar buttons setting (More menu): "icons" (the
 	// default, also when empty) or "text".
 	ToolbarLabels string `json:"toolbarLabels,omitempty"`
@@ -431,6 +434,14 @@ func (m *editorViewRegistry) cancelHomeClose() error {
 func validEditorText(s string, limit int) bool {
 	return len(s) <= limit && utf8.ValidString(s) && !strings.ContainsRune(s, 0)
 }
+
+// The Document Map widths a window may carry (WIDTH_MAX and the narrow
+// default of editor-document-map.js).
+const (
+	editorMapWidthMin = 64
+	editorMapWidthMax = 640
+)
+
 func validateEditorBatch(batch editorBatch) error {
 	if p := batch.Preferences; p != nil {
 		if p.AppTheme != "" && p.AppTheme != "light" && p.AppTheme != "dark" {
@@ -446,6 +457,9 @@ func validateEditorBatch(batch editorBatch) error {
 		}
 		if f := p.FindTransparency; f != nil && (f.Mode != "blur" && f.Mode != "always" || f.Level < 20 || f.Level > 95) {
 			return errors.New("Invalid Find window transparency.")
+		}
+		if w := p.DocumentMapWidth; w != 0 && (w < editorMapWidthMin || w > editorMapWidthMax) {
+			return errors.New("Invalid Document Map width.")
 		}
 		switch p.ToolbarLabels {
 		case "", "icons", "text":

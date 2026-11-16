@@ -724,6 +724,45 @@ func TestEditorComparisonPreferencesOptionalBooleans(t *testing.T) {
 	if old.DocumentMap != nil {
 		t.Fatal("an older window's preferences gained a Document Map setting")
 	}
+	// The Document Map's width reaches a new editor window; an older window's
+	// batch has none (0, the default width), and only 64 to 640 px is accepted.
+	for _, value := range []int{0, 64, 96, 333, 640} {
+		batch := editorFixtureBatch()
+		batch.Preferences = &editorPreferences{FontSize: 13, Indent: 4, Palette: "auto", DocumentMapWidth: value}
+		if err := validateEditorBatch(batch); err != nil {
+			t.Fatal(value, err)
+		}
+		if clone := editorCloneBatch(batch); clone.Preferences.DocumentMapWidth != value {
+			t.Fatal("the Document Map width was not carried to the new window", value)
+		}
+		data, err := json.Marshal(batch.Preferences)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var back editorPreferences
+		if err := json.Unmarshal(data, &back); err != nil || back.DocumentMapWidth != value {
+			t.Fatal("the Document Map width did not survive the move batch", value, err)
+		}
+		if value == 0 && strings.Contains(string(data), "documentMapWidth") {
+			t.Fatal("the default Document Map width is written into the batch")
+		}
+	}
+	if old.DocumentMapWidth != 0 {
+		t.Fatal("an older window's preferences gained a Document Map width")
+	}
+	for _, value := range []int{-1, 1, 63, 641, 4096} {
+		batch := editorFixtureBatch()
+		batch.Preferences = &editorPreferences{FontSize: 13, Indent: 4, Palette: "auto", DocumentMapWidth: value}
+		if err := validateEditorBatch(batch); err == nil {
+			t.Fatal("a Document Map width out of bounds was accepted", value)
+		}
+	}
+	for _, raw := range []string{`{"documentMapWidth":"200"}`, `{"documentMapWidth":200.5}`, `{"documentMapWidth":true}`} {
+		var bad editorPreferences
+		if err := json.Unmarshal([]byte(raw), &bad); err == nil {
+			t.Fatal("a Document Map width that is not a whole number was accepted", raw)
+		}
+	}
 	// The Toolbar buttons setting (icons or text) reaches a new editor window;
 	// an older window's batch has none (icons), and nothing else is accepted.
 	for _, value := range []string{"", "icons", "text"} {
