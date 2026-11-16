@@ -554,7 +554,14 @@ async function mainWindow(browser){
   await shot(page,'editor-map-text-'+theme);
  }
  assert.equal(await page.evaluate(()=>[...NetworkToolkitFileEditor.documentMap.textRows].length>0&&!!NetworkToolkitFileEditor.active.syntaxCache),true,'the editor has painted its syntax colours for the map to use');
- pass('Text mode: drawn in the editor\'s syntax colours on its background, light and dark');
+ await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.colored===true);
+ // A Custom palette: text mode is drawn on its background too.
+ await page.locator('#networkToolkitFileEditor [data-ed-palette]').selectOption('custom');
+ await page.evaluate(()=>{const input=document.querySelector('#networkToolkitFileEditor [data-ed-color-hex="bg"]');input.value='#123456';input.dispatchEvent(new Event('change',{bubbles:true}));});await frames(page);
+ {const i=await mapInfo(page);assert.deepEqual(await canvasPixel(page,i.width-2,i.height-2),[0x12,0x34,0x56],'Custom: text mode has the custom background');}
+ await page.locator('#networkToolkitFileEditor [data-ed-palette]').selectOption('auto');await frames(page);
+ await page.locator('#networkToolkitFileEditor [data-ed-custom-palette] [data-ed="colors"]').click();await frames(page);
+ pass('Text mode: drawn in the editor\'s syntax colours on its background, light, dark and a Custom palette');
 
  // Word wrap: rows are pieces of the text area's columns; resizing keeps the line at the top.
  await page.evaluate(()=>NetworkToolkitFileEditor.activateDocument([...NetworkToolkitFileEditor.documents.keys()][3]));await frames(page);
@@ -586,6 +593,9 @@ async function mainWindow(browser){
   assert.equal((await activeArea(page)).side,side);
   const paneText=await page.evaluate(()=>NetworkToolkitFileEditor.active.content);
   await setActiveScroll(page,0.4);const read=await assertTextBox(page,side+' pane');assertRows(read.rows,paneText,{columns:read.info.layout.zoom.columns,label:side+' pane'});
+  // The pane's own syntax colours reach the map (a configuration or JSON is coloured, plain text is not).
+  const coloured=await page.evaluate(()=>/\.(cfg|json)$/.test(NetworkToolkitFileEditor.active.path));
+  await page.waitForFunction(coloured=>NetworkToolkitFileEditor.documentMap.layout?.colored===coloured,coloured);
  }
  await page.locator('#networkToolkitFileEditor [data-ed="compare"]').click();await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor.is-comparing'));await frames(page);
  size=await mapSize(page);assert.equal(size.hidden,true,'the map is hidden in the comparison view');assert.equal(size.sep.hidden,true,'and so is its separator');

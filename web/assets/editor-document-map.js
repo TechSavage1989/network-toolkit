@@ -466,7 +466,7 @@ function create(adapter){
   const syntax=!zoom?null:page?diskSyntax(d,page):pageSyntax(d,text);
   const content=[d.uid+':'+(d.disk?'p':'t'),revision,text.length].join('|');
   const rest=[total,textarea.clientWidth,m.lineHeight,m.columns,wrapped,common(d,height,width),zoom?'text:'+zoom.font+':'+zoom.columns+':'+(syntax?.stamp||0):'blocks'].join('|');
-  return {kind:'text',mode:zoom?'text':'blocks',zoom,g,start,columns:m.columns,wrapped,deferred:!d.disk&&text.length>LARGE,doc:d.uid,content,
+  return {kind:'text',mode:zoom?'text':'blocks',zoom,g,start,columns:m.columns,wrapped,colored:!!syntax,deferred:!d.disk&&text.length>LARGE,doc:d.uid,content,
    key:content+'|'+rest+'#'+(zoom?Math.round(g.offset):''),
    label:()=>Math.round(clamp(start/Math.max(1,total-textarea.clientHeight),0,1)*100),
    draw:ctx=>zoom?drawTextRows(ctx,d,text,starts,m,wrapped,g,width,total,zoom,syntax):drawText(ctx,d,text,starts,m,wrapped,g,width,total),
@@ -572,7 +572,7 @@ function create(adapter){
   const page=state.page;if(pageCache?.text!==page.text)pageCache={text:page.text,starts:lineStarts(page.text)};
   const syntax=zoom?diskSyntax(d,page):null;
   const base=[d.uid+':l',state.revision,state.lines,common(d,height,width),columns].join('|'),content=[base,page.start,page.text.length].join('|');
-  return {kind:'lines',mode:zoom?'text':'blocks',zoom,g,start,columns,deferred:false,doc:d.uid,content,
+  return {kind:'lines',mode:zoom?'text':'blocks',zoom,g,start,columns,colored:!!syntax,deferred:false,doc:d.uid,content,
    key:content+'|'+(zoom?'text:'+zoom.font+':'+zoom.columns+':'+(syntax?.stamp||0)+'#'+Math.round(g.offset):'blocks#'),
    label:()=>Math.round(clamp(state.top/Math.max(1,state.lines-state.rows),0,1)*100),
    draw:ctx=>zoom?drawPageLines(ctx,d,state,g,width,zoom,syntax):drawLines(ctx,d,state,g,width,columns,base),
@@ -625,7 +625,7 @@ function create(adapter){
   const g=zoom?geometry({total:state.units,rows:state.estimatedRows,height,start,end,row:rowHeight*zoom.scale,scroll:true}):geometry({total:state.units,rows:state.estimatedRows,height,start,end});
   const page=state.page,base=[d.uid+':o',state.revision,state.units,common(d,height,width),state.wrapColumns].join('|'),content=[base,page.start,page.text.length].join('|');
   const syntax=zoom?diskSyntax(d,page):null;
-  return {kind:'offsets',mode:zoom?'text':'blocks',zoom,g,start,columns,deferred:false,doc:d.uid,content,
+  return {kind:'offsets',mode:zoom?'text':'blocks',zoom,g,start,columns,colored:!!syntax,deferred:false,doc:d.uid,content,
    key:content+'|'+(zoom?'text:'+zoom.font+':'+zoom.columns+':'+(syntax?.stamp||0)+':'+start+'#'+Math.round(g.offset):'blocks#'),
    label:()=>Math.round(clamp(start/Math.max(1,state.units-state.visible),0,1)*100),
    draw:ctx=>zoom?drawPageFlow(ctx,d,state,g,width,zoom,columns,rowHeight*zoom.scale,syntax):drawOffsets(ctx,state,g,width,base),
