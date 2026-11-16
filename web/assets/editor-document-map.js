@@ -346,7 +346,9 @@ function create(adapter){
  // slices that read the editor's colours count as updates.
  const stats={updates:0,draws:0,maxUpdate:0,maxDraw:0,textDraws:0,maxTextDraw:0};
  const now=()=>root.performance?.now?.()??0;
- function timed(task){const started=now();try{return task();}finally{const spent=now()-started;stats.updates++;if(spent>stats.maxUpdate)stats.maxUpdate=spent;}}
+ // Where the slowest update spent its time (for the checks' messages).
+ const parts={measure:0,prepare:0,paint:0};
+ function timed(task){parts.measure=parts.prepare=parts.paint=0;const started=now();try{return task();}finally{const spent=now()-started;stats.updates++;if(spent>stats.maxUpdate){stats.maxUpdate=spent;stats.slowest={measure:Math.round(parts.measure),prepare:Math.round(parts.prepare),paint:Math.round(parts.paint),kind:lastLayout?.kind||'',mode:lastLayout?.mode||''};}}}
  function update(){timed(run);}
  function run(){
   frame=0;if(!host)return;
@@ -354,7 +356,7 @@ function create(adapter){
   if(shown!==show){shown=show;host.hidden=!show;if(handle)handle.hidden=!show;range=null;adapter.layoutChanged?.();}
   if(!show){drag=null;lastLayout=null;textRows=[];return;}
   applyWidth();
-  const layout=measure();lastLayout=layout;
+  const began=now(),layout=measure();lastLayout=layout;parts.measure=now()-began;
   if(!layout){clear();return;}
   placeBox(layout);
   if(layout.key===drawn)return;
@@ -822,9 +824,11 @@ function create(adapter){
   try{paint(layout);}finally{const spent=now()-started;stats.draws++;if(spent>stats.maxDraw)stats.maxDraw=spent;}
  }
  function paint(layout){
-  const ctx=prepare();if(!ctx)return;
+  const began=now(),ctx=prepare();parts.prepare=now()-began;if(!ctx)return;
   const c=palette();ctx.globalAlpha=1;ctx.fillStyle=c.bg;ctx.fillRect(0,0,paintWidth(),host.clientHeight);
+  const from=now();
   try{layout.draw(ctx);}catch(error){root.console?.error?.('The document map could not be drawn.',error);}
+  parts.paint=now()-from;
   ctx.globalAlpha=1;
  }
 

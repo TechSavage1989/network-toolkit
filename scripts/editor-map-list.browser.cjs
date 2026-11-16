@@ -1087,7 +1087,11 @@ async function engine(browser){
  await open('export.b64');
  d=await diskState();assert.equal(d.disk,true);assert.equal(d.lines,1,'one line');
  if(!await page.locator('#networkToolkitFileEditor [data-ed-wrap]').isChecked())await page.locator('#networkToolkitFileEditor [data-ed-wrap]').check();
- await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.kind==='offsets');
+ // The box has its size once the wrapped view is measured (before that it is
+ // the smallest box, and a press at its middle would not be at the middle of
+ // the box that is then dragged).
+ await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l?.kind==='offsets'&&l.g.span>100;});
+ await frames(page);
  info=await mapInfo(page);
  assert.equal(info.layout.g.total,d.units,'the map covers every character of the line');
  assert(info.layout.g.used>info.height*0.9,'a 1.7 MB line fills the map');

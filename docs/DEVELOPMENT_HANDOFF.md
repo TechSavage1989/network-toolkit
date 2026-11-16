@@ -6,6 +6,8 @@ Owner report on v1.21.64 (Wrap on, the 11,879-line file): "why does the map make
 
 Known: the "map work stays under 50 ms on a 16 MB document" step of that check fails when the machine is busy (three local failures directly after other browser runs, 45 to 65 ms; five instrumented runs in a row afterwards had no draw over 15 ms; one CI job on PR #194 at 51.8 ms). The map's own draw is not slow; the step measures wall time.
 
+The drag step of the 1.7 MB single-line file that timed out once locally on v1.21.64 failed in CI on this branch, and its `DIAG` line named the cause: the check read the box before the wrapped view was measured (the smallest box), pressed at that box's middle and dragged, so the real 77 px box ended 34 px below the middle of the map. The map moved the box exactly as far as the pointer; the check now waits for the measured box.
+
 Not done: a wrapped long line takes one map row (cut), not several. Not checked on real Windows.
 
 # v1.21.64 Beta 1 - Document Map: real text for large files, and it keeps what it read
