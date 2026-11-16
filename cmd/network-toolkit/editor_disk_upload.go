@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"io"
@@ -196,4 +197,23 @@ func (m *editorViewRegistry) finishUploadReload(g *editorDocumentGrant, d *edito
 	d.mu.Lock()
 	d.loading = false
 	d.mu.Unlock()
+}
+
+// gunzipEditorChunk expands one compressed chunk of a browser file. A chunk
+// is at most editorbuffer.MaxEditBytes of file data: anything that expands
+// past that, has trailing data or is not gzip is refused, so a small request
+// can never fill memory.
+func gunzipEditorChunk(data []byte) ([]byte, error) {
+	bad := errors.New("invalid compressed browser file chunk")
+	reader, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, bad
+	}
+	defer reader.Close()
+	reader.Multistream(false)
+	out, err := io.ReadAll(io.LimitReader(reader, editorbuffer.MaxEditBytes+1))
+	if err != nil || len(out) == 0 || len(out) > editorbuffer.MaxEditBytes {
+		return nil, bad
+	}
+	return out, nil
 }

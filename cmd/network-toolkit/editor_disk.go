@@ -447,6 +447,10 @@ type editorDiskRequest struct {
 	Wrap      bool                 `json:"wrap"`
 	Kind      string               `json:"kind"`
 	Separator string               `json:"separator"`
+	// Gzip marks Data (a chunk of a browser file) as gzip-compressed: text
+	// compresses several times over, and the page's upload is the slow part
+	// of opening a large file from a picker or a drop.
+	Gzip bool `json:"gzip,omitempty"`
 	// Marks are the searches of Copy Marked Text (editor_find.go).
 	Marks []editorbuffer.MarkSearch `json:"marks,omitempty"`
 }
@@ -456,6 +460,14 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 	if e := decodeEditorBody(w, r, editorbuffer.MaxEditBytes*6+16384, &req); e != nil {
 		jsonError(w, 400, e.Error())
 		return
+	}
+	if req.Gzip {
+		data, e := gunzipEditorChunk(req.Data)
+		if e != nil {
+			jsonError(w, 400, e.Error())
+			return
+		}
+		req.Data = data
 	}
 	m.mu.Lock()
 	g := m.documents[uid]
