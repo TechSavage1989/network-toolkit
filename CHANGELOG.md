@@ -1,3 +1,7 @@
+## 1.21.62 Beta 1 - Large files scroll smoothly
+
+- Three costs paid on every scroll step of a disk-backed document are removed: `body:has(...)` rules in file-editor.css (now `<body>` classes kept by `syncEditorPageState`), input-clear.js laying out and rewriting every field on each scroll and gutter redraw, and the wrap measure's rows being matched against the page's style sheets (now in a shadow tree).
+
 ## 1.21.61 Beta 1 - Document Map: the editor's colours only, one pixel per line at the smallest
 
 - Map blocks take every word's colour from the editor's own highlighting (`kindRuns`), never from a heuristic: a document the editor does not colour is one colour. Blocks are 3 px per row down to 1 px (`blockGeometry`); a document with more rows than the map has pixels scrolls inside the map. `editorbuffer.MapSamples` reads a range, so a disk-backed document is sampled for the map's window, one sample per row.

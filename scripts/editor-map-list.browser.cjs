@@ -999,6 +999,27 @@ async function engine(browser){
  pass('16 MB disk-backed document: the whole file in the map in colour, at the default and the widest width, with no long task over 50 ms');
  await pressSeparator(page,'Home');
 
+ // Scrolling the 16 MB file with Wrap on costs nothing outside the editor
+ // (owner report on v1.21.61: large files lagged while scrolling): the wrap
+ // measure's rows are in a shadow tree, no field's Clear button is touched,
+ // and <body> keeps its classes.
+ {
+  const wrapBox=page.locator('#networkToolkitFileEditor [data-ed-wrap]');
+  await wrapBox.check();
+  await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.kind==='offsets');
+  await page.evaluate(()=>{window.scrollWrites=[];new MutationObserver(list=>{for(const m of list){const t=m.target;if(t===document.body||t.closest?.('.input-clear-button,.input-clear-host,.input-clear-enhanced'))scrollWrites.push(m.type+' '+(m.attributeName||'')+' '+t.tagName);}}).observe(document.body,{subtree:true,attributes:true,childList:false});});
+  await editorArea.hover();
+  const before=await page.evaluate(()=>NetworkToolkitFileEditor.active.diskSession.state().page.start);
+  for(let i=0;i<60;i++){await page.mouse.wheel(0,600);await page.waitForTimeout(16);}
+  await page.waitForFunction(start=>NetworkToolkitFileEditor.active.diskSession.state().page.start>start,before,{timeout:15000});
+  const cost=await page.evaluate(()=>{const host=document.querySelector('#networkToolkitFileEditor .nt-editor-wrap-measure');return {writes:scrollWrites.slice(0,8),shadow:!!host?.shadowRoot,light:host?host.children.length:-1,rows:host?.shadowRoot?.querySelectorAll('div>div').length||0};});
+  assert.deepEqual(cost.writes,[],'scrolling writes nothing to <body> or to any field\'s Clear button');
+  assert(cost.shadow&&cost.light===0&&cost.rows>100,'the wrap measure\'s rows are in a shadow tree: '+JSON.stringify(cost));
+  await wrapBox.uncheck();
+  await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.kind==='lines');
+ }
+ pass('16 MB disk-backed document with Wrap on: scrolling touches nothing outside the editor');
+
  // 1.7 MB on one line (a Base64 export) with Wrap on: mapped by offset.
  await open('export.b64');
  d=await diskState();assert.equal(d.disk,true);assert.equal(d.lines,1,'one line');
