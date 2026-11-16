@@ -233,6 +233,12 @@ async function shot(page,name){if(!output)return;await calm(page);await page.scr
   assert.equal(await toggle.getAttribute('data-editor-window-status'),'pending');
   const child=await open('/editor-view/'+first.view,first.token,'editor window',()=>online&&NetworkToolkitFileEditor.listDocuments().length===1,{width:640,height:400});
   await main.waitForFunction(()=>NetworkToolkitEditorWindows.state.outgoing===0&&NetworkToolkitFileEditor.listDocuments().length===0);
+  // The main window's editor is empty now and shows nothing of the document
+  // that left (owner report on v1.21.58: the status bar kept its line count
+  // and the language box its language, as if a document had lost its tab).
+  await main.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-message]').textContent==='Documents moved to another editor window.');
+  assert.deepEqual(await main.evaluate(()=>{const ed=document.querySelector('#networkToolkitFileEditor'),q=s=>ed.querySelector(s);return {tabs:ed.querySelectorAll('[data-ed-tabs] [data-ed-open]').length,text:q('[data-ed-text]').value,gutter:q('[data-ed-gutter-lines]').textContent,position:q('[data-ed-position]').textContent,size:q('[data-ed-size]').textContent,language:q('[data-ed-auto-language]').textContent};}),{tabs:0,text:'',gutter:'',position:'',size:'',language:'Auto'},'the emptied main editor keeps no status of the document that moved');
+  pass('Main window after Detach: no tab, no text and no line count or language of the document that moved');
   await child.locator(ED+' .nt-editor-toolbar').waitFor();await child.waitForFunction(()=>!!document.querySelector('[data-editor-window-toggle]')&&!document.querySelector('[data-editor-window-toggle]').hidden);await frames(child);
   await assertRail(child,'editor window',['connections','files']);
   pass('Detached window: Document list off in the main window arrived through the engine\'s move batch: its rail is Connect, Files and its box is unticked');

@@ -593,6 +593,18 @@ async function detachedWindow(browser){
  bar=await settledBar(r=>r.shell&&r.open&&r.connect,'Connections brings the rail back');
  assert.deepEqual([bar.rail,bar.selected],[['connections'],'connections'],'ticked: the rail is back with Connect open');
  pass('Detached window at 640 x 400: the sidebar tabs follow the batch and the More menu; with all three off the text takes the full width');
+ // Closing the last tab leaves an empty editor with nothing of that document
+ // (owner report on v1.21.58: no tab and no text, yet the status bar read
+ // "Ln 1, Col 1 · 3,932 chars, 116 lines" and the language box "Auto (Aruba
+ // AOS-CX config)"). Light theme, Pastel colors and the map, as in the report.
+ await page.keyboard.press('Escape');await page.locator('#networkToolkitFileEditor [data-editor-files-panel="connections"]').click();await settledBar(r=>!r.open,'the narrow sidebar closes');
+ await page.evaluate(()=>setTheme('light'));await page.locator('#networkToolkitFileEditor [data-ed-palette]').selectOption('pastel');
+ const empty=()=>page.evaluate(()=>{const ed=document.querySelector('#networkToolkitFileEditor'),q=s=>ed.querySelector(s);return {tabs:ed.querySelectorAll('[data-ed-tabs] [data-ed-open]').length,text:q('[data-ed-text]').value,gutter:q('[data-ed-gutter-lines]').textContent,position:q('[data-ed-position]').textContent,size:q('[data-ed-size]').textContent,language:q('[data-ed-auto-language]').textContent,message:q('[data-ed-message]').textContent};});
+ assert.match((await empty()).size,/ lines$/,'a document is open');
+ for(let left=await page.evaluate(()=>NetworkToolkitFileEditor.listDocuments().length);left>0;left--){await page.locator('#networkToolkitFileEditor [data-ed-tabs] [data-ed-close-tab]').first().click();await page.waitForFunction(n=>NetworkToolkitFileEditor.listDocuments().length===n,left-1);}
+ assert.deepEqual(await empty(),{tabs:0,text:'',gutter:'',position:'',size:'',language:'Auto',message:'No open documents.'},'the empty editor shows no line count, position or language of the closed document');
+ await shot(page,'editor-no-documents-640x400-light');
+ pass('Detached window: closing the last tab leaves no position, line count or language of it in the status bar');
  await context.close();
 }
 
