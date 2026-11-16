@@ -121,6 +121,25 @@ function Get-ExecutableVersion([string]$Path) {
     [version]::new($info.FileMajorPart, $info.FileMinorPart, $info.FileBuildPart, $info.FilePrivatePart)
 }
 
+# Replace a program file Setup has just written. Like Setup's PlaceStagedFile,
+# a sharing or access failure (Windows errors 32 and 5: the runner's real-time
+# scan can hold a just-written executable for a moment) is retried for about
+# five seconds; any other failure, or one that lasts, is final.
+function Copy-OverProgram([string]$Source, [string]$Destination) {
+    for ($attempt = 1; ; $attempt++) {
+        try {
+            [IO.File]::Copy($Source, $Destination, $true)
+            return
+        } catch {
+            $inner = $_.Exception
+            while ($inner.InnerException) { $inner = $inner.InnerException }
+            $code = $inner.HResult -band 0xFFFF
+            if ($attempt -ge 20 -or -not (($inner -is [IO.IOException] -and $code -eq 32) -or ($inner -is [UnauthorizedAccessException] -and $code -eq 5))) { throw }
+            Start-Sleep -Milliseconds 250
+        }
+    }
+}
+
 # Silent setup and uninstall show no message; they leave the reason they
 # stopped in this log (replaced on every run, absent after a successful one).
 function Get-SetupLog {
@@ -825,13 +844,13 @@ $newerExe = Join-Path $env:SystemRoot 'System32\cmd.exe'
 if ((Get-ExecutableVersion $newerExe) -le $expectedVersion) { throw 'The downgrade fixture needs a newer executable version.' }
 $newerHash = (Get-FileHash -LiteralPath $newerExe -Algorithm SHA256).Hash
 $uninstallHash = (Get-FileHash -LiteralPath $uninstaller -Algorithm SHA256).Hash
-Copy-Item -LiteralPath $newerExe -Destination $installedExe
+Copy-OverProgram $newerExe $installedExe
 Invoke-Silent $setup 2 '/S' 'A newer version of Network Toolkit'
 # Refused before anything is placed: the separate programs are untouched too.
 Assert-Installed $newerHash
 Assert-Same (Get-FileHash -LiteralPath $uninstaller -Algorithm SHA256).Hash $uninstallHash 'Uninstaller after refused downgrade'
 Assert-Preserved
-Copy-Item -LiteralPath $portableExe -Destination $installedExe
+Copy-OverProgram $portableExe $installedExe
 
 Write-Host 'Checking uninstall removes owned registrations and preserves data.'
 Invoke-Uninstaller $uninstaller
