@@ -1,0 +1,13 @@
+Network Toolkit 1.21.66
+
+## What's New
+
+- Dragging the view box in the Document Map of a long document now follows your pointer line for line: the map stays still while you drag.
+- Drag the box to the top or bottom of the map and the map scrolls by itself, slowly near the edge and faster the further into it (or past it) you hold the pointer. It stops when you release.
+
+## Additional Details
+
+- This applies when the document is too long to fit in the map. A document that fits is dragged as before.
+- The automatic scrolling starts in the top and bottom 48 pixels of the map. The text keeps following the box while the map scrolls.
+- After a drag the map stays where you left it and follows the text again once you scroll the text.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

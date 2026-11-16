@@ -1,3 +1,11 @@
+# v1.21.66 Beta 1 - Document Map: the dragged box follows the pointer; the map scrolls at its edges
+
+v1.21.65 was published and verified: tag at merge commit 1aec103 (PR #196), release run 43954045844 green, both Checks runs green (`browser` re-run once: `features-94.browser.cjs:271` listed rows 1 and 2 where it expected none, cause not found, passed on the re-run; the map check's drag step failed on the first head for the reason below and was fixed), all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.65", stable channel still at v1.21.34.
+
+Owner request on v1.21.65: "when dragging the map viewspace selector to the top or bottom of the map, the map should automatically scroll at a reasonable pace relative to how high up or down low into the top or bottom the viewport indicator is dragged". Before, the box of a map that scrolls was dragged like a scroll bar thumb (on the 11,879-line file about 30 lines per pixel). Now the map is held during a drag, the box follows the pointer row for row, and the map scrolls by itself at its top and bottom edges (rule in the AGENTS.md map bullet). `scripts/editor-map-list.browser.cjs` checks the held map, a slow and a faster rate, the text following, the end and the start, and that it stops on release.
+
+Not checked on real Windows. The speeds (300 px/s × (depth + depth²)) are a first choice.
+
 # v1.21.65 Beta 1 - Document Map: one row per line with Wrap on
 
 v1.21.64 was published and verified: tag at merge commit 7d3dd43 (PR #195), release run 43935855123 green, both Checks runs green without a re-run, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.64", stable channel still at v1.21.34.
