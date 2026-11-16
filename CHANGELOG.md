@@ -1,3 +1,7 @@
+## 1.21.61 Beta 1 - Document Map: the editor's colours only, one pixel per line at the smallest
+
+- Map blocks take every word's colour from the editor's own highlighting (`kindRuns`), never from a heuristic: a document the editor does not colour is one colour. Blocks are 3 px per row down to 1 px (`blockGeometry`); a document with more rows than the map has pixels scrolls inside the map. `editorbuffer.MapSamples` reads a range, so a disk-backed document is sampled for the map's window, one sample per row.
+
 ## 1.21.60 Beta 1 - The Document Map shows the whole document
 
 - The Document Map never scrolls inside itself: text is drawn only when every row of the document fits at 4 px or more (a smaller font for a taller document), otherwise blocks at any width. A disk-backed document (over 512 KiB or 4,000 lines) is drawn from the engine's samples of the whole document (buffer action `map`, `editorbuffer.MapSamples`), in colour with word gaps, instead of bars for the pages that were read.
