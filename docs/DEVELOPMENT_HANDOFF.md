@@ -1,3 +1,11 @@
+# v1.21.67 Beta 1 - Document Map: edge scrolling starts sooner and ends very fast
+
+v1.21.66 was published and verified: tag at merge commit 57703a0 (PR #197), release run 43968906604 green, both Checks runs green after one re-run of their failed jobs (`TestNativeEditorTransferInstalledWebView2`, `editor-workflows108.browser.cjs:35` and the `windows-setup` uninstaller's two-minute wait, none in code the PR touched, causes not found), all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.66", stable channel still at v1.21.34.
+
+Owner request on v1.21.66: "id like the scrolling to start sooner after the view space indicator crosses the threshold and the final speed should be very fast." Before, the edge zone (48 px) was measured at the pointer, which sits in the middle of a box that may be over 100 px tall, so the box was well past the edge before anything moved, and the speed (300 px/s × (depth + depth²)) started near zero. Now the zone (24 px) is measured at the box's own edge and the speed starts at 500 px/s and reaches 30,000 px/s when the pointer is pulled well past the edge (rule in the AGENTS.md map bullet). `scripts/editor-map-list.browser.cjs` checks that the map scrolls with the box just inside the zone and that it is over 8,000 px a second when pulled far past.
+
+Not checked on real Windows.
+
 # v1.21.66 Beta 1 - Document Map: the dragged box follows the pointer; the map scrolls at its edges
 
 v1.21.65 was published and verified: tag at merge commit 1aec103 (PR #196), release run 43954045844 green, both Checks runs green (`browser` re-run once: `features-94.browser.cjs:271` listed rows 1 and 2 where it expected none, cause not found, passed on the re-run; the map check's drag step failed on the first head for the reason below and was fixed), all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.65", stable channel still at v1.21.34.

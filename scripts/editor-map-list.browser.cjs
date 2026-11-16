@@ -1108,21 +1108,26 @@ async function engine(browser){
   assert.equal(held.offset,info.layout.g.offset,'the map did not move while its box was dragged inside it');
   assert(Math.abs(held.start-held.under)<=1,'the text shown is the text under the box: '+JSON.stringify(held));
  }
- // Held near the map's bottom edge the map scrolls by itself, faster the
- // further into the edge the pointer is (owner request after v1.21.65), and
- // it stops when the button is released.
+ // Once the box's own bottom edge is near the map's bottom (owner request
+ // after v1.21.66: start as soon as the box crosses the threshold) the map
+ // scrolls by itself, from about 500 px a second, and very fast the further
+ // the box is pushed past the edge; it stops when the button is released.
  const mapOffset=()=>page.evaluate(()=>NetworkToolkitFileEditor.documentMap.layout.g.offset);
  info=await mapInfo(page);
- await page.mouse.move(x,info.top+info.box.top+info.box.height/2);await page.mouse.down();
- await page.mouse.move(x,info.top+info.height-12,{steps:6});
+ {
+  const grab=info.box.height/2,start=info.top+info.box.top+grab;
+  await page.mouse.move(x,start);await page.mouse.down();
+  // Box bottom 10 px above the map's bottom: inside the 24 px zone, nowhere near the pointer's own edge.
+  await page.mouse.move(x,info.top+info.height-10-info.box.height+grab,{steps:6});
+ }
  let from=await mapOffset();await page.waitForTimeout(600);const slow=await mapOffset()-from;
- await page.mouse.move(x,info.top+info.height+60,{steps:4});
- from=await mapOffset();await page.waitForTimeout(600);const fast=await mapOffset()-from;
- assert(slow>60&&slow<600,'near the edge the map scrolls slowly ('+slow+' px in 0.6 s)');
- assert(fast>slow*2.5,'further into the edge it scrolls faster ('+fast+' against '+slow+' px in 0.6 s)');
+ await page.mouse.move(x,info.top+info.height+120,{steps:4});
+ from=await mapOffset();await page.waitForTimeout(300);const fast=(await mapOffset()-from)*2;
+ assert(slow>150&&slow<1200,'as soon as the box is in the edge zone the map scrolls ('+slow+' px in 0.6 s)');
+ assert(fast>8000,'pushed far past the edge it scrolls very fast ('+fast+' px in 0.6 s)');
  {
   const l=await page.evaluate(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return {under:(l.g.box.top+l.g.offset)/l.g.scale,start:l.start,span:l.g.span};});
-  assert(Math.abs(l.start-l.under)<=l.span,'the text follows the box while the map scrolls: '+JSON.stringify(l));
+  assert(Math.abs(l.start-l.under)<=l.span*3,'the text follows the box while the map scrolls: '+JSON.stringify(l));
  }
  // Kept there, it reaches the very end: the last characters are shown.
  await page.waitForFunction(units=>{const s=NetworkToolkitFileEditor.active.diskSession.state().page;const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]');return s.start+s.text.length>=units&&ta.scrollTop+ta.clientHeight>=ta.scrollHeight-2;},d.units,{timeout:60000});
@@ -1139,7 +1144,7 @@ async function engine(browser){
  await page.mouse.up();
  assert.equal(await mapOffset(),0,'held past the top edge the map scrolls back to its start');
  await shot(page,'editor-map-list-base64-wrap-dark');
- pass('1.7 MB single-line Base64 with Wrap on: mapped by character offset; the box follows the pointer, and held at an edge the map scrolls by itself, faster further in, to the end and back to the start');
+ pass('1.7 MB single-line Base64 with Wrap on: mapped by character offset; the box follows the pointer, and once the box is in an edge zone the map scrolls by itself, very fast further in, to the end and back to the start');
 
  // The whole line in the map from the engine's samples, at the widest map too.
  for(const key of ['Home','End']){

@@ -1,3 +1,7 @@
+## 1.21.67 Beta 1 - Document Map: edge scrolling starts sooner and ends very fast
+
+- The edge depth is measured at the dragged box's edge (`autoDepth`: `drag.last - drag.grab`, plus the box height at the bottom), in a 24 px zone (`AUTO_EDGE`), and the speed is `AUTO_START` (500 px/s) rising with the square of the depth to `AUTO_MAX` (30,000 px/s) at `AUTO_REACH` (4) zone widths.
+
 ## 1.21.66 Beta 1 - Document Map: the dragged box follows the pointer; the map scrolls at its edges
 
 - Dragging the box of a map that scrolls holds the map (`own`, `dragHeld`, `holdAt`): the box moves row for row with the pointer instead of as a scroll bar thumb. With the pointer in the top or bottom `AUTO_EDGE` (48) px or past it, the map scrolls by itself at `AUTO_SPEED` (300) px a second times depth + depth squared (`autoDepth`, `autoSpeed`, `autoStep`), the text following the box; at the document's ends the box stays inside the map.
