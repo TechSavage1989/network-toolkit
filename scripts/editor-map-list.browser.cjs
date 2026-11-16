@@ -48,6 +48,10 @@ const output=process.env.TOOLKIT_TEST_OUTPUT||process.env.NTK_BROWSER_OUTPUT_DIR
 const {NTK_EDITOR_STANDALONE_URL:engineURL,NTK_EDITOR_STANDALONE_TOKEN:engineToken,NTK_EDITOR_MAP_FILES:engineFiles}=process.env;
 const report={passed:false,checks:[],errors:[]};
 const pass=name=>{report.checks.push(name);console.log('PASS '+name);};
+// A full garbage collection (DevTools protocol) before a timed pass, so
+// garbage the check itself made while building large test documents is not
+// counted as the map's work.
+const collectGarbage=async page=>{const cdp=await page.context().newCDPSession(page);try{await cdp.send('HeapProfiler.collectGarbage');}finally{await cdp.detach();}};
 
 // ---- Synthetic documents (192.0.2.x, example.com) ----
 function deviceConfig(count,name){
@@ -442,7 +446,7 @@ async function mainWindow(browser){
  const saved=()=>state.saved.editorPreferences?.sidebarPanels;
  const waitSaved=async(want,label)=>{for(let i=0;i<60&&JSON.stringify(saved())!==JSON.stringify(want);i++)await page.waitForTimeout(50);assert.deepEqual(saved(),want,label);};
  const tick=async(name,on)=>{await openMore(page);if(on)await panelBox(name).check();else await panelBox(name).uncheck();await frames(page);};
- const textBox=()=>page.evaluate(()=>{const area=document.querySelector('#networkToolkitFileEditor .nt-editor-document-area').getBoundingClientRect(),work=document.querySelector('#networkToolkitFileEditor .nt-editor-workspace').getBoundingClientRect(),map=document.querySelector('#networkToolkitFileEditor [data-ed-map]').getBoundingClientRect();return {left:area.left-work.left,width:area.width,room:work.width-map.width};});
+ const textBox=()=>page.evaluate(()=>{const area=document.querySelector('#networkToolkitFileEditor .nt-editor-document-area').getBoundingClientRect(),work=document.querySelector('#networkToolkitFileEditor .nt-editor-workspace').getBoundingClientRect(),map=document.querySelector('#networkToolkitFileEditor [data-ed-map]').getBoundingClientRect(),sep=document.querySelector('#networkToolkitFileEditor [data-ed-map-resize]')?.getBoundingClientRect();return {left:area.left-work.left,width:area.width,room:work.width-map.width-(sep?.width||0)};});
  let bar=await railState(page);
  assert.deepEqual([bar.rail,bar.selected,bar.open,bar.list],[['documents','connections','files'],'documents',true,true],'Docs, Connect and Files on the rail, the list open');
  const width=bar.width;
@@ -788,6 +792,8 @@ async function mainWindow(browser){
  });
  assert.equal(large,16*1024*1024);
  await frames(page);
+ await collectGarbage(page);
+ await page.evaluate(()=>{const map=NetworkToolkitFileEditor.documentMap;Object.assign(map.stats,{updates:0,draws:0,maxUpdate:0,maxDraw:0,textDraws:0,maxTextDraw:0});});
  {
   const i=await mapInfo(page);
   assert.equal(i.doc.name,'synthetic-16mb.cfg');assert.equal(i.layout.kind,'text');
@@ -813,11 +819,11 @@ async function mainWindow(browser){
  await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.mode==='text');
  const pageRows=()=>page.evaluate(()=>{const d=NetworkToolkitFileEditor.active;return NetworkToolkitFileEditor.documentMap.textRows.map(row=>{const end=d.content.indexOf('\n',row.offset);return {...row,line:d.content.slice(row.offset,end<0?undefined:end)};});});
  const checkRows=async label=>{const rows=await pageRows(),columns=(await mapSize(page)).mapColumns;assert(rows.length>=5&&rows.length<=200,label+': only the rows in the map are drawn ('+rows.length+')');for(const row of rows)assert.equal(row.text,shownRow(row.line,columns),label+': row at '+row.offset);return rows;};
- // Typing into a 16 MB page-held text makes 16 MB strings, and a garbage
- // collection after it can land in any frame, the map's too: a pass that sees
- // a pause over 50 ms is repeated once and the repeat decides (map work that
- // is slow in itself is slow both times; both passes are reported).
+ // Building the 16 MB text and typing into it (above) leave 16 MB strings
+ // behind; their garbage collection could land in any later frame, the map's
+ // too. Collect it before measuring, so the map's own work is what is timed.
  const textWork=async typed=>{
+  await collectGarbage(page);
   await page.evaluate(()=>{const map=NetworkToolkitFileEditor.documentMap;Object.assign(map.stats,{updates:0,draws:0,maxUpdate:0,maxDraw:0,textDraws:0,maxTextDraw:0});});
   for(const fraction of [0.5,1,0.25])await setActiveScroll(page,fraction),await assertTextBox(page,'16 MB text '+fraction),await checkRows('16 MB text '+fraction);
   const i=await mapInfo(page),x=i.left+i.width/2;
@@ -834,13 +840,11 @@ async function mainWindow(browser){
   return stats;
  };
  {
-  const passes=[await textWork('y')];
-  const fast=stats=>stats.maxUpdate<50&&stats.maxDraw<50&&stats.maxTextDraw<50;
-  if(!fast(passes[0]))passes.push(await textWork('z'));
-  assert(fast(passes.at(-1)),'the map work stays under 50 ms on a 16 MB document in text mode: '+JSON.stringify(passes));
-  report.large16MiBText={pageHeld:true,width:(await mapSize(page)).width,font:(await mapSize(page)).font,stats:passes.at(-1),passes};
+  const stats=await textWork('y');
+  assert(stats.maxUpdate<50&&stats.maxDraw<50&&stats.maxTextDraw<50,'the map work stays under 50 ms on a 16 MB document in text mode: '+JSON.stringify(stats));
+  report.large16MiBText={pageHeld:true,width:(await mapSize(page)).width,font:(await mapSize(page)).font,stats};
  }
- pass('16 MB page-held document in text mode: the rows in view only, map work '+JSON.stringify(report.large16MiBText.passes));
+ pass('16 MB page-held document in text mode: the rows in view only, map work '+JSON.stringify(report.large16MiBText.stats));
  await page.evaluate(()=>NetworkToolkitFileEditor.active.dirty=false);
  await context.close();
  return batch;
@@ -927,7 +931,7 @@ async function detachedWindow(browser,batch){
  bar=await settledBar(r=>!r.shell,'no sidebar in the small window');
  assert.deepEqual([bar.rail,bar.dock,bar.open],[[],false,false],'all three off at 640 x 400: no rail and no side button');
  g=await geometry();
- const full=await page.evaluate(()=>{const area=document.querySelector('#networkToolkitFileEditor .nt-editor-document-area').getBoundingClientRect(),work=document.querySelector('#networkToolkitFileEditor .nt-editor-workspace').getBoundingClientRect(),map=document.querySelector('#networkToolkitFileEditor [data-ed-map]').getBoundingClientRect();return {left:area.left-work.left,width:area.width,room:work.width-map.width};});
+ const full=await page.evaluate(()=>{const area=document.querySelector('#networkToolkitFileEditor .nt-editor-document-area').getBoundingClientRect(),work=document.querySelector('#networkToolkitFileEditor .nt-editor-workspace').getBoundingClientRect(),map=document.querySelector('#networkToolkitFileEditor [data-ed-map]').getBoundingClientRect(),sep=document.querySelector('#networkToolkitFileEditor [data-ed-map-resize]')?.getBoundingClientRect();return {left:area.left-work.left,width:area.width,room:work.width-map.width-(sep?.width||0)};});
  assert(full.left<=1&&Math.abs(full.width-full.room)<=1&&g.overflow<=0,'the text takes the full width at 640 x 400: '+JSON.stringify({full,g}));
  await shot(page,'editor-sidebar-tabs-detached-all-off-640x400-dark');
  await openMore(page);await page.locator('#ntEditorMoreActions [data-ed-sidebar-panel="connections"]').check();await frames(page);
