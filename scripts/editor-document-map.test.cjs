@@ -177,3 +177,22 @@ test('document list: tab order, extension column, and the views of a split edito
  assert.deepEqual(split.map(row=>row.group?'['+row.label+' '+row.count+']':row.uid+':'+row.side),['[Left view 1]','a:left','[Right view 2]','b:right','c:right']);
  assert.deepEqual(list.rows({}),[]);
 });
+
+test('blocks take their colours from the editor only, and never draw a row under one pixel',()=>{
+ const map=require('../web/assets/editor-document-map.js'),{TEXT,NUMBER}=map.kinds;
+ // Without the editor's colours every word is normal text, whatever it holds.
+ assert.deepEqual(map.kindRuns('05:05:49.185: source \'Start\' 42',0,31),[[0,13,TEXT],[14,6,TEXT],[21,7,TEXT],[29,2,TEXT]]);
+ // With them, runs follow the editor's kinds; blanks and tabs split words.
+ assert.deepEqual(map.kindRuns('ab 12\tx',0,7,{kindAt:i=>i>=3&&i<5?NUMBER:TEXT}),[[0,2,TEXT],[3,2,NUMBER],[8,1,TEXT]]);
+ assert.deepEqual(map.kindRuns('zz ab',3,5,{kindAt:i=>i===13?NUMBER:TEXT,base:10}),[[0,1,NUMBER],[1,1,TEXT]]);
+ // 100 rows in a 600 px map: 3 px each. 400 rows: all of them, 1.5 px each.
+ let g=map.blockGeometry({total:2000,rows:100,height:600,start:0,end:500});
+ assert.equal(g.used,300);assert.equal(g.offset,0);
+ g=map.blockGeometry({total:8000,rows:400,height:600,start:0,end:500});
+ assert.equal(g.used,600);assert.equal(g.offset,0);assert.equal(g.scale*20,1.5);
+ // 5,000 rows: one pixel each, the map scrolls, the box a thumb from top to bottom.
+ g=map.blockGeometry({total:100000,rows:5000,height:600,start:0,end:500});
+ assert.equal(g.scale*20,1);assert.equal(g.used,600);assert.equal(g.offset,0);assert.equal(g.box.top,0);
+ g=map.blockGeometry({total:100000,rows:5000,height:600,start:99500,end:100000});
+ assert.equal(g.offset,4400);assert.equal(Math.round(g.box.top+g.box.height),600);
+});

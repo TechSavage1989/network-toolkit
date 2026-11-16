@@ -1,3 +1,18 @@
+# v1.21.61 Beta 1 - Document Map: the editor's colours only, one pixel per line at the smallest
+
+Owner report on v1.21.60 (a plain text log, 83,384 characters, 1,182 lines, Wrap on): "the document map has color where the actual document does not. the document map is allowed to be scrollable if it needs to extend beyond the length of the screen to fit an entire document with at least one pixel line representing 1 real line at the smallest."
+
+v1.21.60 was published and verified: tag at merge commit b0a28ea (PR #191), release run 43810459712 green, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.60", stable channel still at v1.21.34. Its push run had two jobs fail once and pass on their one re-run, with no cause found: `TestNativeEditorTransferInstalledWebView2` ("production unsaved dialog after native WM_CLOSE not reached") and one 51 ms long task in the map check's 16 MB disk-backed step (50 ms limit).
+
+What changed (rules in AGENTS.md, the Document Map bullet):
+- Colours: blocks no longer use `lineRuns` (which coloured numbers, quotes, first words and comments by its own guess). `kindRuns` takes each word's kind from the editor's highlighting (the page-held document's `syntaxCache` runs; for a disk-backed document the language worker colours the samples on the `map` channel). Plain text, Highlight off and documents past the editor's limit are one colour.
+- Scale: `blockGeometry` gives 3 px per row while the document fits, then fewer down to 1 px; with more rows than map pixels the map scrolls at 1 px per row (the existing scroll geometry: box as thumb, click shows the row under the pointer). Text mode is unchanged (only when every row fits at 4 px or more). Blocks are drawn only for the rows in the map's window.
+- Engine: `MapSamples(rows, columns, byOffset, from, to)` samples a range. The map keeps one window of samples (its own window plus one on each side), refetched near an edge and 250 ms after an edit; the bars for pages already read (`drawLines`, `drawOffsets`, `drawSeen`) are removed.
+
+Checks: unit tests for `kindRuns` and `blockGeometry`; `TestMapSamplesCoverTheWholeDocument` with ranges; `scripts/editor-map-list.browser.cjs` with the real engine on Chromium 151: 1 px per row and thumb box on a 706-line document, a plain text document and Highlight off are one hue, a coloured document three or more, 16 MB page-held and disk-backed documents and the 1.7 MB single line drawn for the map's window, no long task over 50 ms.
+
+Known limits: a sampled line of a disk-backed document is coloured on its own, so a construct that spans lines can be coloured differently from the editor; with more than 4,096 map rows of samples needed at once nothing more is read (a map is at most its own height, so this is not reached). Not tried on Windows by the owner yet.
+
 # v1.21.60 Beta 1 - The Document Map shows the whole document
 
 Owner report on v1.21.59 (a 603,110 character, 18,934 line configuration with Wrap on): "the document map is broken now and doesn't show the colors of text, individual spaces or anything, and when expanded only show a very small portion of the document, which is antithetical to the purpose of it".

@@ -17,7 +17,7 @@ func TestMapSamplesCoverTheWholeDocument(t *testing.T) {
 	b := openTest(t, text.String())
 	meta := b.Metadata()
 	lines := strings.Split(text.String(), "\n")
-	got, err := b.MapSamples(200, 40, false)
+	got, err := b.MapSamples(200, 40, false, 0, 0)
 	if err != nil || len(got.Rows) != 200 || got.Lines != meta.Lines {
 		t.Fatal(err, len(got.Rows))
 	}
@@ -30,7 +30,7 @@ func TestMapSamplesCoverTheWholeDocument(t *testing.T) {
 	}
 	// By offset: wrapped rows of 40 units, the first, a middle and the last
 	// part of the document, never across a line break.
-	got, err = b.MapSamples(333, 40, true)
+	got, err = b.MapSamples(333, 40, true, 0, 0)
 	if err != nil || len(got.Rows) != 333 {
 		t.Fatal(err)
 	}
@@ -51,13 +51,28 @@ func TestMapSamplesCoverTheWholeDocument(t *testing.T) {
 		t.Fatalf("the last row is not in the last line: %+v", last)
 	}
 	for _, bad := range [][2]int{{0, 40}, {MaxMapRows + 1, 40}, {10, 0}, {10, MaxMapColumns + 1}} {
-		if _, err := b.MapSamples(bad[0], bad[1], false); err != ErrBoundary {
+		if _, err := b.MapSamples(bad[0], bad[1], false, 0, 0); err != ErrBoundary {
 			t.Fatalf("%v: %v", bad, err)
 		}
 	}
+	// A range: every line of [400, 460), one row each.
+	if got, err = b.MapSamples(60, 40, false, 400, 460); err != nil || len(got.Rows) != 60 {
+		t.Fatal(err)
+	}
+	for k, row := range got.Rows {
+		if want := lines[400+k]; row.Line != int64(400+k) || !strings.HasPrefix(want, row.Text) {
+			t.Fatalf("range row %d: %+v", k, row)
+		}
+	}
+	if got, err = b.MapSamples(10, 40, true, 1000, 1400); err != nil || got.Rows[0].Start > 1000 || got.Rows[9].Start < 1300 || got.Rows[9].Start > 1400 {
+		t.Fatalf("offset range: %v %+v", err, got.Rows)
+	}
+	if _, err = b.MapSamples(10, 40, false, 5, meta.Lines+1); err != ErrBoundary {
+		t.Fatal(err)
+	}
 	// A row that would start inside a surrogate pair is read without it.
 	pairs := openTest(t, strings.Repeat("😀", 50))
-	if got, err = pairs.MapSamples(7, 3, true); err != nil || len(got.Rows) != 7 {
+	if got, err = pairs.MapSamples(7, 3, true, 0, 0); err != nil || len(got.Rows) != 7 {
 		t.Fatal(err)
 	}
 }

@@ -12,26 +12,21 @@
    narrow windows), between that default and half of the space the map shares
    with the document area, at most WIDTH_MAX.
 
-   It never renders a whole large document. Below the text threshold the map
-   has three levels of detail, chosen by how many text rows each map pixel
-   holds:
-     - every row gets at least one pixel: words are drawn as small blocks in the
-       document's syntax colours (only possible for short documents);
-     - up to PER_LINE lines per pixel: one thin bar per line (indent, length);
-     - more: one bar per map pixel row from the line starts the editor already
-       keeps (average length), sampling the first line of each row.
-   Every level costs at most a few thousand lines or one pass over the map's
-   pixel rows.
+   It never renders a whole large document: blocks and text are drawn only
+   for the rows in the map's window (all of them when the document fits).
 
    Text mode: the map is the text area zoomed out to the map's width (its
    columns, at most TEXT_REFERENCE of them, fill the map, as the blocks do).
    Once that zoom gives a font of TEXT_FONT px or more, the map draws the document's characters instead of
    blocks, at most TEXT_FONT_MAX px (or TEXT_SHARE of the editor's font) so it
    stays an overview; rows are as tall as the scaled line height. The map
-   always shows the whole document and never scrolls inside itself (owner
-   report on v1.21.59): a document too tall for that font is drawn at the
-   largest font at which every row fits, down to TEXT_FIT px, and below that
-   as blocks, at any width. The colours are the editor's own: the HTML its language worker made
+   shows as much of the document as it can (owner rules after v1.21.59 and
+   v1.21.60): text only when every row fits, at the largest font at which
+   they do, down to TEXT_FIT px; otherwise blocks, ROW px per row down to one
+   pixel per row, and only a document with more rows than the map has pixels
+   scrolls inside the map (the box then moves like a scroll bar thumb).
+   Blocks and text take their colours from the editor's highlighting only: a
+   document the editor does not colour is one colour in the map. The colours are the editor's own: the HTML its language worker made
    for a page-held document (read in slices, never in one long task), and the
    same worker on its own channel for the loaded page of a disk-backed one;
    without them (Highlight off, plain text, past the editor's limit) the text
@@ -42,9 +37,8 @@
    is in the page) is mapped by position like its scroll bar: by line without
    word wrap, by character offset with word wrap (the v1.21.53 scroll model;
    editor-disk-view.js). It is drawn as blocks from samples the engine reads
-   over the whole document (one per map pixel row), so every part shows in
-   colour whichever pages were read; until the first samples arrive, from
-   the pages the reader has seen.
+   for the map's window (one per map row), so every part shows whichever
+   pages were read.
 
    The comparison view has its own change map, so this one is hidden there. */
 (function(root){
@@ -123,6 +117,24 @@ function lineShape(text,start,end,{tab=4,limit=SAMPLE,markers=[]}={}){
  return {indent:col,length:Math.max(col,length+(col-(i-start))),blank:i>=end,comment};
 }
 
+// The words of text[start,end) as [column, length, kind] in the editor's own
+// colours: runs of non-blank characters of one kind (`kindAt(base + index)`;
+// without it everything is normal text, so a document the editor does not
+// colour has no colours in the map either). Tabs advance to the next stop.
+function kindRuns(text,start,end,{tab=4,limit=SAMPLE,kindAt=null,base=0}={}){
+ const out=[],stop=Math.min(end,start+limit*2);let col=0,i=start,from=-1,kind=TEXT;
+ const flush=()=>{if(from>=0)out.push([from,col-from,kind]);from=-1;};
+ while(i<stop&&col<limit){
+  const code=text.charCodeAt(i);
+  if(code===9){flush();col+=tab-(col%tab);i++;continue;}
+  if(code===32||code===13||code===10){flush();col++;i++;continue;}
+  const next=kindAt?kindAt(base+i):TEXT;
+  if(from<0||next!==kind){flush();from=col;kind=next;}
+  col++;i++;
+ }
+ flush();return out;
+}
+
 function lineStarts(text){const starts=[0];let at=-1;while((at=text.indexOf('\n',at+1))!==-1)starts.push(at+1);return starts;}
 // Line starts at or before `offset` in a sorted list, as an index.
 function before(starts,offset){let low=0,high=starts.length;while(low<high){const mid=(low+high)>>1;if(starts[mid]<=offset)low=mid+1;else high=mid;}return low;}
@@ -149,6 +161,13 @@ function geometry({total,rows,height,start,end,row=ROW,scroll=false}){
  const used=Math.max(1,height),scale=natural/total,size=Math.min(used,Math.max(MIN_BOX,span*scale)),last=Math.max(0,total-span);
  const share=last>0?clamp(Math.max(0,start)/last,0,1):0;
  return {total,used,scale,span,offset:share*(natural-used),drag:last>0&&used>size?(used-size)/last:scale,box:{top:share*(used-size),height:size}};
+}
+// Blocks: ROW pixels per text row while the document fits, then fewer, but
+// never less than one pixel row per text row (owner rule after v1.21.60): a
+// document with more rows than the map has pixels scrolls inside the map.
+function blockGeometry({total,rows,height,start,end}){
+ rows=Math.max(1,rows);
+ return geometry({total,rows,height,start,end,row:Math.max(1,Math.min(ROW,height/rows)),scroll:true});
 }
 // The axis position to show at the top of the view for a pointer at map y,
 // with `grab` the pointer's distance from the box top (a click centres the
@@ -265,7 +284,7 @@ function rowCells(text,begin,end,{tab=4,columns=TEXT_COLUMNS,kindAt=null}={}){
 // ---- The panel ----
 function create(adapter){
  let host=null,handle=null,canvas=null,view=null,frame=0,timer=0,drawn='',drawnContent='',drawnDoc='',colors=null,colorKey='',drag=null,seen=null,widths=new Map(),pageCache=null,wrapCache=null,shown=null,lastLayout=null,pending=null,seekFrame=0;
- let inner=null,resize=null,dragWidth=null,range=null,textRows=[],stamps=0,parsing=null,diskSyntaxState=null,diskTimer=0,samples=null,sampleWant='',sampleFailed='',sampleTimer=0;
+ let inner=null,resize=null,dragWidth=null,range=null,textRows=[],stamps=0,parsing=null,diskSyntaxState=null,diskTimer=0,samples=null,sampleBusy=false,sampleFailed='',sampleTimer=0;
  const parsed=new WeakMap();
  const document=root.document;
 
@@ -472,14 +491,15 @@ function create(adapter){
   if(!starts){if(pageCache?.text!==text)pageCache={text,starts:lineStarts(text)};starts=pageCache.starts;}
   const total=Math.max(1,textarea.scrollHeight),start=textarea.scrollTop,end=start+textarea.clientHeight,rows=total/m.lineHeight;
   const zoom=zoomFor(m,width,m.columns,0,rows,height);
-  const g=zoom?geometry({total,rows,height,start,end,row:m.lineHeight*zoom.scale}):geometry({total,rows,height,start,end});
-  const syntax=!zoom?null:page?diskSyntax(d,page):pageSyntax(d,text);
+  const g=zoom?geometry({total,rows,height,start,end,row:m.lineHeight*zoom.scale}):blockGeometry({total,rows,height,start,end});
+  // Blocks and text take their colours from the editor's own highlighting.
+  const syntax=page?diskSyntax(d,page):pageSyntax(d,text);
   const content=[d.uid+':'+(d.disk?'p':'t'),revision,text.length].join('|');
-  const rest=[total,textarea.clientWidth,m.lineHeight,m.columns,wrapped,common(d,height,width),zoom?'text:'+zoom.font+':'+zoom.columns+':'+(syntax?.stamp||0):'blocks'].join('|');
+  const rest=[total,textarea.clientWidth,m.lineHeight,m.columns,wrapped,common(d,height,width),(zoom?'text:'+zoom.font+':'+zoom.columns:'blocks')+':'+(syntax?.stamp||0)].join('|');
   return {kind:'text',mode:zoom?'text':'blocks',zoom,g,start,columns:m.columns,wrapped,colored:!!syntax,deferred:!d.disk&&text.length>LARGE,doc:d.uid,content,
-   key:content+'|'+rest+'#'+(zoom?Math.round(g.offset):''),
+   key:content+'|'+rest+'#'+Math.round(g.offset),
    label:()=>Math.round(clamp(start/Math.max(1,total-textarea.clientHeight),0,1)*100),
-   draw:ctx=>zoom?drawTextRows(ctx,d,text,starts,m,wrapped,g,width,total,zoom,syntax):drawText(ctx,d,text,starts,m,wrapped,g,width,total),
+   draw:ctx=>zoom?drawTextRows(ctx,d,text,starts,m,wrapped,g,width,total,zoom,syntax):drawText(ctx,d,text,starts,m,wrapped,g,width,total,syntax),
    seek:value=>{textarea.scrollTop=value;},
    scroll:delta=>{if(paged?.wheelBy)paged.wheelBy(delta);else textarea.scrollTop+=delta;},
    step:{line:m.lineHeight,page:Math.max(m.lineHeight,textarea.clientHeight-m.lineHeight)}};
@@ -497,38 +517,32 @@ function create(adapter){
   wrapCache={text,key,exact,cumulative,total:cumulative[n]};return wrapCache;
  }
 
- function drawText(ctx,d,text,starts,m,wrapped,g,width,total){
+ // Blocks of a page-held document: the rows in the map's window only (the
+ // whole document when it fits), each word a block in the editor's colours.
+ function drawText(ctx,d,text,starts,m,wrapped,g,width,total,syntax){
   textRows=[];
-  const c=palette(),{markers,keywords}=markersFor(d),tab=adapter.tabSize(),n=starts.length;
+  const c=palette(),tab=adapter.tabSize(),n=starts.length;
   const columns=m.columns,cw=width/columns,usable=Math.max(1,total-m.top-m.bottom);
   const cumulative=wrapped?wrapRows(d,text,starts,columns,tab,m.lineHeight).cumulative:null;
   // Text-area pixels per text row: rows are spread over the scroll height.
   const rowPixels=usable/Math.max(1,wrapped?cumulative[n]:n),rowHeight=rowPixels*g.scale;
-  const lineTop=i=>(m.top+(wrapped?cumulative[i]:i)*rowPixels)*g.scale;
-  const lineEnd=i=>i+1<n?starts[i+1]-1:text.length;
+  const lineEnd=i=>i+1<n?starts[i+1]-1:text.length,kindAt=syntax?syntaxCursor(syntax.runs):null;
+  const detail=rowHeight>=2,block=detail?Math.max(1,Math.min(rowHeight-0.5,rowHeight*0.7)):Math.max(0.5,rowHeight),alpha=detail?1:0.85;
   ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);
-  // The words of line i (from wrapped row `from`, `rows` rows of it) as blocks.
-  const paint=(i,y,height,alpha,from=0,rows=Infinity)=>{
-   const begin=wrapped&&from?Math.min(lineEnd(i),starts[i]+from*columns):starts[i];
-   const limit=wrapped?Math.min(SAMPLE*8,Math.max(1,Math.min(rows,Math.ceil(cumulative[i+1]-cumulative[i])-from))*columns):columns;
-   for(const [col,length,kind] of lineRuns(text,begin,lineEnd(i),{tab,limit,markers,keywords:keywords&&!from})){
-    ctx.fillStyle=c.kinds[kind];ctx.globalAlpha=alpha*(kind===TEXT?0.75:1);
-    if(!wrapped){ctx.fillRect(col*cw,y,Math.max(0.6,Math.min(length,columns-col)*cw),height);continue;}
-    for(let at=col,left=length;left>0;){const row=Math.floor(at/columns),x=at%columns,take=Math.min(left,columns-x);ctx.fillRect(x*cw,y+row*rowHeight,Math.max(0.6,take*cw),height);at+=take;left-=take;}
+  const at=Math.max(0,(g.offset/g.scale-m.top)/rowPixels);
+  for(let i=clamp(wrapped?findRow(cumulative,at):Math.floor(at),0,n-1);i<n;i++){
+   let y=(m.top+(wrapped?cumulative[i]:i)*rowPixels)*g.scale-g.offset;if(y>g.used)break;
+   let begin=starts[i],limit=columns;
+   if(wrapped){
+    // A long wrapped line: from its first row in the window, the rows that show.
+    const rows=Math.max(1,Math.ceil(cumulative[i+1]-cumulative[i])),skip=y<0?Math.min(rows-1,Math.floor(-y/rowHeight)):0;
+    begin=Math.min(lineEnd(i),starts[i]+skip*columns);y+=skip*rowHeight;
+    limit=Math.min(65536,Math.min(rows-skip,Math.ceil((g.used-y)/rowHeight)+1)*columns);
    }
-  };
-  if(rowHeight>=1){
-   // Every text row has a pixel row or more: the words of every line.
-   const block=Math.max(1,Math.min(rowHeight-0.5,rowHeight*0.7));
-   for(let i=0;i<n;i++){const y=lineTop(i);if(y>g.used)break;paint(i,y,block,1);}
-  }else if(n<=g.used*PER_LINE){
-   // A few lines per pixel row: every line, thin and translucent.
-   for(let i=0;i<n;i++)paint(i,lineTop(i),Math.max(0.35,rowHeight),0.55);
-  }else{
-   // More: the line at the top of each pixel row.
-   for(let y=0;y<g.used;y++){
-    const at=(y/g.scale-m.top)/rowPixels,line=clamp(wrapped?findRow(cumulative,at):Math.floor(at),0,n-1);
-    paint(line,y,1,0.55,wrapped?Math.max(0,Math.floor(at-cumulative[line])):0,1);
+   for(const [col,length,kind] of kindRuns(text,begin,lineEnd(i),{tab,limit,kindAt})){
+    ctx.fillStyle=c.kinds[kind]||c.fg;ctx.globalAlpha=alpha*(kind===TEXT?0.75:1);
+    if(!wrapped){ctx.fillRect(col*cw,y,Math.max(0.6,Math.min(length,columns-col)*cw),block);continue;}
+    for(let from=col,left=length;left>0;){const row=Math.floor(from/columns),x=from%columns,take=Math.min(left,columns-x);ctx.fillRect(x*cw,y+row*rowHeight,Math.max(0.6,take*cw),block);from+=take;left-=take;}
    }
   }
   ctx.globalAlpha=1;
@@ -556,125 +570,103 @@ function create(adapter){
   });
  }
 
- // Rows the reader has seen at this revision and size: bar width (0..1) and
- // whether the row starts with a comment. The rows of pages not read are a
- // faint texture as wide as the document's average line (`estimate`).
- function seenRows(key,used){
-  if(seen?.key!==key)seen={key,widths:new Float32Array(Math.ceil(used)).fill(-1),comments:new Uint8Array(Math.ceil(used))};
-  return seen;
- }
- function drawSeen(ctx,c,record,g,width,estimate){
-  texture(ctx,c,g,width,estimate);
-  for(let y=0;y<record.widths.length;y++){
-   const w=record.widths[y];if(w<0)continue;
-   ctx.globalAlpha=1;ctx.fillStyle=c.bg;ctx.fillRect(0,y,width,1);
-   if(w>0){ctx.globalAlpha=0.6;ctx.fillStyle=record.comments[y]?c.kinds[COMMENT]:c.fg;ctx.fillRect(0,y,Math.max(0.6,w*width),1);}
+ // ---- A disk-backed document that is not all in the page ----
+ // The map draws it from the engine's samples (editorbuffer.MapSamples): one
+ // per map row over the part of the document in the map's window and a
+ // window's length on each side, read again when the view nears their edge,
+ // and SAMPLE_DELAY ms after an edit (the samples it has stay meanwhile).
+ // `step` is axis units (lines, or characters with Wrap) per map row.
+ function sampled(d,kind,revision,first,last,limit,columns,step){
+  const base=[d.uid,kind,revision,columns,step.toFixed(4)].join('|'),span=Math.max(1,last-first);
+  const have=samples?.base===base?samples:null;
+  const near=have&&((first-have.from<span/2&&have.from>0)||(have.to-last<span/2&&have.to<limit));
+  if(adapter.samples&&!sampleBusy&&(!have||first<have.from||last>have.to||near)){
+   let from=Math.max(0,Math.floor(first-span)),to=Math.min(limit,Math.ceil(last+span));
+   if((to-from)/step>SAMPLE_ROWS){from=Math.max(0,Math.floor(first-(SAMPLE_ROWS*step-span)/2));to=Math.min(limit,Math.floor(from+SAMPLE_ROWS*step));}
+   const count=clamp(Math.ceil((to-from)/step),1,SAMPLE_ROWS),key=base+'|'+from+'|'+to;
+   if(to>from&&sampleFailed!==key&&!(have&&have.from===from&&have.to===to)){
+    sampleBusy=true;
+    const done=()=>{sampleBusy=false;schedule();};
+    sampleTimer=root.setTimeout(()=>{
+     Promise.resolve(adapter.samples(d,{kind,limit:count,size:columns,from,to})).then(value=>{
+      if(!Array.isArray(value?.rows)){sampleFailed=key;return;}
+      samples={base,doc:d.uid,kind,columns,from,to,count,rows:value.rows,runs:null,starts:null,colour:'',stamp:++stamps};
+     }).catch(()=>{sampleFailed=key;}).then(done);
+    },samples?.doc===d.uid&&!have?SAMPLE_DELAY:0);
+   }
   }
-  ctx.globalAlpha=1;
+  const found=samples?.doc===d.uid&&samples.kind===kind&&samples.columns===columns?samples:null;
+  if(found){found.fresh=found.base===base&&first>=found.from&&last<=found.to;sampleColours(d,found);}
+  return found;
  }
- function texture(ctx,c,g,width,estimate){ctx.fillStyle=c.band;ctx.globalAlpha=0.16;ctx.fillRect(0,0,Math.max(1,clamp(estimate,0,1)*width),g.used);ctx.globalAlpha=1;}
-
- // ---- The whole of a disk-backed document, from the engine's samples ----
- // The samples for this document, axis, revision and size; while newer ones
- // are on their way (asked SAMPLE_DELAY ms after the last change) the map
- // keeps the ones it has, and before the first arrive it draws what the
- // reader has seen.
- function sampled(d,kind,revision,count,columns){
-  const key=[d.uid,kind,revision,count,columns].join('|');
-  if(adapter.samples&&samples?.key!==key&&sampleWant!==key&&sampleFailed!==key){
-   sampleWant=key;root.clearTimeout(sampleTimer);
-   sampleTimer=root.setTimeout(()=>{
-    Promise.resolve(adapter.samples(d,{kind,limit:count,size:columns})).then(value=>{
-     if(sampleWant!==key)return;
-     sampleWant='';
-     if(!Array.isArray(value?.rows)){sampleFailed=key;return;}
-     samples={key,doc:d.uid,kind,columns,rows:value.rows,stamp:++stamps};schedule();
-    }).catch(()=>{if(sampleWant===key){sampleWant='';sampleFailed=key;}});
-   },samples?.doc===d.uid?SAMPLE_DELAY:0);
-  }
-  return samples?.doc===d.uid&&samples.kind===kind?samples:null;
+ // The samples in the editor's colours: its language worker colours their
+ // text on the map's own channel. Without Highlight, for plain text and past
+ // SYNTAX_LIMIT they stay the normal text colour, as the document does.
+ function sampleColours(d,found){
+  const language=adapter.language(d)||'text',on=!!adapter.syntax()&&language!=='text',want=on?language:'';
+  if(found.colour===want)return;
+  found.colour=want;found.runs=null;found.stamp=++stamps;
+  if(!on)return;
+  const starts=new Int32Array(found.rows.length);let length=0;
+  const text=found.rows.map((row,k)=>{starts[k]=length;length+=(row.text||'').length+1;return row.text||'';}).join('\n');
+  const service=root.NTKEditorLanguageService;if(!service||!text||text.length>SYNTAX_LIMIT)return;
+  service.highlight(text,language,{channel:'map'}).then(value=>{
+   if(samples!==found||found.colour!==want||!value||value.limited)return;
+   const runs=parseSyntax(value.html);
+   if(runs&&runs.length===text.length){found.runs=runs;found.starts=starts;found.stamp=++stamps;schedule();}
+  }).catch(()=>{});
  }
- // One sample per map row: its words as blocks in the syntax colours.
- function drawSamples(ctx,d,found,g,width){
+ // Each sample at its place on the axis: its words as blocks.
+ function drawSamples(ctx,found,g,width,pitch){
   textRows=[];
-  const c=palette(),{markers,keywords}=markersFor(d),tab=adapter.tabSize(),rows=found.rows,columns=found.columns,cw=width/columns;
-  const pitch=g.used/Math.max(1,rows.length),detail=pitch>=2,block=detail?Math.max(1,Math.min(pitch-0.5,pitch*0.7)):Math.max(1,pitch),alpha=detail?1:0.7;
+  const c=palette(),tab=adapter.tabSize(),rows=found.rows,columns=found.columns,cw=width/columns,kindAt=found.runs?syntaxCursor(found.runs):null;
+  const detail=pitch>=2,block=detail?Math.max(1,Math.min(pitch-0.5,pitch*0.7)):Math.max(0.5,pitch),alpha=detail?1:0.85,each=(found.to-found.from)/found.count;
   ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);
   for(let k=0;k<rows.length;k++){
-   const row=rows[k],text=row.text||'',y=k*pitch,first=!row.column;
-   for(const [col,length,kind] of lineRuns(text,0,text.length,{tab,limit:columns,markers:first?markers:[],keywords:keywords&&first})){
-    ctx.fillStyle=c.kinds[kind];ctx.globalAlpha=alpha*(kind===TEXT?0.75:1);ctx.fillRect(col*cw,y,Math.max(0.6,Math.min(length,columns-col)*cw),block);
+   const y=(found.from+Math.floor(k*each))*g.scale-g.offset;if(y<-pitch)continue;if(y>g.used)break;
+   const text=rows[k].text||'';
+   for(const [col,length,kind] of kindRuns(text,0,text.length,{tab,limit:columns,kindAt,base:kindAt?found.starts[k]:0})){
+    ctx.fillStyle=c.kinds[kind]||c.fg;ctx.globalAlpha=alpha*(kind===TEXT?0.75:1);ctx.fillRect(col*cw,y,Math.max(0.6,Math.min(length,columns-col)*cw),block);
    }
   }
   ctx.globalAlpha=1;
  }
+ function diskLayout(d,kind,g,found,columns,pitch,height,width,extra){
+  return {kind,mode:'blocks',zoom:null,g,columns,sampled:!!found,fresh:!!found?.fresh,colored:!!found?.runs,deferred:false,doc:d.uid,content:d.uid+':'+kind,
+   key:[d.uid,kind,common(d,height,width),columns,found?found.stamp:'none',Math.round(g.offset*2),pitch.toFixed(3)].join('|'),
+   draw:ctx=>{if(found)drawSamples(ctx,found,g,width,pitch);else{textRows=[];ctx.fillStyle=palette().bg;ctx.fillRect(0,0,width,g.used);}},
+   ...extra};
+ }
 
- // A disk-backed document without word wrap: the axis is the line number.
+ // Without word wrap the axis is the line number: one sample per line.
  function lineLayout(d,textarea,state,height,width,paged){
-  const m=textMetrics(textarea),cw=state.characterWidth||m.charWidth,columns=Math.max(16,Math.floor(textarea.clientWidth/Math.max(1,cw)));
+  const m=textMetrics(textarea),cw=state.characterWidth||m.charWidth,columns=Math.min(SAMPLE_COLUMNS,Math.max(16,Math.floor(textarea.clientWidth/Math.max(1,cw))));
   const start=state.top+(state.fraction||0),end=start+state.rows;
-  const g=geometry({total:state.lines,rows:state.lines,height,start,end});
-  const page=state.page;if(pageCache?.text!==page.text)pageCache={text:page.text,starts:lineStarts(page.text)};
-  const found=sampled(d,'lines',state.revision,clamp(Math.min(Math.ceil(g.used),state.lines),1,SAMPLE_ROWS),Math.min(SAMPLE_COLUMNS,columns));
-  const base=[d.uid+':l',state.revision,state.lines,common(d,height,width),columns].join('|'),content=[base,page.start,page.text.length].join('|');
-  return {kind:'lines',mode:'blocks',zoom:null,g,start,columns,sampled:!!found,colored:false,deferred:false,doc:d.uid,content,
-   key:found?[d.uid+':l',common(d,height,width),columns,'samples',found.stamp].join('|'):content+'|blocks#',
+  const g=blockGeometry({total:state.lines,rows:state.lines,height,start,end});
+  const first=Math.floor(g.offset/g.scale),last=Math.min(state.lines,Math.ceil((g.offset+g.used)/g.scale));
+  const found=sampled(d,'lines',state.revision,first,last,state.lines,columns,1);
+  return diskLayout(d,'lines',g,found,columns,g.scale,height,width,{start,
    label:()=>Math.round(clamp(state.top/Math.max(1,state.lines-state.rows),0,1)*100),
-   draw:ctx=>found?drawSamples(ctx,d,found,g,width):drawLines(ctx,d,state,g,width,columns,base),
    seek:value=>paged.mapSeek({line:value}),
    scroll:delta=>paged.wheelBy(delta),
-   step:{line:1,page:Math.max(1,state.rows-1)}};
+   step:{line:1,page:Math.max(1,state.rows-1)}});
  }
- function drawLines(ctx,d,state,g,width,columns,base){
-  textRows=[];
-  const page=state.page,c=palette(),record=seenRows(base,g.used),{markers,keywords}=markersFor(d),tab=adapter.tabSize(),starts=pageCache.starts,text=page.text,n=starts.length,cw=width/columns;
-  const end=i=>i+1<n?starts[i+1]-1:text.length,rowHeight=g.scale;
-  // Record what this page shows, then draw the known rows and the page.
-  for(let i=0;i<n;i++){
-   const y0=Math.floor((page.line+i)*g.scale),y1=Math.min(record.widths.length,Math.max(y0+1,Math.floor((page.line+i+1)*g.scale)));
-   const shape=lineShape(text,starts[i],end(i),{tab,markers}),w=shape.blank?0:Math.min(1,Math.max(0,shape.length)/columns);
-   for(let y=y0;y<y1;y++)if(record.widths[y]<w||record.widths[y]<0){record.widths[y]=w;record.comments[y]=shape.comment?1:0;}
-  }
-  ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);drawSeen(ctx,c,record,g,width,(state.units/Math.max(1,state.lines)-1)/columns);
-  // The loaded page in detail while it has at most PER_LINE lines per pixel.
-  if(rowHeight*PER_LINE>=1){
-   const top=page.line*g.scale,detail=rowHeight>=1,block=detail?Math.max(1,Math.min(rowHeight-0.5,rowHeight*0.7)):Math.max(0.35,rowHeight),alpha=detail?1:0.55;
-   ctx.globalAlpha=1;ctx.fillStyle=c.bg;ctx.fillRect(0,top,width,Math.max(1,n*rowHeight));
-   for(let i=0;i<n;i++){const y=(page.line+i)*g.scale;if(y>g.used)break;for(const [col,length,kind] of lineRuns(text,starts[i],end(i),{tab,limit:columns,markers,keywords})){ctx.fillStyle=c.kinds[kind];ctx.globalAlpha=alpha*(kind===TEXT?0.75:1);ctx.fillRect(col*cw,y,Math.max(0.6,Math.min(length,columns-col)*cw),block);}}
-   ctx.globalAlpha=1;
-  }
- }
- // A disk-backed document with word wrap: the axis is the character offset,
- // and the map is as tall as the document's estimated wrapped rows.
+
+ // With word wrap the axis is the character offset, and the map is as tall
+ // as the document's estimated wrapped rows: one sample per map row.
  function offsetLayout(d,textarea,state,height,width,paged){
-  const m=textMetrics(textarea),columns=Math.max(1,state.wrapColumns||80);
+  const columns=Math.min(SAMPLE_COLUMNS,Math.max(1,state.wrapColumns||80));
   const start=state.offset,end=start+state.visible;
-  const g=geometry({total:state.units,rows:state.estimatedRows,height,start,end});
-  const found=sampled(d,'offsets',state.revision,clamp(Math.ceil(g.used),1,SAMPLE_ROWS),Math.min(SAMPLE_COLUMNS,columns));
-  const page=state.page,base=[d.uid+':o',state.revision,state.units,common(d,height,width),state.wrapColumns].join('|'),content=[base,page.start,page.text.length].join('|');
-  return {kind:'offsets',mode:'blocks',zoom:null,g,start,columns,sampled:!!found,colored:false,deferred:false,doc:d.uid,content,
-   key:found?[d.uid+':o',common(d,height,width),columns,'samples',found.stamp].join('|'):content+'|blocks#',
+  const g=blockGeometry({total:state.units,rows:state.estimatedRows,height,start,end});
+  const first=Math.floor(g.offset/g.scale),last=Math.min(state.units,Math.ceil((g.offset+g.used)/g.scale));
+  const pitch=g.scale*state.units/Math.max(1,state.estimatedRows),found=sampled(d,'offsets',state.revision,first,last,state.units,columns,pitch/g.scale);
+  return diskLayout(d,'offsets',g,found,columns,pitch,height,width,{start,
    label:()=>Math.round(clamp(start/Math.max(1,state.units-state.visible),0,1)*100),
-   draw:ctx=>found?drawSamples(ctx,d,found,g,width):drawOffsets(ctx,state,g,width,base),
    seek:value=>paged.mapSeek({offset:value}),
    scroll:delta=>paged.wheelBy(delta),
-   step:{line:state.rowHeight||20,page:Math.max(20,textarea.clientHeight-(state.rowHeight||20))}};
+   step:{line:state.rowHeight||20,page:Math.max(20,textarea.clientHeight-(state.rowHeight||20))}});
  }
- function drawOffsets(ctx,state,g,width,base){
-  textRows=[];
-  const page=state.page;
-  if(pageCache?.text!==page.text)pageCache={text:page.text,starts:lineStarts(page.text)};
-  const c=palette(),record=seenRows(base,g.used),text=page.text,starts=pageCache.starts,columns=Math.max(1,state.wrapColumns||80);
-  const first=Math.floor(page.start*g.scale),last=Math.min(record.widths.length,Math.ceil((page.start+text.length)*g.scale));
-  for(let y=first;y<last;y++){
-   const a=clamp(Math.floor(y/g.scale)-page.start,0,text.length),b=clamp(Math.ceil((y+1)/g.scale)-page.start,a,text.length);if(b<=a)continue;
-   // Line breaks in [a,b): line starts in (a,b].
-   const breaks=before(starts,b)-before(starts,a);
-   const chars=b-a-breaks,rows=Math.max(1,breaks+chars/columns);
-   record.widths[y]=Math.min(1,chars/(rows*columns));record.comments[y]=0;
-  }
-  ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);drawSeen(ctx,c,record,g,width,(state.units-state.lines+1)/Math.max(1,state.estimatedRows*columns));
- }
+
  function draw(layout){
   const started=now();
   try{paint(layout);}finally{const spent=now()-started;stats.draws++;if(spent>stats.maxDraw)stats.maxDraw=spent;}
@@ -815,13 +807,15 @@ function create(adapter){
   get layout(){return lastLayout;},
   // The rows text mode drew last ({line, row, y, text}); empty for blocks.
   get textRows(){return textRows;},
+  // The samples a disk-backed document is drawn from (for the checks).
+  get sampleState(){return samples?{kind:samples.kind,from:samples.from,to:samples.to,count:samples.count,rows:samples.rows.length,columns:samples.columns,colored:!!samples.runs,first:samples.rows[0]||null,last:samples.rows.at(-1)||null}:null;},
   get width(){return host&&!host.hidden?host.getBoundingClientRect().width:0;},
   limits:()=>host?limits():null,
   redraw(){drawn='';colors=null;schedule();},
-  dispose(){if(frame)root.cancelAnimationFrame(frame);root.clearTimeout(timer);root.clearTimeout(diskTimer);root.clearTimeout(sampleTimer);sampleWant='';parsing=null;host=null;}});
+  dispose(){if(frame)root.cancelAnimationFrame(frame);root.clearTimeout(timer);root.clearTimeout(diskTimer);root.clearTimeout(sampleTimer);parsing=null;host=null;}});
 }
 
-const api={create,commentMarkers,lineRuns,lineShape,lineStarts,geometry,targetAt,dragTarget,widthLimits,storedWidth,shownWidth,textZoom,parseSyntax,syntaxReader,syntaxCursor,rowCells,
+const api={create,commentMarkers,lineRuns,kindRuns,blockGeometry,lineShape,lineStarts,geometry,targetAt,dragTarget,widthLimits,storedWidth,shownWidth,textZoom,parseSyntax,syntaxReader,syntaxCursor,rowCells,
  ROW,MIN_BOX,PER_LINE,SAMPLE,WIDTH,NARROW_WIDTH,WIDTH_MAX,TEXT_FONT,TEXT_FONT_MAX,TEXT_REFERENCE,TEXT_COLUMNS,TEXT_ROWS,kinds:{TEXT,COMMENT,STRING,KEYWORD,NUMBER,PROPERTY}};
 root.NTKEditorDocumentMap=Object.freeze(api);
 if(typeof module==='object'&&module.exports)module.exports=api;

@@ -1,0 +1,13 @@
+Network Toolkit 1.21.61
+
+## What's New
+
+- The Document Map now uses only the colors the document itself has. A plain text file, such as a log, is one color in the map; before, the map colored numbers and quoted text on its own.
+- The map shrinks to show the whole document, but a line is never drawn smaller than one pixel row. A document with more lines than that scrolls inside the map as you scroll the text.
+
+## Additional Details
+
+- With Highlight off, every document is one color in the map, as in the editor.
+- While the map scrolls, the box moves from the top to the bottom of the map like a scroll bar; a click in the map shows the line under the pointer.
+- Large files that are read in sections are drawn the same way, for the part of the file in the map.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

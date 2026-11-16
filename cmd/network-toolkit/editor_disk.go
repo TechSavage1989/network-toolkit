@@ -588,7 +588,7 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		}
 	case "map":
 		// The Document Map's overview of the whole document (read-only).
-		value, err = v.Buffer.MapSamples(req.Limit, int(req.Size), req.Kind == "offsets")
+		value, err = v.Buffer.MapSamples(req.Limit, int(req.Size), req.Kind == "offsets", req.From, req.To)
 	case "edit", "undo", "redo":
 		value, err = disk.mutate(v.Buffer, req)
 	case "edit-begin", "edit-chunk", "edit-commit", "edit-abort":

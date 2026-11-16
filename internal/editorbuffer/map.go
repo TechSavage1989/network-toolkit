@@ -21,11 +21,13 @@ type MapSamples struct {
 	Rows []MapSample `json:"rows"`
 }
 
-// MapSamples reads `rows` samples spread evenly over the document. By line
-// (no word wrap) a sample is the start of a line. By offset (word wrap) it is
-// the wrapped row of `columns` units that holds the position: rows start at
-// the line's start and every `columns` units after it.
-func (b *Buffer) MapSamples(rows, columns int, byOffset bool) (MapSamples, error) {
+// MapSamples reads `rows` samples spread evenly over [from, to) of the
+// document: lines by line (no word wrap), UTF-16 units by offset (word wrap);
+// to <= from is the whole document. By line a sample is the start of a line
+// (rows == to-from gives every line of the range). By offset it is the
+// wrapped row of `columns` units that holds the position: rows start at the
+// line's start and every `columns` units after it.
+func (b *Buffer) MapSamples(rows, columns int, byOffset bool, from, to int64) (MapSamples, error) {
 	b.lifetime.RLock()
 	defer b.lifetime.RUnlock()
 	b.mu.RLock()
@@ -37,13 +39,23 @@ func (b *Buffer) MapSamples(rows, columns int, byOffset bool) (MapSamples, error
 		return MapSamples{}, ErrBoundary
 	}
 	total := size(b.root)
+	limit := total.lines + 1
+	if byOffset {
+		limit = total.units
+	}
+	if to <= from {
+		from, to = 0, limit
+	}
+	if from < 0 || to > limit {
+		return MapSamples{}, ErrBoundary
+	}
 	out := MapSamples{Metadata: b.metadataLocked(), Rows: make([]MapSample, 0, rows)}
 	data := make([]byte, 0, columns*3)
 	for k := 0; k < rows; k++ {
 		var line, start, column int64
 		var err error
 		if byOffset {
-			at := int64(k) * total.units / int64(rows)
+			at := from + int64(k)*(to-from)/int64(rows)
 			if line, err = b.lineAt(b.root, at); err == ErrBoundary && at > 0 {
 				at--
 				line, err = b.lineAt(b.root, at)
@@ -57,7 +69,7 @@ func (b *Buffer) MapSamples(rows, columns int, byOffset bool) (MapSamples, error
 			column = (at - start) / int64(columns) * int64(columns)
 			start += column
 		} else {
-			line = int64(k) * (total.lines + 1) / int64(rows)
+			line = from + int64(k)*(to-from)/int64(rows)
 			if start, err = b.lineStart(b.root, line); err != nil {
 				return MapSamples{}, err
 			}

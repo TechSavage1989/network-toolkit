@@ -136,16 +136,30 @@ async function setActiveScroll(page,fraction){
 }
 // The box must be the visible share of the text area: top = scrollTop x scale,
 // height = clientHeight x scale (never less than the minimum box).
+// Where the box should be. A document whose rows fit the map at one pixel
+// or more each is mapped top to bottom; a longer one scrolls inside the map
+// and the box moves like a scroll bar thumb.
+function expectedBox(info,ta){
+ const g=info.layout.g,natural=ta.scrollHeight*g.scale,size=Math.min(g.used,Math.max(10,ta.clientHeight*g.scale));
+ if(natural<=info.height+0.5)return {scrolls:false,top:Math.min(ta.scrollTop*g.scale,g.used-size),height:size};
+ const share=Math.max(0,Math.min(1,ta.scrollTop/Math.max(1,ta.scrollHeight-ta.clientHeight)));
+ return {scrolls:true,top:share*(g.used-size),height:size};
+}
+// Blocks: 3 px per row while the document fits, then fewer, never under 1 px
+// per row; then the map scrolls.
 async function assertBoxMatches(page,label){
  const [info,ta]=await Promise.all([mapInfo(page),activeArea(page)]);
  assert(!info.hidden&&info.box&&info.layout,label+': the map shows a box');
  assert.equal(info.layout.kind,'text',label+': a page-held document is mapped by its text area');
- const scale=info.layout.g.scale,used=info.layout.g.used;
- assert(Math.abs(info.layout.g.total-ta.scrollHeight)<=1,label+': the map covers the whole scroll height ('+info.layout.g.total+' / '+ta.scrollHeight+')');
- assert(Math.abs(used-Math.min(info.height,ta.scrollHeight/ta.lineHeight*3))<=1,label+': the map is 3 px per row, or fits the whole document to its height');
- const height=Math.max(10,ta.clientHeight*scale),top=Math.min(ta.scrollTop*scale,used-Math.min(used,height));
- assert(Math.abs(info.box.top-top)<=1,label+': box top '+info.box.top+' should be '+top);
- assert(Math.abs(info.box.height-Math.min(used,height))<=1,label+': box height '+info.box.height+' should be '+height);
+ const g=info.layout.g,rows=ta.scrollHeight/ta.lineHeight,pitch=Math.max(1,Math.min(3,info.height/rows));
+ assert(Math.abs(g.total-ta.scrollHeight)<=1,label+': the map covers the whole scroll height ('+g.total+' / '+ta.scrollHeight+')');
+ assert(Math.abs(g.scale*ta.lineHeight-pitch)<=0.02,label+': '+pitch.toFixed(2)+' px per row ('+(g.scale*ta.lineHeight)+')');
+ const want=expectedBox(info,ta);
+ assert.equal(want.scrolls,rows>info.height+0.5,label+': the map scrolls only when the rows do not fit at 1 px');
+ assert(Math.abs(g.used-Math.min(info.height,rows*pitch))<=1,label+': the map is as tall as its rows, at most its own height');
+ if(!want.scrolls)assert.equal(g.offset,0,label);
+ assert(Math.abs(info.box.top-want.top)<=1,label+': box top '+info.box.top+' should be '+want.top);
+ assert(Math.abs(info.box.height-want.height)<=1,label+': box height '+info.box.height+' should be '+want.height);
  return {info,ta};
 }
 const canvasSum=page=>page.evaluate(()=>{const c=document.querySelector('#networkToolkitFileEditor [data-ed-map] canvas'),x=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let sum=0;for(let i=0;i<x.length;i+=7)sum=(sum*31+x[i])>>>0;return sum;});
@@ -205,7 +219,9 @@ const mapPaint=page=>page.evaluate(()=>{
  const canvas=document.querySelector('#networkToolkitFileEditor [data-ed-map] canvas'),ctx=canvas.getContext('2d'),l=NetworkToolkitFileEditor.documentMap.layout;
  const used=Math.max(1,Math.floor(l.g.used*devicePixelRatio)),data=ctx.getImageData(0,0,canvas.width,used).data,counts=new Map();
  for(let i=0;i<data.length;i+=4){const key=data[i]<<16|data[i+1]<<8|data[i+2];counts.set(key,(counts.get(key)||0)+1);}
- const bg=[...counts].sort((a,b)=>b[1]-a[1])[0][0],base=[bg>>16,bg>>8&255,bg&255],hues=new Set(),bands=new Set();
+ // The background is the editor's own (a map filled edge to edge has no background pixel to find).
+ const probe=document.createElement('canvas').getContext('2d');probe.fillStyle=getComputedStyle(canvas.closest('[data-ed-map]')).getPropertyValue('--nt-code-bg').trim()||'#000';probe.fillRect(0,0,1,1);
+ const base=[...probe.getImageData(0,0,1,1).data].slice(0,3),hues=new Set(),bands=new Set();
  for(let y=0;y<used;y++)for(let x=0;x<canvas.width;x++){
   const i=(y*canvas.width+x)*4,d=[data[i]-base[0],data[i+1]-base[1],data[i+2]-base[2]],size=Math.hypot(...d);
   if(size<24)continue;
@@ -293,13 +309,13 @@ async function mainWindow(browser){
  // The box is the visible share at every scroll position.
  for(const fraction of [0,0.25,0.5,0.8,1])await setActiveScroll(page,fraction),await assertBoxMatches(page,'scroll '+fraction);
  info=await mapInfo(page);
- assert(info.layout.g.scale*(await activeArea(page)).lineHeight<1,'a 705-line document is fitted to the map height');
+ assert(Math.abs(info.layout.g.scale*(await activeArea(page)).lineHeight-1)<=0.02,'a 705-line document is drawn at one pixel per line and scrolls in the map');
  // A click centres the view there.
  await setActiveScroll(page,0);
  const used=info.layout.g.used;
  for(const at of [0.6,0.3]){
-  const y=used*at;await page.mouse.click(info.left+info.width/2,info.top+y);await frames(page);
-  const ta=await activeArea(page),g=(await mapInfo(page)).layout.g,expected=Math.max(0,Math.min(ta.scrollHeight-ta.clientHeight,y/g.scale-ta.clientHeight/2));
+  const y=used*at,before=(await mapInfo(page)).layout.g;await page.mouse.click(info.left+info.width/2,info.top+y);await frames(page);
+  const ta=await activeArea(page),g=(await mapInfo(page)).layout.g,expected=Math.max(0,Math.min(ta.scrollHeight-ta.clientHeight,(y+before.offset)/before.scale-ta.clientHeight/2));
   assert(Math.abs(ta.scrollTop-expected)<=2/g.scale,'a click at '+at+' centres the view there ('+ta.scrollTop+' / '+expected+')');
   await assertBoxMatches(page,'after a click');
  }
@@ -308,7 +324,9 @@ async function mainWindow(browser){
   const before=await activeArea(page),{box,layout}=await mapInfo(page),x=info.left+info.width/2,y=info.top+box.top+box.height/2;
   await page.mouse.move(x,y);await page.mouse.down();for(let step=1;step<=6;step++)await page.mouse.move(x,y+step*10);await page.mouse.up();await frames(page);
   const after=await activeArea(page);
-  assert(Math.abs(after.scrollTop-before.scrollTop-60/layout.g.scale)<=2/layout.g.scale,'dragging the box 60 px scrolls 60 map pixels ('+(after.scrollTop-before.scrollTop)+')');
+  // The box follows the pointer: `drag` is its map pixels per text-area pixel (the scale, or a scroll bar thumb's when the map scrolls).
+  assert(Math.abs(after.scrollTop-before.scrollTop-60/layout.g.drag)<=2/layout.g.drag,'dragging the box 60 px moves the box 60 px ('+(after.scrollTop-before.scrollTop)+')');
+  assert(Math.abs((await mapInfo(page)).box.top-box.top-60)<=1.5,'and the box moved with the pointer');
   assert.equal(await text.evaluate(el=>el===document.activeElement||!document.activeElement.closest('[data-ed-map]')),true,'the map takes no focus from the text');
   await assertBoxMatches(page,'after a drag');
  }
@@ -662,12 +680,14 @@ async function mainWindow(browser){
  // it: its real text when every row fits at 4 px or more, else blocks.
  const whole=async label=>{
   const [info,size,ta]=await Promise.all([mapInfo(page),mapSize(page),activeArea(page)]),g=info.layout.g;
-  assert.equal(g.offset,0,label+': nothing scrolls inside the map');
-  assert(g.used<=info.height+0.5&&Math.abs(g.total-ta.scrollHeight)<=1,label+': the whole document is in the map');
+  assert(g.used<=info.height+0.5&&Math.abs(g.total-ta.scrollHeight)<=1,label+': the map covers the whole document');
   assert.equal(size.font,size.fit,label+': '+(size.fit?'text at '+size.fit+' px':'blocks')+' at '+size.width+' px');
   assert.equal(size.mode,size.fit?'text':'blocks',label);
-  const height=Math.max(10,ta.clientHeight*g.scale),top=Math.min(ta.scrollTop*g.scale,g.used-Math.min(g.used,height));
-  assert(Math.abs(info.box.top-top)<=1&&Math.abs(info.box.height-Math.min(g.used,height))<=1,label+': the box is the part on screen');
+  const want=expectedBox(info,ta);
+  if(size.fit)assert.equal(want.scrolls,false,label+': text is drawn only when the whole document fits');
+  if(!want.scrolls)assert.equal(g.offset,0,label+': a document that fits does not scroll in the map');
+  else assert(Math.abs(g.scale*ta.lineHeight-1)<=0.02,label+': a scrolling map is one pixel per row');
+  assert(Math.abs(info.box.top-want.top)<=1&&Math.abs(info.box.height-want.height)<=1,label+': the box is the part on screen');
   return {info,size,ta};
  };
  // A long document (706 lines): blocks at every width, all of it.
@@ -680,7 +700,22 @@ async function mainWindow(browser){
   await pressSeparator(page,'ArrowLeft');
  }
  assert(widths.length>5&&widths.every(step=>step.endsWith(':blocks')),'a long document is blocks at every width: '+widths.join(' '));
- {const paint=await mapPaint(page);assert.equal(paint.bands,20,'every part of the long document is drawn');assert(paint.hues>=3,'in the syntax colours: '+JSON.stringify(paint));}
+ await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.colored);await frames(page);
+ {const paint=await mapPaint(page);assert.equal(paint.bands,20,'every row of the map is drawn');assert(paint.hues>=3,'in the editor\'s syntax colours: '+JSON.stringify(paint));}
+ // Colours come only from the document's own highlighting: a plain text
+ // document (the editor draws it in one colour) is one colour in the map,
+ // whatever numbers and quotes it holds; with Highlight off, every document.
+ await page.evaluate(()=>NetworkToolkitFileEditor.activateDocument([...NetworkToolkitFileEditor.documents.keys()][3]));await frames(page);
+ await pressSeparator(page,'Home');await frames(page);
+ {const paint=await mapPaint(page);assert.equal(paint.mode,'blocks');assert.equal(paint.hues,1,'a plain text document has one colour in the map: '+JSON.stringify(paint));}
+ await page.evaluate(()=>NetworkToolkitFileEditor.activateDocument([...NetworkToolkitFileEditor.documents.keys()][0]));await frames(page);
+ await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.colored);
+ await page.locator('#networkToolkitFileEditor [data-ed-syntax]').uncheck();await frames(page);
+ await page.waitForFunction(()=>!NetworkToolkitFileEditor.documentMap.layout?.colored);await frames(page);
+ {const paint=await mapPaint(page);assert.equal(paint.hues,1,'Highlight off: one colour in the map too: '+JSON.stringify(paint));}
+ await page.locator('#networkToolkitFileEditor [data-ed-syntax]').check();await frames(page);
+ await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.colored);
+ await pressSeparator(page,'End');await frames(page);
  await shot(page,'editor-map-wide-blocks-dark');
  pass('The whole document at every width: a long document stays blocks in its colours, the box the part on screen');
 
@@ -908,10 +943,13 @@ async function engine(browser){
  const x=info.left+info.width/2;
  // Click at three places: the view centres there.
  for(const at of [0.5,0.9,0.1]){
-  await page.mouse.click(x,info.top+info.layout.g.used*at);
-  await page.waitForFunction(at=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&Math.abs((l.g.box.top+l.g.box.height/2)/l.g.used-at)<0.02;},at,{timeout:15000});
+  // The map is one pixel per line and scrolls: a click shows the line under the pointer.
+  const g=(await mapInfo(page)).layout.g,target=(g.used*at+g.offset)/g.scale;
+  assert(Math.abs(g.scale-1)<=0.001&&g.used===info.height,'451,649 lines: one pixel per line, scrolling in the map');
+  await page.mouse.click(x,info.top+g.used*at);
+  await page.waitForFunction(target=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&Math.abs(l.start+l.g.span/2-target)<3;},target,{timeout:15000});
   const cursor=await page.evaluate(()=>Number(document.querySelector('#networkToolkitFileEditor [data-ed-gutter-lines] [data-source-line]')?.dataset.sourceLine));
-  assert(Math.abs(cursor/d.lines-at)<0.03,'a click at '+at+' shows line '+cursor+' of '+d.lines);
+  assert(Math.abs(cursor-target)<60,'a click on line '+Math.round(target)+' shows it (first line '+cursor+')');
  }
  // Drag the box down, then the wheel over the map and over the text.
  info=await mapInfo(page);
@@ -934,17 +972,23 @@ async function engine(browser){
  // widest map too (never only the part that was read).
  for(const key of ['Home','End']){
   await pressSeparator(page,key);
-  await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l?.kind==='lines'&&l.sampled;},null,{timeout:15000});
+  await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l?.kind==='lines'&&l.fresh&&l.colored;},null,{timeout:15000});
   await frames(page);
   const paint=await mapPaint(page);info=await mapInfo(page);
-  assert.equal(paint.mode,'blocks');assert.equal(paint.offset,0);assert.equal(info.layout.g.total,d.lines,'the map covers every line');
+  assert.equal(paint.mode,'blocks');assert.equal(info.layout.g.total,d.lines,'the map covers every line');
   assert.equal(paint.bands,20,'every part of the 16 MB file is drawn ('+key+'): '+JSON.stringify(paint));
-  assert(paint.hues>=3,'in the syntax colours: '+JSON.stringify(paint));
+  // Its colours are the editor's own for these lines (the worker coloured the samples); this file's lines are one colour in the editor.
+  assert(paint.hues>=1&&await page.evaluate(()=>NetworkToolkitFileEditor.documentMap.layout.colored),'drawn in the editor\'s colours: '+JSON.stringify(paint));
  }
  await page.evaluate(()=>{mapLongTasks.length=0;});
  info=await mapInfo(page);
- await page.mouse.click(info.left+info.width/2,info.top+info.layout.g.used*0.7);
- await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&Math.abs((l.g.box.top+l.g.box.height/2)/l.g.used-0.7)<0.02;},null,{timeout:15000});
+ {
+  const g=info.layout.g,target=(g.used*0.7+g.offset)/g.scale;
+  await page.mouse.click(info.left+info.width/2,info.top+g.used*0.7);
+  await page.waitForFunction(target=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&Math.abs(l.start+l.g.span/2-target)<3;},target,{timeout:15000});
+  await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.sampled);await frames(page);
+  assert.equal((await mapPaint(page)).bands,20,'the map is drawn around the new place');
+ }
  await frames(page);await page.waitForTimeout(300);
  {
   const longTasks=await page.evaluate(()=>mapLongTasks);
@@ -963,10 +1007,11 @@ async function engine(browser){
  info=await mapInfo(page);
  assert.equal(info.layout.g.total,d.units,'the map covers every character of the line');
  assert(info.layout.g.used>info.height*0.9,'a 1.7 MB line fills the map');
- await page.mouse.click(x,info.top+info.layout.g.used*0.5);
- await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&Math.abs((l.g.box.top+l.g.box.height/2)/l.g.used-0.5)<0.02;},null,{timeout:15000});
+ // Drag the box to the middle of the map: the middle of the line.
+ await page.mouse.move(x,info.top+info.box.top+info.box.height/2);await page.mouse.down();await page.mouse.move(x,info.top+info.layout.g.used*0.5,{steps:12});await page.mouse.up();
+ await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&Math.abs((l.g.box.top+l.g.box.height/2)/l.g.used-0.5)<0.03;},null,{timeout:15000});
  const middle=await page.evaluate(()=>{const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]'),view=NetworkToolkitFileEditor.active.diskSession.state().page;return {start:view.start,end:view.start+view.text.length,shown:ta.value.slice(0,16)};});
- assert(middle.start>d.units*0.4&&middle.end<d.units*0.65,'a click in the middle shows the middle of the line: '+JSON.stringify(middle));
+ assert(middle.start>d.units*0.4&&middle.end<d.units*0.65,'the box in the middle shows the middle of the line: '+JSON.stringify(middle));
  // Drag the box to the very end: the last characters are shown.
  info=await mapInfo(page);
  await page.mouse.move(x,info.top+info.box.top+info.box.height/2);await page.mouse.down();await page.mouse.move(x,info.top+info.height+40,{steps:12});await page.mouse.up();
@@ -985,10 +1030,10 @@ async function engine(browser){
  // The whole line in the map from the engine's samples, at the widest map too.
  for(const key of ['Home','End']){
   await pressSeparator(page,key);
-  await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l?.kind==='offsets'&&l.sampled;},null,{timeout:15000});
+  await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l?.kind==='offsets'&&l.fresh;},null,{timeout:15000});
   await frames(page);
   const paint=await mapPaint(page);
-  assert.equal(paint.mode,'blocks');assert.equal(paint.offset,0);
+  assert.equal(paint.mode,'blocks');
   assert.equal(paint.bands,20,'every part of the 1.7 MB line is drawn ('+key+'): '+JSON.stringify(paint));
  }
  await shot(page,'editor-map-list-base64-wrap-wide-dark');
