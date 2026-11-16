@@ -1,0 +1,14 @@
+Network Toolkit 1.21.59
+
+## What's New
+
+- In the Text Editor's More menu, tick or untick Document list, Connections and Files to choose which tabs the sidebar shows. With all three off, the sidebar is gone and the text uses the full width.
+- Drag the left edge of the Document Map to make it wider or narrower. Once it is wide enough, it shows the document's real text in small print, in its syntax colours.
+- After you close the last document or move it to another window, the editor no longer shows that document's size and language.
+
+## Additional Details
+
+- A tab you turn off goes away with its panel; if it was showing, the sidebar shows the next remaining tab. Ticking a tab again brings it back, open. Asking for a hidden panel (a command in Search tools and commands, choosing a saved connection, Use in Connect) turns its tab back on.
+- The Document Map's width is kept, like the map itself, and applies to every Text Editor window. Arrow keys resize it when its edge has the focus; double-click the edge or press Enter to reset it. It never grows so wide that too little room is left for the text.
+- In text mode the map draws only the lines in view, so very large files stay quick; the box that shows the part on screen moves through the text as you scroll.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
