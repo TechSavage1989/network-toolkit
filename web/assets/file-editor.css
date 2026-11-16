@@ -532,6 +532,10 @@ body.nt-editor-sidebar-open .toast-stack{z-index:420}
 .nt-editor-map:hover .nt-editor-map-view{background:color-mix(in srgb,var(--accent) 21%,transparent)}
 .nt-editor-map.is-dragging,.nt-editor-map.is-dragging .nt-editor-map-view{cursor:grabbing}
 .nt-editor-map.is-dragging .nt-editor-map-view{background:color-mix(in srgb,var(--accent) 27%,transparent)}
+.nt-editor-map-bar{position:absolute;top:0;right:0;bottom:0;width:9px;cursor:default;background:color-mix(in srgb,var(--nt-code-fg,var(--text)) 7%,transparent)}
+.nt-editor-map-bar[hidden]{display:none}
+.nt-editor-map-thumb{position:absolute;top:0;left:1px;right:1px;min-height:24px;border-radius:4px;background:color-mix(in srgb,var(--nt-code-fg,var(--text)) 38%,transparent)}
+.nt-editor-map-bar:hover .nt-editor-map-thumb,.nt-editor-map-bar.is-own .nt-editor-map-thumb{background:color-mix(in srgb,var(--nt-code-fg,var(--text)) 58%,transparent)}
 .nt-editor-map-view:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .nt-editor-workspace.files-dock-right>.nt-editor-map{border-right:1px solid var(--line)}
 @media(max-width:680px){.nt-editor-map{flex-basis:64px;width:64px}}

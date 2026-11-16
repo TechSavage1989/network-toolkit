@@ -4,10 +4,12 @@ Network Toolkit 1.21.63
 
 - Files of several thousand lines dropped into the Text Editor no longer stall while scrolling, and they open faster. A 350 KB configuration of 12,000 lines stalled on every scroll step with Highlight on; it now scrolls smoothly and opens in a fraction of the time.
 - Large files dropped into the Text Editor, or opened with Open file, open about two to three times faster.
+- The Document Map has its own scroll bar when a document is too long to fit in it. Drag it, or roll the mouse wheel over the map, to look through the whole document without losing your place in the text.
 
 ## Additional Details
 
 - A dropped file over 4,000 lines is now handled like a file opened by its path: the app's engine holds it and the editor shows it in sections, instead of drawing every line number and color at once.
 - The file is now compressed before it is passed to the app's engine, and several parts are prepared at once. Text compresses well, and that step was the slow part of opening a large file.
+- The map's scroll bar appears only when the map itself scrolls. The box stays on the text you have on screen, a click in the map still takes the text there, and the map follows the text again when you scroll the text. When the whole document fits in the map, the wheel over the map scrolls the text as before.
 - Files opened by their path, from the Files sidebar or from Windows Explorer, were already fast and are unchanged.
 - Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

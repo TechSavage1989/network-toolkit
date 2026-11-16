@@ -330,15 +330,38 @@ async function mainWindow(browser){
   assert.equal(await text.evaluate(el=>el===document.activeElement||!document.activeElement.closest('[data-ed-map]')),true,'the map takes no focus from the text');
   await assertBoxMatches(page,'after a drag');
  }
- // The wheel over the map scrolls the document.
+ // The map scrolls on its own (owner request after v1.21.62): the wheel over
+ // it and its own scroll bar move the map and leave the text where it is.
  {
+  const bar=()=>page.evaluate(()=>{const host=document.querySelector('#networkToolkitFileEditor [data-ed-map]'),bar=host.querySelector('[data-ed-map-bar]'),thumb=bar.querySelector('[data-ed-map-thumb]').getBoundingClientRect(),box=host.getBoundingClientRect(),g=NetworkToolkitFileEditor.documentMap.layout.g;return {hidden:bar.hidden,role:bar.getAttribute('role'),label:bar.getAttribute('aria-label'),now:Number(bar.getAttribute('aria-valuenow')),thumbTop:thumb.top-box.top,thumbHeight:thumb.height,x:thumb.left+thumb.width/2,top:box.top,offset:g.offset,max:g.max,own:!!g.own,used:g.used,scale:g.scale,boxTop:g.box.top};});
   await setActiveScroll(page,0.2);const before=await activeArea(page);
-  await page.mouse.move(info.left+info.width/2,info.top+20);await page.mouse.wheel(0,300);await frames(page);
-  const after=await activeArea(page);
-  assert(Math.abs(after.scrollTop-before.scrollTop-300)<=1,'the wheel over the map scrolls the text by its distance ('+(after.scrollTop-before.scrollTop)+')');
-  await assertBoxMatches(page,'after the wheel');
+  let b=await bar();
+  assert.deepEqual([b.hidden,b.role,b.label,b.own],[false,'scrollbar','Scroll the document map',false],'a map that scrolls has its own scroll bar');
+  assert(b.max>50&&Math.abs(b.thumbTop-b.offset/b.max*(b.used-b.thumbHeight))<=1,'its thumb is where the map is: '+JSON.stringify(b));
+  const followed=b.offset;
+  await page.mouse.move(info.left+info.width/2,info.top+20);await page.mouse.wheel(0,90);await frames(page);
+  let after=await activeArea(page);b=await bar();
+  assert.equal(after.scrollTop,before.scrollTop,'the wheel over the map leaves the text where it is');
+  assert(b.own&&Math.abs(b.offset-Math.min(b.max,followed+90))<=1,'and scrolls the map by its distance: '+JSON.stringify({followed,b}));
+  assert(Math.abs(b.boxTop-(after.scrollTop*b.scale-b.offset))<=1,'the box stays on the text that is on screen');
+  // Dragging the bar's thumb scrolls the map, not the text.
+  await page.mouse.move(b.x,b.top+b.thumbTop+b.thumbHeight/2);await page.mouse.down();await page.mouse.move(b.x,b.top+4,{steps:5});await page.mouse.up();await frames(page);
+  after=await activeArea(page);b=await bar();
+  assert.equal(after.scrollTop,before.scrollTop,'dragging the map\'s bar leaves the text where it is');
+  assert.equal(b.offset,0,'and takes the map to its start');assert.equal(b.now,0);
+  // A click in the map still shows the text under the pointer, and the map stays.
+  const y=120,target=(y+b.offset)/b.scale;
+  await page.mouse.click(info.left+info.width/3,info.top+y);await frames(page);
+  after=await activeArea(page);b=await bar();
+  assert(Math.abs(after.scrollTop+after.clientHeight/2-target)<=2/b.scale,'a click shows the text under the pointer ('+after.scrollTop+')');
+  assert(b.own&&b.offset===0,'and the map stays where it was put');
+  // Scrolling the text takes the map back to following it.
+  await page.waitForTimeout(1600);
+  await setActiveScroll(page,0.7);
+  await page.waitForFunction(()=>!NetworkToolkitFileEditor.documentMap.layout.g.own);
+  await assertBoxMatches(page,'after the text was scrolled');
  }
- pass('Document map: the box matches the text area scroll; a click centres the view, dragging the box and the wheel scroll it');
+ pass('Document map: the box matches the text area scroll; a click centres the view and dragging the box scrolls it; the wheel over the map and the map\'s own bar scroll the map alone');
 
  // Typing: the map follows the edit.
  {
@@ -958,9 +981,22 @@ async function engine(browser){
  await page.mouse.up();
  await page.waitForFunction(top=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&l.g.box.top>top+150;},info.box.top,{timeout:15000});
  const dragged=await topLine();
- await page.mouse.move(x,info.top+20);for(let i=0;i<20;i++){await page.mouse.wheel(0,400);await page.waitForTimeout(16);}
- await page.waitForFunction(line=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&l.g.box.top/l.g.scale>line;},dragged,{timeout:15000});
+ // The wheel over the map scrolls the map alone, through other parts of the
+ // file (drawn from new samples), and the text stays where it is.
+ {
+  const at=await page.evaluate(()=>{const s=NetworkToolkitFileEditor.active.diskSession.state().page,g=NetworkToolkitFileEditor.documentMap.layout.g;return {start:s.start,line:s.line,offset:g.offset};});
+  await page.mouse.move(x,info.top+20);for(let i=0;i<20;i++){await page.mouse.wheel(0,400);await page.waitForTimeout(16);}
+  await page.waitForFunction(offset=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&l.g.own&&Math.abs(l.g.offset-offset-8000)<=1&&l.fresh;},at.offset,{timeout:15000});
+  await frames(page);
+  const now=await page.evaluate(()=>{const s=NetworkToolkitFileEditor.active.diskSession.state().page;return {start:s.start,line:s.line};});
+  assert.deepEqual(now,{start:at.start,line:at.line},'the wheel over the map does not move the text');
+  assert.equal((await mapPaint(page)).bands,20,'the part of the file the map moved to is drawn');
+ }
+ assert(dragged>=0);
+ // Scrolling the text takes the map back to following it.
+ await page.waitForTimeout(1600);
  await editorArea.hover();for(let i=0;i<20;i++){await page.mouse.wheel(0,-400);await page.waitForTimeout(16);}
+ await page.waitForFunction(()=>!NetworkToolkitFileEditor.documentMap.layout.g.own,null,{timeout:15000});
  await frames(page);await page.waitForTimeout(300);
  const longTasks=await page.evaluate(()=>mapLongTasks);
  assert(longTasks.every(ms=>ms<=50),'no long task over 50 ms while scrolling a 16 MB disk-backed document with the map: '+JSON.stringify(longTasks));

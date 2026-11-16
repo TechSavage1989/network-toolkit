@@ -8,6 +8,8 @@ Owner report on v1.21.62, with a 355,575 byte FortiGate configuration of 11,879 
 
 Measured (standalone Text Editor on its real engine, Chromium 151): a dropped file took about 100 ms per MB, a file opened by path 16 MB in 0.4 s and 200 MB in 3 s. The engine handled a 1 MiB chunk in about 15 ms; the rest was the browser's upload of each chunk (about 70 ms for a 1.4 MB JSON body), whatever the chunk size.
 
+Owner request in the same release: "i'd also like the map to have it's own scrollbar, that way i can scroll through it and review it's overall content without loosing my current position in the actual document." A Document Map that scrolls (more rows than pixels) now has a scroll bar at its right edge, and the wheel over it scrolls the map alone (`ownScroll`, `scrollMap`, `placeBar` in editor-document-map.js; rule in the AGENTS.md map bullet). Checked by `scripts/editor-map-list.browser.cjs` on a 706-line page-held and a 16 MB disk-backed document.
+
 What changed (rule in AGENTS.md, "Browser file import"):
 - `sendBrowserFile` (file-editor.js) gzips each chunk with `CompressionStream` and sends it compressed when that is clearly smaller (`gzip:true`), reads and compresses four chunks ahead while sending in order, and sends 1 MiB per request (the engine's `MaxEditBytes`).
 - The buffer route expands a compressed chunk first (`gunzipEditorChunk`, editor_disk_upload.go): refused unless it is gzip, not empty and at most one chunk when expanded. `import-chunk` and `verify-chunk` are otherwise unchanged; plain chunks still work.
