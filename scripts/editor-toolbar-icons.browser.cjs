@@ -19,6 +19,10 @@
 //    settings) and reaches a detached editor window through the engine's move
 //    batch; that window at its native minimum (640 x 400) and the main window
 //    at 1024 px never scroll sideways and keep every button inside the toolbar;
+//  - the sidebar tabs (More → View → Document list, Connections, Files) reach
+//    that window in the same batch: Document list off in the main window gives
+//    it a rail of Connect and Files and an unticked box, and ticking it there
+//    brings Docs back first with its panel;
 //  - Move / merge as an icon opens its menu, and a pending move still shows
 //    its words and its indicator beside the icon, and can be cancelled there.
 // Screenshots (light and dark) go to TOOLKIT_TEST_OUTPUT.
@@ -83,10 +87,22 @@ async function assertToolbar(page,mode,where,{oneRow=false}={}){
  return {...t,rows:rows.size};
 }
 // The rail: Docs first, then Connect and Files.
-async function assertRail(page,where){
- const rail=await page.evaluate(()=>[...document.querySelectorAll('#networkToolkitFileEditor [data-editor-files-panel]')].map(b=>({panel:b.dataset.editorFilesPanel,label:b.getAttribute('aria-label'),text:b.textContent.trim()})));
- assert.deepEqual(rail.map(r=>r.panel),['documents','connections','files'],where+': the rail order');
- assert.deepEqual(rail.map(r=>r.label),['Documents','Connections','Files']);assert.deepEqual(rail.map(r=>r.text),['Docs','Connect','Files']);
+// Tabs turned off in More → View (Document list, Connections, Files) are not
+// on the rail, and the boxes say so (`shown`).
+const RAIL={documents:['Documents','Docs'],connections:['Connections','Connect'],files:['Files','Files']};
+async function assertRail(page,where,shown=['documents','connections','files']){
+ const rail=await page.evaluate(()=>[...document.querySelectorAll('#networkToolkitFileEditor [data-editor-files-panel]')].filter(b=>!b.hidden&&b.getClientRects().length>0).map(b=>({panel:b.dataset.editorFilesPanel,label:b.getAttribute('aria-label'),text:b.textContent.trim()})));
+ assert.deepEqual(rail.map(r=>r.panel),shown,where+': the rail order');
+ assert.deepEqual(rail.map(r=>r.label),shown.map(name=>RAIL[name][0]));assert.deepEqual(rail.map(r=>r.text),shown.map(name=>RAIL[name][1]));
+ const boxes=await page.evaluate(()=>Object.fromEntries([...document.querySelectorAll('#networkToolkitFileEditor [data-ed-sidebar-panel]')].map(box=>[box.dataset.edSidebarPanel,box.checked])));
+ assert.deepEqual(boxes,Object.fromEntries(Object.keys(RAIL).map(name=>[name,shown.includes(name)])),where+': the More menu boxes');
+}
+// More → View → a sidebar tab box.
+async function tickPanel(page,name,on){
+ const more=page.locator(ED+' .nt-editor-more');if(!await more.evaluate(el=>el.open))await more.locator('summary').click();
+ await page.locator(ED+' #ntEditorMoreActions').waitFor();
+ const box=page.locator(ED+' #ntEditorMoreActions [data-ed-sidebar-panel="'+name+'"]');if(on)await box.check();else await box.uncheck();
+ await page.waitForFunction(([name,on])=>NetworkToolkitFileEditor.sidebarPanels[name]===on,[name,on]);
 }
 const sidebar=page=>page.evaluate(()=>{const host=document.querySelector('#networkToolkitFileEditor [data-ed-files-sidebar]'),tab=document.querySelector('#networkToolkitFileEditor [data-editor-files-panel][aria-selected="true"]');return {open:!!host&&!host.hidden,panel:tab?.dataset.editorFilesPanel||'',focused:document.activeElement?.dataset?.editorFilesPanel||''};});
 async function paletteRun(page,label){
@@ -124,6 +140,7 @@ async function chooseLabels(page,value,name=''){
 // The engine's copy of the saved settings (what a reload or another app reads).
 const saved=page=>page.evaluate(async()=>(await api('/state'))?.editorPreferences?.toolbarLabels);
 async function waitSaved(page,value){for(let i=0;i<100;i++){if(await saved(page)===value)return;await page.waitForTimeout(100);}assert.fail('the engine never kept Toolbar buttons = '+value);}
+async function waitSavedPanels(page,value){const read=()=>page.evaluate(async()=>{const p=(await api('/state'))?.editorPreferences?.sidebarPanels;return JSON.stringify(p&&{documents:p.documents,connections:p.connections,files:p.files});});for(let i=0;i<100;i++){if(await read()===JSON.stringify(value))return;await page.waitForTimeout(100);}assert.fail('the engine never kept sidebarPanels = '+JSON.stringify(value)+' (it has '+await read()+')');}
 const textHeight=page=>page.evaluate(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').getBoundingClientRect().height);
 // Screenshots wait for the theme's colour transitions and keep the pointer off
 // the toolbar, so no button shows a hover look.
@@ -204,6 +221,10 @@ async function shot(page,name){if(!output)return;await calm(page);await page.scr
   // ---- A detached editor window gets the choice ----
   await main.evaluate(()=>NetworkToolkitFileEditor.closeAll());await main.waitForFunction(()=>NetworkToolkitFileEditor.listDocuments().length===0);
   await main.evaluate(async text=>{const ed=NetworkToolkitFileEditor,doc=await ed.newDocument();const r=await ed.insertText(doc.id,text,'start');if(!r?.ok)throw new Error(r?.error||'insert');},SAMPLE);
+  // The sidebar tabs travel in the same batch: Document list off here.
+  await tickPanel(main,'documents',false);await main.keyboard.press('Escape');
+  await assertRail(main,'main without Docs',['connections','files']);
+  await waitSavedPanels(main,{documents:false,connections:true,files:true});
   await main.waitForFunction(()=>!NetworkToolkitEditorWindows.state.running);
   await main.locator('[data-editor-window-detach]').click();
   const [first]=await launches(1);
@@ -212,8 +233,24 @@ async function shot(page,name){if(!output)return;await calm(page);await page.scr
   assert.equal(await toggle.getAttribute('data-editor-window-status'),'pending');
   const child=await open('/editor-view/'+first.view,first.token,'editor window',()=>online&&NetworkToolkitFileEditor.listDocuments().length===1,{width:640,height:400});
   await main.waitForFunction(()=>NetworkToolkitEditorWindows.state.outgoing===0&&NetworkToolkitFileEditor.listDocuments().length===0);
+  // The main window's editor is empty now and shows nothing of the document
+  // that left (owner report on v1.21.58: the status bar kept its line count
+  // and the language box its language, as if a document had lost its tab).
+  await main.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-message]').textContent==='Documents moved to another editor window.');
+  assert.deepEqual(await main.evaluate(()=>{const ed=document.querySelector('#networkToolkitFileEditor'),q=s=>ed.querySelector(s);return {tabs:ed.querySelectorAll('[data-ed-tabs] [data-ed-open]').length,text:q('[data-ed-text]').value,gutter:q('[data-ed-gutter-lines]').textContent,position:q('[data-ed-position]').textContent,size:q('[data-ed-size]').textContent,language:q('[data-ed-auto-language]').textContent};}),{tabs:0,text:'',gutter:'',position:'',size:'',language:'Auto'},'the emptied main editor keeps no status of the document that moved');
+  pass('Main window after Detach: no tab, no text and no line count or language of the document that moved');
   await child.locator(ED+' .nt-editor-toolbar').waitFor();await child.waitForFunction(()=>!!document.querySelector('[data-editor-window-toggle]')&&!document.querySelector('[data-editor-window-toggle]').hidden);await frames(child);
-  await assertRail(child,'editor window');
+  await assertRail(child,'editor window',['connections','files']);
+  pass('Detached window: Document list off in the main window arrived through the engine\'s move batch: its rail is Connect, Files and its box is unticked');
+  // Ticked again in the window: Docs returns first with its panel (it covers
+  // the text at 640 px; Escape closes it).
+  await tickPanel(child,'documents',true);
+  await child.waitForFunction(()=>!document.querySelector('#networkToolkitFileEditor [data-ed-files-sidebar]').hidden&&!document.querySelector('#networkToolkitFileEditor [data-editor-documents]').hidden);
+  await assertRail(child,'editor window, ticked again');
+  await child.locator(ED+' [data-ed-doc-uid]').first().click();
+  await child.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-files-sidebar]').hidden);
+  await tickPanel(main,'documents',true);await main.keyboard.press('Escape');await assertRail(main,'main with Docs again');
+  await waitSavedPanels(main,{documents:true,connections:true,files:true});
   const heights={};
   for(const mode of ['light','dark']){await theme(child,mode);await assertToolbar(child,'text','editor window 640x400 '+mode);heights.text=await textHeight(child);await shot(child,'window-640-text-'+mode);}
   pass('Detached window: the main window\'s Text choice arrived through the engine\'s move batch; 640 x 400 keeps every button inside the toolbar, light and dark');

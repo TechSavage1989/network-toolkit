@@ -1,3 +1,7 @@
+## 1.21.59 Beta 1 - Sidebar tabs, resizable Document Map
+
+- More → View → Document list, Connections and Files show or remove the editor sidebar's rail tabs (`editorPreferences.sidebarPanels`, shared, carried to detached windows; with all three off there is no sidebar; an explicit request for a hidden panel turns it back on). The Document Map is resizable (`editorPreferences.documentMapWidth`) and draws the document's text in its syntax colours once wide enough, bounded to the rows in view. An editor left with no document clears the last document's status, size and language (`showNoDocuments`).
+
 ## 1.21.58 Beta 1 - Icon toolbar in the Text Editor
 
 - The Text Editor toolbar shows icons by default, with More → View → Toolbar buttons (Icons / Text) to show words instead (`editorPreferences.toolbarLabels`, shared, carried to detached windows); Open file, Save, Save as and Move / merge become icon buttons; the toolbar's Files button is removed (the sidebar rail opens Docs, Connect and Files, now in that order, with command palette entries for the sidebar).

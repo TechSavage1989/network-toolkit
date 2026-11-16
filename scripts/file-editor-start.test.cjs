@@ -193,6 +193,24 @@ test('toolbar buttons are icons by default, switch to text, keep names and toolt
   h.api.setToolbarLabels('text');assert.equal(h.api.windowAdapter.checkpoint([]).preferences.toolbarLabels,'text','a new editor window gets the choice');
  }
 });
+// The Document Map's width (its separator, editor-document-map.js) is an
+// editor preference: saved, shared live and given to a new editor window;
+// absent, or anything but a whole 64..640 px, is the default width.
+test('the Document Map width is a saved, shared editor preference that a new editor window gets',async()=>{
+ for(const [saved,expected] of [[undefined,undefined],[300,300],[64,64],[640,640],[63,undefined],[641,undefined],[300.5,undefined],['300',undefined],[null,undefined]]){
+  const h=harness(saved===undefined?{}:{documentMapWidth:saved});await h.first();
+  assert.equal(h.api.windowAdapter.checkpoint([]).preferences.documentMapWidth,expected,'a saved '+saved+' gives '+expected);
+  h.api.setToolbarLabels('text');
+  assert.equal(h.c.state.editorPreferences.documentMapWidth,expected,'saving other preferences keeps the width ('+saved+')');
+ }
+ const h=harness({documentMapWidth:280});await h.first();
+ h.api.windowAdapter.applyPreferences({...h.c.state.editorPreferences,documentMapWidth:420});
+ assert.equal(h.api.windowAdapter.checkpoint([]).preferences.documentMapWidth,420,'a width from another app applies');
+ h.api.windowAdapter.applyPreferences({...h.c.state.editorPreferences,documentMapWidth:undefined});
+ assert.equal(h.api.windowAdapter.checkpoint([]).preferences.documentMapWidth,undefined,'a window without the setting has the default width');
+ h.api.setToolbarLabels('icons');
+ assert.equal(Object.hasOwn(JSON.parse(JSON.stringify(h.c.state.editorPreferences)),'documentMapWidth'),false,'the default width is not written');
+});
 test('compact Compare action retains its full accessible name and explanatory title',async()=>{
  const h=harness();await h.first();const button=h.document.querySelector('[data-ed="compare"]');assert.equal(button.getAttribute('aria-label'),'Compare documents');assert.equal(button.getAttribute('title'),'Compare documents');assert.match(button.className,/nt-editor-icon-button/);
 });

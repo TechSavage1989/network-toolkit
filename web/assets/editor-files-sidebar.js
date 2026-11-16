@@ -6,10 +6,27 @@ const detached=()=>typeof EDITOR_WINDOW!=='undefined'&&EDITOR_WINDOW;
 // The rail's panels, in rail order: the Document List first (owner request
 // after v1.21.57; like Notepad++'s Document List), then Connect and Files.
 // They share one sidebar: its width, side and open/closed setting. The rail is
-// the only way to open and close it: the toolbar has no Files button.
+// the only way to open and close it: the toolbar has no Files button. Each tab
+// can be turned off in More → View (see `enabled` below).
 const PANELS={documents:{label:'Docs',name:'Documents',icon:'documents',id:'ntEditorDocumentsTab'},connections:{label:'Connect',name:'Connections',icon:'connect',id:'ntEditorConnectionsTab'},files:{label:'Files',name:'Files',icon:'folder',id:'ntEditorFilesTab'}};
+const ORDER=Object.keys(PANELS);
 const panelName=value=>Object.hasOwn(PANELS,value)?value:'files';
-function readPreferences(){if(preferencesLoaded)return;preferencesLoaded=true;let v={};if(detached()){try{v=JSON.parse(root.sessionStorage?.getItem('ntk.editor.files')||'{}');}catch{}}else v=typeof state==='undefined'?{}:state.editorFilesPreferences||{};dock=v.dock==='right'?'right':'left';side=v.side==='remote'?'remote':'local';panel=panelName(v.panel);width=Number.isFinite(v.width)?Math.max(220,Math.min(600,v.width)):300;wideCollapsed=v.collapsed===true;return v;}
+// Which rail tabs show (owner request after v1.21.58: More → View → Document
+// list, Connections, Files). file-editor.js owns the setting
+// (editorPreferences.sidebarPanels, absent = shown) and passes it to
+// setPanels(). A tab turned off is removed with its panel; with all three off
+// there is no sidebar at all. An explicit request for a hidden panel (the
+// palette, Connection settings, Use, a saved connection) turns its tab back on
+// through enablePanel(); nothing automatic ever does.
+const enabled={documents:true,connections:true,files:true};
+const shown=name=>enabled[name]!==false;
+const anyShown=()=>ORDER.some(shown);
+// The panel that shows when the chosen one is turned off: the first remaining
+// one in rail order. Only in memory: the saved choice changes with the next
+// thing the user does in the sidebar, so a setting synced from another app
+// writes nothing.
+function fallback(){if(!shown(panel))panel=ORDER.find(shown)||panel;}
+function readPreferences(){if(preferencesLoaded)return;preferencesLoaded=true;let v={};if(detached()){try{v=JSON.parse(root.sessionStorage?.getItem('ntk.editor.files')||'{}');}catch{}}else v=typeof state==='undefined'?{}:state.editorFilesPreferences||{};dock=v.dock==='right'?'right':'left';side=v.side==='remote'?'remote':'local';panel=panelName(v.panel);fallback();width=Number.isFinite(v.width)?Math.max(220,Math.min(600,v.width)):300;wideCollapsed=v.collapsed===true;return v;}
 function remember(host){const value={side,panel,width,collapsed:wideCollapsed,dock};if(detached()){try{root.sessionStorage?.setItem('ntk.editor.files',JSON.stringify(value));}catch{}}else if(typeof state!=='undefined'){state.editorFilesPreferences=value;if(typeof saveState==='function')saveState();}}
 function setup(editor){
  const host=editor?.querySelector('[data-ed-files-sidebar]');if(!host)return null;
@@ -33,7 +50,7 @@ function setup(editor){
  documentList?.mount(host.querySelector('[data-editor-documents]'));
  const paths=sessions?.querySelector('.nt-editor-file-path-actions');if(paths)host.querySelector('[data-editor-file-paths]').append(paths);
  shell.addEventListener('click',event=>{if(event.target.closest('[data-editor-files-dock]')){setDock(editor,dock==='left'?'right':'left');return;}const primary=event.target.closest('[data-editor-files-panel]'),tab=event.target.closest('[data-editor-files-side]');if(primary){if(primary.dataset.editorFilesPanel===panel&&!host.hidden)toggle(editor);else selectPanel(primary.dataset.editorFilesPanel);return;}if(tab){navigationRevision++;side=tab.dataset.editorFilesSide;if(side==='local'&&protocol!=='ftp')protocol='ssh';mount(host);remember(host);}});
- shell.addEventListener('keydown',event=>{if(event.key==='Escape'&&isCompact()&&!host.hidden){event.preventDefault();event.stopPropagation();toggle(editor);return;}const tab=event.target.closest('[role="tab"]');if(!tab)return;const vertical=tab.parentElement.getAttribute('aria-orientation')==='vertical',back=vertical?'ArrowUp':'ArrowLeft',forward=vertical?'ArrowDown':'ArrowRight';if(![back,forward,'Home','End'].includes(event.key))return;const tabs=[...tab.parentElement.querySelectorAll('[role="tab"]')],at=tabs.indexOf(tab),next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(at+(event.key===back?-1:1)+tabs.length)%tabs.length;event.preventDefault();event.stopPropagation();if(vertical)selectPanel(tabs[next].dataset.editorFilesPanel);else tabs[next].click();tabs[next].focus();});
+ shell.addEventListener('keydown',event=>{if(event.key==='Escape'&&isCompact()&&!host.hidden){event.preventDefault();event.stopPropagation();toggle(editor);return;}const tab=event.target.closest('[role="tab"]');if(!tab)return;const vertical=tab.parentElement.getAttribute('aria-orientation')==='vertical',back=vertical?'ArrowUp':'ArrowLeft',forward=vertical?'ArrowDown':'ArrowRight';if(![back,forward,'Home','End'].includes(event.key))return;const tabs=[...tab.parentElement.querySelectorAll('[role="tab"]')].filter(item=>!item.hidden),at=tabs.indexOf(tab),next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(at+(event.key===back?-1:1)+tabs.length)%tabs.length;event.preventDefault();event.stopPropagation();if(vertical)selectPanel(tabs[next].dataset.editorFilesPanel);else tabs[next].click();tabs[next].focus();});
  const handle=shell.querySelector('.nt-editor-files-resize');let drag=null;
  const resize=value=>{width=Math.max(220,Math.min(600,value));shell.style.flexBasis=width+'px';shell.style.width=width+'px';handle.setAttribute('aria-valuenow',String(Math.round(width)));};
  handle.addEventListener('pointerdown',event=>{if(event.button!==0)return;event.preventDefault();const box=shell.getBoundingClientRect();drag={id:event.pointerId,left:box.left,right:box.right};handle.setPointerCapture(event.pointerId);});
@@ -51,18 +68,23 @@ function applyDock(editor){
 }
 function setDock(editor,next){dock=next==='right'?'right':'left';applyDock(editor);const host=editor?.querySelector('[data-ed-files-sidebar]');if(host)remember(host);editor?.querySelector('[data-editor-files-dock]')?.focus?.({preventScroll:true});}
 function syncRail(host){
- const shell=host.closest('.nt-editor-files-shell');shell.classList.toggle('is-collapsed',host.hidden);host.inert=host.hidden;host.setAttribute('aria-labelledby',PANELS[panel].id);
- for(const tab of shell.querySelectorAll('[data-editor-files-panel]')){const selected=tab.dataset.editorFilesPanel===panel;tab.setAttribute('aria-selected',String(selected));tab.setAttribute('aria-expanded',String(selected&&!host.hidden));tab.tabIndex=selected?0:-1;tab.title=(selected&&!host.hidden?'Close ':'Open ')+PANELS[panelName(tab.dataset.editorFilesPanel)].name;tab.removeAttribute('data-editor-files-close');tab.removeAttribute('data-editor-files-reopen');if(selected)tab.setAttribute(host.hidden?'data-editor-files-reopen':'data-editor-files-close','');}
- // The More menu's "Document list" box shows whether the list is open.
- const box=host.closest('#networkToolkitFileEditor')?.querySelector('[data-ed-document-list]');if(box)box.checked=panel==='documents'&&!host.hidden;
+ const shell=host.closest('.nt-editor-files-shell');shell.hidden=!anyShown();shell.classList.toggle('is-collapsed',host.hidden);host.inert=host.hidden;host.setAttribute('aria-labelledby',PANELS[panel].id);
+ for(const tab of shell.querySelectorAll('[data-editor-files-panel]')){const selected=tab.dataset.editorFilesPanel===panel;tab.hidden=!shown(tab.dataset.editorFilesPanel);tab.setAttribute('aria-selected',String(selected));tab.setAttribute('aria-expanded',String(selected&&!host.hidden));tab.tabIndex=selected?0:-1;tab.title=(selected&&!host.hidden?'Close ':'Open ')+PANELS[panelName(tab.dataset.editorFilesPanel)].name;tab.removeAttribute('data-editor-files-close');tab.removeAttribute('data-editor-files-reopen');if(selected)tab.setAttribute(host.hidden?'data-editor-files-reopen':'data-editor-files-close','');}
 }
 function visibility(editor,host,show){host.hidden=!show;syncRail(host);if(!show)clearTimeout(accessTimer);else mount(host);}
 function isCompact(){return (root.innerWidth||900)<=680;}
 function expandedIntent(show){compactLayout=isCompact();if(compactLayout)compactOpen=show;else wideCollapsed=!show;}
-function responsive(editor,host){const compact=isCompact();if(compactLayout!==compact){compactOpen=false;compactLayout=compact;}const show=compact?compactOpen:!wideCollapsed,focused=!show&&host.contains(document.activeElement);if(host.hidden===show)navigationRevision++;visibility(editor,host,show);if(focused)editor.querySelector('[data-editor-files-reopen]')?.focus?.({preventScroll:true});}
+function responsive(editor,host){const compact=isCompact();if(compactLayout!==compact){compactOpen=false;compactLayout=compact;}const show=anyShown()&&(compact?compactOpen:!wideCollapsed),focused=!show&&host.closest('.nt-editor-files-shell')?.contains(document.activeElement);if(host.hidden===show)navigationRevision++;visibility(editor,host,show);if(focused){const reopen=anyShown()&&editor.querySelector('[data-editor-files-reopen]');if(reopen)reopen.focus({preventScroll:true});else root.NetworkToolkitFileEditor?.focusText?.();}}
 function initialize(editor){readPreferences();const host=setup(editor);if(host)responsive(editor,host);}
-function toggle(editor){readPreferences();const host=setup(editor);if(!host)return;navigationRevision++;expandedIntent(host.hidden);visibility(editor,host,host.hidden);remember(host);(host.hidden?editor.querySelector('[data-editor-files-reopen]'):editor.querySelector('[data-editor-files-panel][aria-selected="true"]'))?.focus?.({preventScroll:true});}
-function selectPanel(value){const host=document.querySelector('[data-ed-files-sidebar]');if(!host)return;const next=['connections','documents'].includes(value)?value:'files';
+function toggle(editor){readPreferences();const host=setup(editor);if(!host)return;
+ // With every tab turned off there is no sidebar: asking for it (the palette)
+ // turns the last chosen panel back on.
+ if(!anyShown()){selectPanel(panel);return;}
+ navigationRevision++;expandedIntent(host.hidden);visibility(editor,host,host.hidden);remember(host);(host.hidden?editor.querySelector('[data-editor-files-reopen]'):editor.querySelector('[data-editor-files-panel][aria-selected="true"]'))?.focus?.({preventScroll:true});}
+function selectPanel(value){const host=document.querySelector('[data-ed-files-sidebar]');if(!host)return;const next=panelName(value);
+ // Every caller is an explicit request for that panel: one turned off in
+ // More → View is turned back on (its box is ticked again).
+ if(!shown(next))enablePanel(next);
  // Preserve the active connection toolbar and keyboard focus when already open.
  navigationRevision++;
  if(panel===next&&!host.hidden){if(detached())mount(host);return;}
@@ -105,7 +127,7 @@ function manageAccess(){
  openModal('Editor SFTP explorer access','<p>Allow a separate editor window to use the SFTP connections currently open in the main window. Local Windows files are available independently. This does not share saved passwords or terminal control. Open editor files remain protected from explorer changes.</p>'+requests.map(row=>'<div class="setting-row"><span>'+esc(row.name||'Editor window')+'</span><div class="row gap6">'+(row.pending?'<button type="button" class="btn small primary" data-editor-files-allow="'+esc(row.viewId)+'">Allow</button>':'')+'<button type="button" class="btn small ghost" data-editor-files-deny="'+esc(row.viewId)+'">'+(row.pending?'Decline':'Revoke')+'</button></div></div>').join(''),'<button type="button" class="btn ghost" data-action="close-modal">Close</button>');
  const modal=document.querySelector('#modalRoot');modal.onclick=async function answer(event){const button=event.target.closest('[data-editor-files-allow],[data-editor-files-deny]');if(!button)return;const id=button.dataset.editorFilesAllow||button.dataset.editorFilesDeny,row=requests.find(row=>row.viewId===id);if(!row)return;button.disabled=true;try{await api('/editor-views/explorer/'+id,'POST',{requestId:row.requestId,allow:!!button.dataset.editorFilesAllow});modal.onclick=null;closeModal();syncRequests(requests.filter(item=>item!==row));}catch(error){button.disabled=false;toast(error.message,'error');}};
 }
-function showConnection(kind){if(detached()||!['ssh','ftp'].includes(kind))throw Error('Open saved connections in the main window.');const editor=document.querySelector('#networkToolkitFileEditor'),host=editor?.querySelector('[data-ed-files-sidebar]');if(!editor||editor.hidden||!host)throw Error('Open the editor before connecting a saved profile.');navigationRevision++;protocol=kind;side='remote';panel='connections';if(host.hidden)toggle(editor);else mount(host);remember(host);}
+function showConnection(kind){if(detached()||!['ssh','ftp'].includes(kind))throw Error('Open saved connections in the main window.');const editor=document.querySelector('#networkToolkitFileEditor'),host=editor?.querySelector('[data-ed-files-sidebar]');if(!editor||editor.hidden||!host)throw Error('Open the editor before connecting a saved profile.');if(!shown('connections'))enablePanel('connections');navigationRevision++;protocol=kind;side='remote';panel='connections';if(host.hidden)toggle(editor);else mount(host);remember(host);}
 async function useSource(source){
  if(sourceBusy)throw Error('Finish the current file connection action first.');
  const browser=root.NetworkToolkitRemoteBrowser;if(!browser)throw Error('The file browser is unavailable.');
@@ -117,15 +139,36 @@ async function useSource(source){
  else{const id=source.slice(9);if(model.connecting||model.busy||model.pendingClose)throw Error('Finish the current file operation first.');if(model.connected&&model.sessionId!==id)throw Error('Disconnect the current file browser before choosing another connection. Open documents remain unchanged.');if(!model.connected)await browser.connectTerminal(kind,id);if(!model.connected||model.sessionId!==id)throw Error('The SSH connection is no longer available. Refresh the list.');}
  if(revision!==navigationRevision||host.hidden||editor.hidden||!host.isConnected)return;
  const selected=document.querySelector('#ntEditorRemoteSource');if(selected&&selected.value!==source)return;
+ if(!shown('files'))enablePanel('files');
  protocol=kind;side='remote';panel='files';mount(host);remember(host);
  }finally{sourceBusy=false;}
 }
 root.addEventListener?.('resize',()=>{if(!preferencesLoaded)return;const editor=document.querySelector('#networkToolkitFileEditor'),host=editor?.querySelector('[data-ed-files-sidebar]');if(editor&&!editor.hidden&&host&&isCompact()!==compactLayout)responsive(editor,host);});
 // Show (or hide) the Document List; with focus, put the keyboard on its rows.
+// Showing it turns Docs back on if it was off (selectPanel).
 function showDocuments(show=true,{focus=false}={}){
  const editor=document.querySelector('#networkToolkitFileEditor');readPreferences();const host=setup(editor);if(!host)return false;
  if(!show){if(panel==='documents'&&!host.hidden)toggle(editor);return true;}
  selectPanel('documents');if(focus)documentList?.focus();return true;
 }
-root.NetworkToolkitEditorFiles=Object.freeze({initialize,selectPanel,useSource,showConnection,toggle,syncRequests,manageAccess,detached,showDocuments,refreshDocuments(){documentList?.render();},get documentList(){return documentList;},get panel(){return panel;},setDock(value){setDock(document.querySelector('#networkToolkitFileEditor'),value);},get dock(){return dock;}});
+// Turns a hidden tab back on for an explicit request: through the editor's
+// setting (the box in More → View is ticked and the choice saved), and here
+// too in case the editor is not loaded.
+function enablePanel(name){root.NetworkToolkitFileEditor?.setSidebarPanel?.(name,true,{open:false});if(!shown(name))setPanels({...enabled,[name]:true});}
+// The setting changed (the More menu, a new editor window's batch, or another
+// app of the data folder): show or remove rail tabs. The open or closed state,
+// the side and the width stay; a removed panel that was showing gives way to
+// the first remaining one, and with none left the sidebar is gone.
+function setPanels(next){
+ const before=panel;
+ for(const name of ORDER)enabled[name]=!(next&&typeof next==='object')||next[name]!==false;
+ fallback();
+ const editor=document.querySelector('#networkToolkitFileEditor'),host=editor?.querySelector('[data-ed-files-sidebar]');
+ if(!preferencesLoaded||!host?.closest('.nt-editor-files-shell'))return;
+ const show=anyShown()&&(isCompact()?compactOpen&&compactLayout===true:!wideCollapsed);
+ if(show===host.hidden)responsive(editor,host);
+ else if(show&&before!==panel){navigationRevision++;mount(host);}
+ else syncRail(host);
+}
+root.NetworkToolkitEditorFiles=Object.freeze({initialize,selectPanel,useSource,showConnection,toggle,syncRequests,manageAccess,detached,showDocuments,setPanels,refreshDocuments(){documentList?.render();},get documentList(){return documentList;},get panel(){return panel;},get panels(){return {...enabled};},setDock(value){setDock(document.querySelector('#networkToolkitFileEditor'),value);},get dock(){return dock;}});
 })(globalThis);
