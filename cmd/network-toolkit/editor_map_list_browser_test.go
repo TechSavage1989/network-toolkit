@@ -22,8 +22,9 @@ import (
 // the shipped page, and then in the standalone Text Editor against its
 // production engine: a 16 MB disk-backed file is mapped by line and scrolled
 // through the map with no long task over 50 ms, a 1.7 MB single-line Base64
-// export with Wrap on is mapped by character offset, and after a reload the
-// engine has kept both settings in the data folder's shared settings.
+// export with Wrap on is mapped by character offset, both again with the map
+// wide enough to show their text, and after a reload the engine has kept the
+// map, its width and the list in the data folder's shared settings.
 func TestEditorSessionBrowserMapList(t *testing.T) {
 	if os.Getenv("NTK_EDITOR_SESSION_BROWSER") != "1" {
 		t.Skip("requires the isolated Playwright browser")
@@ -122,6 +123,11 @@ func TestEditorSessionBrowserMapList(t *testing.T) {
 	sidebar, _ := disk["editorFilesPreferences"].(map[string]any)
 	if prefs["documentMap"] != true || sidebar["panel"] != "documents" {
 		t.Fatalf("the shared settings do not keep the map and the list: editorPreferences=%v editorFilesPreferences=%v", prefs, sidebar)
+	}
+	// The script leaves the map at its largest width (text mode), a whole
+	// number of CSS pixels between the default and the cap.
+	if width, ok := prefs["documentMapWidth"].(float64); !ok || width != float64(int(width)) || width <= editorMapWidthMin || width > editorMapWidthMax {
+		t.Fatalf("the shared settings do not keep the Document Map width: %v", prefs["documentMapWidth"])
 	}
 	for name, text := range contents {
 		if got, err := os.ReadFile(filepath.Join(files, name)); err != nil || string(got) != text {

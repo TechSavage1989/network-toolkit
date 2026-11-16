@@ -1,7 +1,9 @@
 /* Bounded, local worker requests. Separate workers keep formatting independent
- * of live syntax painting. Timeout termination also bounds pathological regexes. */
+ * of live syntax painting. Timeout termination also bounds pathological regexes.
+ * The Document Map colours a disk-backed page on its own channel ('map'), so
+ * its request never cancels the editor's own. */
 (function(root){'use strict';
-const slots=new Map(),channels=new Set(['default','compare-left','compare-right']);let sequence=0;
+const slots=new Map(),channels=new Set(['default','compare-left','compare-right','map']);let sequence=0;
 const channelOf=options=>channels.has(options?.channel)?options.channel:'default';
 const slotKey=(action,options)=>action==='highlight'?'highlight:'+channelOf(options):action;
 function terminate(key,error){const slot=slots.get(key);if(!slot)return;slots.delete(key);slot.worker.terminate();for(const pending of slot.pending.values()){root.clearTimeout(pending.timer);pending.reject(error);}slot.pending.clear();}

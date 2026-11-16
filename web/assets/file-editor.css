@@ -512,9 +512,20 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 /* Document Map (editor-document-map.js): a miniature of the whole document at
    the right edge of the document area, between the text and a sidebar docked
    on the right. The comparison view has its own map, so this one is hidden
-   there; the bottom of the editor stays free for docked panels. */
-.nt-editor-map{position:relative;order:1;flex:0 0 96px;width:96px;min-width:0;min-height:0;overflow:hidden;border-left:1px solid var(--line);background:var(--nt-code-bg,var(--input));cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+   there; the bottom of the editor stays free for docked panels. Its separator
+   (the editor's pane divider, editor-splitters.css) sits on its inner edge;
+   a width chosen there is set inline and overrides the default below. */
+.nt-editor-map{position:relative;order:1;flex:0 0 96px;width:96px;min-width:0;min-height:0;overflow:hidden;background:var(--nt-code-bg,var(--input));cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
 .nt-editor-map[hidden]{display:none}
+.nt-editor-map-resize{order:1;flex:0 0 5px;width:5px}
+.nt-editor-map-inner{position:absolute;top:0;right:0;bottom:0;width:100%;background:var(--nt-code-bg,var(--input))}
+/* While dragging, the drawing and the separator are their own compositing
+   layers, so the text under them is never painted again (a 16 MB text area is
+   slow to paint). */
+.nt-editor-map.is-resizing{z-index:1;overflow:visible}
+.nt-editor-map.is-resizing>.nt-editor-map-inner{will-change:transform}
+.nt-editor-map-resize.is-resizing{position:relative;z-index:2;will-change:transform}
+.nt-editor-map-resize[hidden]{display:none}
 .nt-editor-map-canvas{position:absolute;top:0;left:0;display:block;pointer-events:none}
 .nt-editor-map-view{position:absolute;left:0;right:0;top:0;height:10px;box-sizing:border-box;background:color-mix(in srgb,var(--accent) 15%,transparent);border-block:1px solid color-mix(in srgb,var(--accent) 60%,transparent);cursor:grab}
 .nt-editor-map-view[hidden]{display:none}
