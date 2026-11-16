@@ -69,6 +69,12 @@ const TEXT_FONT=6,TEXT_FONT_MAX=9,TEXT_SHARE=0.6,TEXT_REFERENCE=120,TEXT_COLUMNS
 // are drawn as the document's own characters, as small as SAMPLE_FONT of the
 // row (owner request after v1.21.63: real text, like Notepad++'s map), and a
 // row longer than the map is squeezed by at most SAMPLE_SQUEEZE, then cut.
+// Dragging the box into the top or bottom AUTO_EDGE px of a map that scrolls
+// scrolls the map: AUTO_SPEED px a second times depth + depth squared, depth
+// being how far into the edge the pointer is (1 at the map's end, at most
+// AUTO_REACH past it).
+const AUTO_EDGE=48,AUTO_SPEED=300,AUTO_REACH=4;
+const autoSpeed=depth=>AUTO_SPEED*(depth+depth*depth);
 const SAMPLE_PITCH=2.5,SAMPLE_FONT=1.35,SAMPLE_SQUEEZE=0.5;
 const TEXT_FIT=4,CHUNK=1024,CHUNKS=64,COLOUR_COLUMNS=190,SAMPLE_COLUMNS=512,SAMPLE_DELAY=250;
 const SYNTAX_LIMIT=200000; // a disk page coloured for the map at most
@@ -289,7 +295,7 @@ function rowCells(text,begin,end,{tab=4,columns=TEXT_COLUMNS,kindAt=null}={}){
 // ---- The panel ----
 function create(adapter){
  let host=null,handle=null,canvas=null,view=null,frame=0,timer=0,drawn='',drawnContent='',drawnDoc='',colors=null,colorKey='',drag=null,seen=null,widths=new Map(),pageCache=null,wrapCache=null,shown=null,lastLayout=null,pending=null,seekFrame=0;
- let inner=null,resize=null,dragWidth=null,range=null,textRows=[],stamps=0,parsing=null,diskSyntaxState=null,diskTimer=0,samples=null,sampleBusy=false,colourBusy=false,sampleTimer=0,bar=null,thumb=null,own=null,barDrag=null;
+ let inner=null,resize=null,dragWidth=null,range=null,textRows=[],stamps=0,parsing=null,diskSyntaxState=null,diskTimer=0,samples=null,sampleBusy=false,colourBusy=false,sampleTimer=0,bar=null,thumb=null,own=null,barDrag=null,autoFrame=0,autoTime=0;
  const parsed=new WeakMap();
  const document=root.document;
 
@@ -918,7 +924,7 @@ function create(adapter){
  // ---- Pointer, wheel and keys ----
  function pointY(event){return event.clientY-host.getBoundingClientRect().top;}
  function seekTo(layout,value){
-  if(own&&own.doc===layout.doc)own.hold=now()+1500;
+  if(own&&own.doc===layout.doc)own.hold=drag?Infinity:now()+1500;
   pending={layout,value};
   if(layout.kind==='text'){flush();return;}
   if(!seekFrame)seekFrame=root.requestAnimationFrame(flush);
@@ -932,16 +938,64 @@ function create(adapter){
   // text there and then drags from there. Focus stays in the text.
   const y=pointY(event),{box}=layout.g,inside=y>=box.top&&y<=box.top+box.height;
   const from=inside?clamp(layout.start,0,Math.max(0,layout.g.total-layout.g.span)):targetAt(layout.g,y,box.height/2);
-  drag={id:event.pointerId,y,from};host.classList.add('is-dragging');
+  drag={id:event.pointerId,y,from,grab:inside?y-box.top:box.height/2,last:y};host.classList.add('is-dragging');
   try{host.setPointerCapture(event.pointerId);}catch{}
   if(!inside)seekTo(layout,from);
  }
  function pointerMove(event){
   if(drag?.id!==event.pointerId)return;
   const layout=measure();if(!layout)return;
-  seekTo(layout,dragTarget(layout.g,drag.from,pointY(event)-drag.y));
+  drag.last=pointY(event);
+  if(layout.g.max>0){dragHeld(layout);return;}
+  seekTo(layout,dragTarget(layout.g,drag.from,drag.last-drag.y));
  }
- function pointerUp(event){if(drag?.id!==event.pointerId)return;drag=null;host.classList.remove('is-dragging');try{host.releasePointerCapture(event.pointerId);}catch{}}
+ // Dragging the box in a map that scrolls (owner request after v1.21.65):
+ // the map stays where it is, so the box follows the pointer row for row,
+ // and with the pointer in the top or bottom AUTO_EDGE px of the map (or
+ // past it) the map scrolls by itself, faster the further in the pointer
+ // is, the box staying under the pointer.
+ function dragHeld(layout){
+  if(!layout.g.own)own={doc:layout.doc,offset:layout.g.offset,start:layout.start,hold:Infinity};
+  else own.hold=Infinity;
+  const held=measure();if(!held)return;
+  holdAt(held);
+  if(!autoFrame&&autoDepth(held.g)){autoTime=0;autoFrame=root.requestAnimationFrame(autoStep);}
+ }
+ // The text goes to the row under the dragged box, and the map never leaves
+ // the box outside itself (at the document's start and end the pointer can
+ // be past the box).
+ function holdAt(layout){
+  const g=layout.g,target=targetAt(g,drag.last,drag.grab),top=target*g.scale;
+  // (Only there: elsewhere the box may reach past the map's edge with the pointer.)
+  if(target<=0)own.offset=0;
+  else if(target>=g.total-g.span)own.offset=clamp(Math.max(own.offset,top+g.box.height-g.used),0,g.max);
+  seekTo(layout,target);
+ }
+ // How far into an edge the pointer is, as a share of the edge (negative at
+ // the top; past the map's end it keeps growing, up to AUTO_REACH).
+ function autoDepth(g){
+  const edge=Math.min(AUTO_EDGE,g.used/4),y=drag.last;
+  return clamp(y<edge?(y-edge)/edge:y>g.used-edge?(y-(g.used-edge))/edge:0,-AUTO_REACH,AUTO_REACH);
+ }
+ function autoStep(time){
+  autoFrame=0;
+  if(!drag||!own)return;
+  const layout=measure();if(!layout||!layout.g.own)return;
+  const depth=autoDepth(layout.g);if(!depth)return;
+  const passed=autoTime?Math.min(50,time-autoTime):16;autoTime=time;
+  const next=clamp(own.offset+Math.sign(depth)*autoSpeed(Math.abs(depth))*passed/1000,0,layout.g.max);
+  if(next===own.offset)return;
+  own.offset=next;
+  const moved=measure();if(moved)holdAt(moved);
+  schedule();
+  autoFrame=root.requestAnimationFrame(autoStep);
+ }
+ function pointerUp(event){
+  if(drag?.id!==event.pointerId)return;
+  drag=null;host.classList.remove('is-dragging');try{host.releasePointerCapture(event.pointerId);}catch{}
+  if(autoFrame){root.cancelAnimationFrame(autoFrame);autoFrame=0;}
+  if(own)own.hold=now()+1500;
+ }
  function wheel(event){
   if(event.ctrlKey||!event.deltaY||!visible())return;
   const layout=measure();if(!layout)return;

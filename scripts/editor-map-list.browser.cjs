@@ -158,6 +158,8 @@ async function assertBoxMatches(page,label){
  assert.equal(want.scrolls,rows>info.height+0.5,label+': the map scrolls only when the rows do not fit at 1 px');
  assert(Math.abs(g.used-Math.min(info.height,rows*pitch))<=1,label+': the map is as tall as its rows, at most its own height');
  if(!want.scrolls)assert.equal(g.offset,0,label);
+ // A map held by a drag, its wheel or its bar: the box is on the text's real place.
+ if(g.own)want.top=ta.scrollTop*g.scale-g.offset;
  assert(Math.abs(info.box.top-want.top)<=1,label+': box top '+info.box.top+' should be '+want.top);
  assert(Math.abs(info.box.height-want.height)<=1,label+': box height '+info.box.height+' should be '+want.height);
  return {info,ta};
@@ -324,8 +326,8 @@ async function mainWindow(browser){
   const before=await activeArea(page),{box,layout}=await mapInfo(page),x=info.left+info.width/2,y=info.top+box.top+box.height/2;
   await page.mouse.move(x,y);await page.mouse.down();for(let step=1;step<=6;step++)await page.mouse.move(x,y+step*10);await page.mouse.up();await frames(page);
   const after=await activeArea(page);
-  // The box follows the pointer: `drag` is its map pixels per text-area pixel (the scale, or a scroll bar thumb's when the map scrolls).
-  assert(Math.abs(after.scrollTop-before.scrollTop-60/layout.g.drag)<=2/layout.g.drag,'dragging the box 60 px moves the box 60 px ('+(after.scrollTop-before.scrollTop)+')');
+  // The box follows the pointer row for row: a map that scrolls stays where it is while its box is dragged.
+  assert(Math.abs(after.scrollTop-before.scrollTop-60/layout.g.scale)<=2/layout.g.scale,'dragging the box 60 px moves the box 60 px ('+(after.scrollTop-before.scrollTop)+')');
   assert(Math.abs((await mapInfo(page)).box.top-box.top-60)<=1.5,'and the box moved with the pointer');
   assert.equal(await text.evaluate(el=>el===document.activeElement||!document.activeElement.closest('[data-ed-map]')),true,'the map takes no focus from the text');
   await assertBoxMatches(page,'after a drag');
@@ -334,7 +336,9 @@ async function mainWindow(browser){
  // it and its own scroll bar move the map and leave the text where it is.
  {
   const bar=()=>page.evaluate(()=>{const host=document.querySelector('#networkToolkitFileEditor [data-ed-map]'),bar=host.querySelector('[data-ed-map-bar]'),thumb=bar.querySelector('[data-ed-map-thumb]').getBoundingClientRect(),box=host.getBoundingClientRect(),g=NetworkToolkitFileEditor.documentMap.layout.g;return {hidden:bar.hidden,role:bar.getAttribute('role'),label:bar.getAttribute('aria-label'),now:Number(bar.getAttribute('aria-valuenow')),thumbTop:thumb.top-box.top,thumbHeight:thumb.height,x:thumb.left+thumb.width/2,top:box.top,offset:g.offset,max:g.max,own:!!g.own,used:g.used,scale:g.scale,boxTop:g.box.top};});
-  await setActiveScroll(page,0.2);const before=await activeArea(page);
+  // The drag above held the map; scrolling the text a moment later lets it follow again.
+  await page.waitForTimeout(1600);
+  await setActiveScroll(page,0.2);await page.waitForFunction(()=>!NetworkToolkitFileEditor.documentMap.layout.g.own);const before=await activeArea(page);
   let b=await bar();
   assert.deepEqual([b.hidden,b.role,b.label,b.own],[false,'scrollbar','Scroll the document map',false],'a map that scrolls has its own scroll bar');
   assert(b.max>50&&Math.abs(b.thumbTop-b.offset/b.max*(b.used-b.thumbHeight))<=1,'its thumb is where the map is: '+JSON.stringify(b));
@@ -1095,25 +1099,47 @@ async function engine(browser){
  info=await mapInfo(page);
  assert.equal(info.layout.g.total,d.units,'the map covers every character of the line');
  assert(info.layout.g.used>info.height*0.9,'a 1.7 MB line fills the map');
- // Drag the box to the middle of the map: the middle of the line.
+ // Drag the box to the middle of the map: the map stays where it is, the box
+ // follows the pointer, and the text shown is the text under the box.
  await page.mouse.move(x,info.top+info.box.top+info.box.height/2);await page.mouse.down();await page.mouse.move(x,info.top+info.layout.g.used*0.5,{steps:12});await page.mouse.up();
- await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&Math.abs((l.g.box.top+l.g.box.height/2)/l.g.used-0.5)<0.03;},null,{timeout:15000}).catch(async error=>{console.log('DIAG',JSON.stringify(await page.evaluate(()=>{const m=NetworkToolkitFileEditor.documentMap,l=m.layout,s=NetworkToolkitFileEditor.active.diskSession.state();return {g:l.g,start:l.start,fresh:l.fresh,state:m.sampleState,page:{start:s.page.start,len:s.page.text.length},units:s.metadata.units};})));throw error;});
- const middle=await page.evaluate(()=>{const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]'),view=NetworkToolkitFileEditor.active.diskSession.state().page;return {start:view.start,end:view.start+view.text.length,shown:ta.value.slice(0,16)};});
- assert(middle.start>d.units*0.4&&middle.end<d.units*0.65,'the box in the middle shows the middle of the line: '+JSON.stringify(middle));
- // Drag the box to the very end: the last characters are shown.
+ await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&l.g.own&&Math.abs((l.g.box.top+l.g.box.height/2)/l.g.used-0.5)<0.03;},null,{timeout:15000}).catch(async error=>{console.log('DIAG',JSON.stringify(await page.evaluate(()=>{const m=NetworkToolkitFileEditor.documentMap,l=m.layout,s=NetworkToolkitFileEditor.active.diskSession.state();return {g:l.g,start:l.start,fresh:l.fresh,state:m.sampleState,page:{start:s.page.start,len:s.page.text.length},units:s.metadata.units};})));throw error;});
+ {
+  const held=await page.evaluate(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return {offset:l.g.offset,under:(l.g.box.top+l.g.offset)/l.g.scale,start:l.start};});
+  assert.equal(held.offset,info.layout.g.offset,'the map did not move while its box was dragged inside it');
+  assert(Math.abs(held.start-held.under)<=1,'the text shown is the text under the box: '+JSON.stringify(held));
+ }
+ // Held near the map's bottom edge the map scrolls by itself, faster the
+ // further into the edge the pointer is (owner request after v1.21.65), and
+ // it stops when the button is released.
+ const mapOffset=()=>page.evaluate(()=>NetworkToolkitFileEditor.documentMap.layout.g.offset);
  info=await mapInfo(page);
- await page.mouse.move(x,info.top+info.box.top+info.box.height/2);await page.mouse.down();await page.mouse.move(x,info.top+info.height+40,{steps:12});await page.mouse.up();
- await page.waitForFunction(units=>{const s=NetworkToolkitFileEditor.active.diskSession.state().page;const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]');return s.start+s.text.length>=units&&ta.scrollTop+ta.clientHeight>=ta.scrollHeight-2;},d.units,{timeout:15000});
+ await page.mouse.move(x,info.top+info.box.top+info.box.height/2);await page.mouse.down();
+ await page.mouse.move(x,info.top+info.height-12,{steps:6});
+ let from=await mapOffset();await page.waitForTimeout(600);const slow=await mapOffset()-from;
+ await page.mouse.move(x,info.top+info.height+60,{steps:4});
+ from=await mapOffset();await page.waitForTimeout(600);const fast=await mapOffset()-from;
+ assert(slow>60&&slow<600,'near the edge the map scrolls slowly ('+slow+' px in 0.6 s)');
+ assert(fast>slow*2.5,'further into the edge it scrolls faster ('+fast+' against '+slow+' px in 0.6 s)');
+ {
+  const l=await page.evaluate(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return {under:(l.g.box.top+l.g.offset)/l.g.scale,start:l.start,span:l.g.span};});
+  assert(Math.abs(l.start-l.under)<=l.span,'the text follows the box while the map scrolls: '+JSON.stringify(l));
+ }
+ // Kept there, it reaches the very end: the last characters are shown.
+ await page.waitForFunction(units=>{const s=NetworkToolkitFileEditor.active.diskSession.state().page;const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]');return s.start+s.text.length>=units&&ta.scrollTop+ta.clientHeight>=ta.scrollHeight-2;},d.units,{timeout:60000});
+ await page.mouse.up();
  const tail=await page.evaluate(()=>document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]').value.slice(-32));
  const expectedTail=fs.readFileSync(path.join(engineFiles,'export.b64'),'utf8').slice(-32);
  assert.equal(tail,expectedTail,'dragging the box to the end shows the last characters');
  await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&Math.abs(l.g.box.top+l.g.box.height-l.g.used)<=1;});
- // And back to the start.
+ from=await mapOffset();await page.waitForTimeout(300);assert.equal(await mapOffset(),from,'the map stops when the button is released');
+ // And back to the start, held past the top edge.
  info=await mapInfo(page);
- await page.mouse.move(x,info.top+info.box.top+info.box.height/2);await page.mouse.down();await page.mouse.move(x,info.top-40,{steps:12});await page.mouse.up();
- await page.waitForFunction(()=>{const s=NetworkToolkitFileEditor.active.diskSession.state().page;const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]');return s.start===0&&ta.scrollTop<2;},null,{timeout:15000});
+ await page.mouse.move(x,info.top+info.box.top+info.box.height/2);await page.mouse.down();await page.mouse.move(x,info.top-60,{steps:12});
+ await page.waitForFunction(()=>{const s=NetworkToolkitFileEditor.active.diskSession.state().page;const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]');return s.start===0&&ta.scrollTop<2;},null,{timeout:60000});
+ await page.mouse.up();
+ assert.equal(await mapOffset(),0,'held past the top edge the map scrolls back to its start');
  await shot(page,'editor-map-list-base64-wrap-dark');
- pass('1.7 MB single-line Base64 with Wrap on: mapped by character offset; the map reaches the middle, the end and the start');
+ pass('1.7 MB single-line Base64 with Wrap on: mapped by character offset; the box follows the pointer, and held at an edge the map scrolls by itself, faster further in, to the end and back to the start');
 
  // The whole line in the map from the engine's samples, at the widest map too.
  for(const key of ['Home','End']){

@@ -1,3 +1,7 @@
+## 1.21.66 Beta 1 - Document Map: the dragged box follows the pointer; the map scrolls at its edges
+
+- Dragging the box of a map that scrolls holds the map (`own`, `dragHeld`, `holdAt`): the box moves row for row with the pointer instead of as a scroll bar thumb. With the pointer in the top or bottom `AUTO_EDGE` (48) px or past it, the map scrolls by itself at `AUTO_SPEED` (300) px a second times depth + depth squared (`autoDepth`, `autoSpeed`, `autoStep`), the text following the box; at the document's ends the box stays inside the map.
+
 ## 1.21.65 Beta 1 - Document Map: one row per line with Wrap on
 
 - A disk-backed document whose average line is no longer than the wrap width is mapped by line with Wrap on too (`flowLines`, `lineOffset`, `lineLayout(..., flow)`); by offset, evenly spaced samples drew a long line twice and skipped short ones. A click or drag seeks to the line's character offset, taken from the held samples.
