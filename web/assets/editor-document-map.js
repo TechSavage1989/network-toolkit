@@ -284,7 +284,7 @@ function rowCells(text,begin,end,{tab=4,columns=TEXT_COLUMNS,kindAt=null}={}){
 // ---- The panel ----
 function create(adapter){
  let host=null,handle=null,canvas=null,view=null,frame=0,timer=0,drawn='',drawnContent='',drawnDoc='',colors=null,colorKey='',drag=null,seen=null,widths=new Map(),pageCache=null,wrapCache=null,shown=null,lastLayout=null,pending=null,seekFrame=0;
- let inner=null,resize=null,dragWidth=null,range=null,textRows=[],stamps=0,parsing=null,diskSyntaxState=null,diskTimer=0,samples=null,sampleBusy=false,sampleFailed='',sampleTimer=0;
+ let inner=null,resize=null,dragWidth=null,range=null,textRows=[],stamps=0,parsing=null,diskSyntaxState=null,diskTimer=0,samples=null,sampleBusy=false,sampleFailed='',sampleTimer=0,bar=null,thumb=null,own=null,barDrag=null;
  const parsed=new WeakMap();
  const document=root.document;
 
@@ -292,8 +292,10 @@ function create(adapter){
   if(!element||host===element)return;
   host=element;
   if(!host.id)host.id='ntEditorDocumentMap';
-  host.innerHTML='<div class="nt-editor-map-inner"><canvas class="nt-editor-map-canvas" aria-hidden="true"></canvas><div class="nt-editor-map-view" data-ed-map-view tabindex="0" role="scrollbar" aria-orientation="vertical" aria-label="Visible part of the document" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>';
-  inner=host.firstElementChild;canvas=host.querySelector('canvas');view=host.querySelector('[data-ed-map-view]');
+  host.innerHTML='<div class="nt-editor-map-inner"><canvas class="nt-editor-map-canvas" aria-hidden="true"></canvas><div class="nt-editor-map-view" data-ed-map-view tabindex="0" role="scrollbar" aria-orientation="vertical" aria-label="Visible part of the document" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div><div class="nt-editor-map-bar" data-ed-map-bar hidden role="scrollbar" aria-orientation="vertical" aria-label="Scroll the document map" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" title="Scroll the map without moving the text"><div class="nt-editor-map-thumb" data-ed-map-thumb></div></div></div>';
+  inner=host.firstElementChild;canvas=host.querySelector('canvas');view=host.querySelector('[data-ed-map-view]');bar=host.querySelector('[data-ed-map-bar]');thumb=host.querySelector('[data-ed-map-thumb]');
+  bar.addEventListener('pointerdown',barDown);bar.addEventListener('pointermove',barMove);
+  for(const name of ['pointerup','pointercancel','lostpointercapture'])bar.addEventListener(name,()=>{barDrag=null;});
   // The separator on the map's inner edge, as the editor's other dividers.
   handle=document.createElement('div');
   handle.className='nt-editor-pane-resize nt-editor-map-resize';handle.hidden=host.hidden;
@@ -410,6 +412,53 @@ function create(adapter){
 
  function markersFor(d){const language=adapter.language(d)||'text';return {language,markers:commentMarkers(adapter.commentStyle?.(language),language),keywords:language!=='text'&&!!adapter.syntax()};}
 
+ // ---- The map's own scrolling (owner request after v1.21.62) ----
+ // A map that scrolls (more rows than pixels) normally follows the text, its
+ // box a scroll bar thumb. The wheel over the map and the map's own bar scroll
+ // the map alone, so the whole document can be looked over without moving
+ // the text: `own` holds that offset for one document. The box is then where
+ // the text really is (it may be out of sight), a click still shows the text
+ // under the pointer, and the map follows the text again once the text is
+ // scrolled by anything but the map.
+ function ownScroll(uid,g,start){
+  // Under a pixel is rounding of a document that fits, not something to scroll.
+  const more=g.scale*g.total-g.used,max=more>=1?more:0;
+  g.max=max;g.own=false;
+  if(!own)return g;
+  if(own.doc!==uid||!max){own=null;return g;}
+  if(Math.abs(start-own.start)>1e-6){if(now()<own.hold)own.start=start;else{own=null;return g;}}
+  const offset=clamp(own.offset,0,max);
+  return {...g,max,own:true,offset,drag:g.scale,box:{top:Math.max(0,start)*g.scale-offset,height:g.box.height}};
+ }
+ function scrollMap(layout,offset){
+  const g=layout.g;if(!(g.max>0))return;
+  own={doc:layout.doc,offset:clamp(offset,0,g.max),start:layout.start,hold:own?.doc===layout.doc?own.hold:0};
+  schedule();
+ }
+ function placeBar(layout){
+  const g=layout.g,show=g.max>0;
+  if(bar.hidden===show)bar.hidden=!show;
+  if(!show)return;
+  const size=Math.max(24,Math.min(g.used,g.used*g.used/(g.max+g.used))),top=g.offset/g.max*(g.used-size);
+  thumb.style.height=size.toFixed(2)+'px';thumb.style.transform='translateY('+top.toFixed(2)+'px)';
+  const value=String(Math.round(g.offset/g.max*100));if(bar.getAttribute('aria-valuenow')!==value)bar.setAttribute('aria-valuenow',value);
+  bar.classList.toggle('is-own',!!g.own);
+ }
+ function barOffset(layout,y,grab){const g=layout.g,size=thumb.getBoundingClientRect().height;return (y-grab)/Math.max(1,g.used-size)*g.max;}
+ function barDown(event){
+  if(event.button!==0)return;
+  const layout=measure();if(!layout||!(layout.g.max>0))return;
+  event.preventDefault();event.stopPropagation();
+  const y=pointY(event),box=thumb.getBoundingClientRect(),top=box.top-host.getBoundingClientRect().top,inside=y>=top&&y<=top+box.height;
+  barDrag={id:event.pointerId,grab:inside?y-top:box.height/2};
+  try{bar.setPointerCapture(event.pointerId);}catch{}
+  if(!inside)scrollMap(layout,barOffset(layout,y,barDrag.grab));
+ }
+ function barMove(event){
+  if(barDrag?.id!==event.pointerId)return;
+  const layout=measure();if(layout)scrollMap(layout,barOffset(layout,pointY(event),barDrag.grab));
+ }
+
  // The layout of the active document for this frame, or null.
  function measure(){
   const d=adapter.document();if(!d||d.loading||d.staged)return null;
@@ -491,7 +540,7 @@ function create(adapter){
   if(!starts){if(pageCache?.text!==text)pageCache={text,starts:lineStarts(text)};starts=pageCache.starts;}
   const total=Math.max(1,textarea.scrollHeight),start=textarea.scrollTop,end=start+textarea.clientHeight,rows=total/m.lineHeight;
   const zoom=zoomFor(m,width,m.columns,0,rows,height);
-  const g=zoom?geometry({total,rows,height,start,end,row:m.lineHeight*zoom.scale}):blockGeometry({total,rows,height,start,end});
+  const g=zoom?geometry({total,rows,height,start,end,row:m.lineHeight*zoom.scale}):ownScroll(d.uid,blockGeometry({total,rows,height,start,end}),start);
   // Blocks and text take their colours from the editor's own highlighting.
   const syntax=page?diskSyntax(d,page):pageSyntax(d,text);
   const content=[d.uid+':'+(d.disk?'p':'t'),revision,text.length].join('|');
@@ -612,8 +661,16 @@ function create(adapter){
   const service=root.NTKEditorLanguageService;if(!service||!text||text.length>SYNTAX_LIMIT)return;
   service.highlight(text,language,{channel:'map'}).then(value=>{
    if(samples!==found||found.colour!==want||!value||value.limited)return;
-   const runs=parseSyntax(value.html);
-   if(runs&&runs.length===text.length){found.runs=runs;found.starts=starts;found.stamp=++stamps;schedule();}
+   // Read in slices between frames, like a page-held document's colours:
+   // the samples of a wide map are a few hundred kilobytes of HTML.
+   const reader=syntaxReader(value.html);
+   const slice=()=>{
+    if(samples!==found||found.colour!==want)return;
+    if(!timed(()=>reader.step(now()+PARSE_SLICE))){root.setTimeout(slice,0);return;}
+    const runs=reader.result();
+    if(runs&&runs.length===text.length){found.runs=runs;found.starts=starts;found.stamp=++stamps;schedule();}
+   };
+   slice();
   }).catch(()=>{});
  }
  // Each sample at its place on the axis: its words as blocks.
@@ -642,7 +699,7 @@ function create(adapter){
  function lineLayout(d,textarea,state,height,width,paged){
   const m=textMetrics(textarea),cw=state.characterWidth||m.charWidth,columns=Math.min(SAMPLE_COLUMNS,Math.max(16,Math.floor(textarea.clientWidth/Math.max(1,cw))));
   const start=state.top+(state.fraction||0),end=start+state.rows;
-  const g=blockGeometry({total:state.lines,rows:state.lines,height,start,end});
+  const g=ownScroll(d.uid,blockGeometry({total:state.lines,rows:state.lines,height,start,end}),start);
   const first=Math.floor(g.offset/g.scale),last=Math.min(state.lines,Math.ceil((g.offset+g.used)/g.scale));
   const found=sampled(d,'lines',state.revision,first,last,state.lines,columns,1);
   return diskLayout(d,'lines',g,found,columns,g.scale,height,width,{start,
@@ -657,7 +714,7 @@ function create(adapter){
  function offsetLayout(d,textarea,state,height,width,paged){
   const columns=Math.min(SAMPLE_COLUMNS,Math.max(1,state.wrapColumns||80));
   const start=state.offset,end=start+state.visible;
-  const g=blockGeometry({total:state.units,rows:state.estimatedRows,height,start,end});
+  const g=ownScroll(d.uid,blockGeometry({total:state.units,rows:state.estimatedRows,height,start,end}),start);
   const first=Math.floor(g.offset/g.scale),last=Math.min(state.units,Math.ceil((g.offset+g.used)/g.scale));
   const pitch=g.scale*state.units/Math.max(1,state.estimatedRows),found=sampled(d,'offsets',state.revision,first,last,state.units,columns,pitch/g.scale);
   return diskLayout(d,'offsets',g,found,columns,pitch,height,width,{start,
@@ -679,6 +736,7 @@ function create(adapter){
  }
 
  function placeBox(layout){
+  placeBar(layout);
   const {box}=layout.g;view.hidden=false;
   view.style.top=box.top.toFixed(2)+'px';view.style.height=box.height.toFixed(2)+'px';
   const value=String(layout.label());if(view.getAttribute('aria-valuenow')!==value){view.setAttribute('aria-valuenow',value);view.setAttribute('aria-valuetext',value+'%');}
@@ -763,13 +821,14 @@ function create(adapter){
  // ---- Pointer, wheel and keys ----
  function pointY(event){return event.clientY-host.getBoundingClientRect().top;}
  function seekTo(layout,value){
+  if(own&&own.doc===layout.doc)own.hold=now()+1500;
   pending={layout,value};
   if(layout.kind==='text'){flush();return;}
   if(!seekFrame)seekFrame=root.requestAnimationFrame(flush);
  }
  function flush(){seekFrame=0;const next=pending;pending=null;if(!next)return;try{const result=next.layout.seek(next.value);if(result?.catch)result.catch(error=>adapter.message?.(error.message,true));}catch(error){adapter.message?.(error.message,true);}schedule();}
  function pointerDown(event){
-  if(event.button!==0||!visible())return;
+  if(event.button!==0||!visible()||event.target.closest?.('[data-ed-map-bar]'))return;
   const layout=measure();if(!layout)return;
   event.preventDefault();
   // A press on the box drags it; anywhere else first centres the view on the
@@ -790,6 +849,8 @@ function create(adapter){
   if(event.ctrlKey||!event.deltaY||!visible())return;
   const layout=measure();if(!layout)return;
   event.preventDefault();
+  // A map that scrolls is scrolled on its own; the text stays where it is.
+  if(layout.g.max>0){scrollMap(layout,layout.g.offset+event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?layout.g.used:1));return;}
   const unit=event.deltaMode===1?layout.step.line:event.deltaMode===2?layout.step.page:1;
   layout.scroll(event.deltaY*unit);schedule();
  }

@@ -1,3 +1,25 @@
+# v1.21.63 Beta 1 - Dropped and picked files open faster
+
+Owner (after v1.21.61, "very large files load in slow"): files are opened by drag and drop, from a few KB up to 100 MB.
+
+v1.21.62 was published and verified: tag at merge commit ee7a152 (PR #193), release run 43907806755 green, both Checks runs green without a re-run, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.62", stable channel still at v1.21.34.
+
+Owner report on v1.21.62, with a 355,575 byte FortiGate configuration of 11,879 lines (used for local measurement only, never committed): "it's just as bad if not worse than before. also takes longer to load the files." Cause: `importFiles` sent a dropped file to the engine only above 512 KiB, while a path open also does above 4,000 lines, so this file was page-held: 11,879 gutter rows and 23,476 highlight spans, laid out and repainted on every scroll step with Highlight on (trace of 60 wheel steps: Paint 8.1 s, Layout 6.2 s; 188 long tasks of up to 351 ms in 150 steps; opening 0.9 to 2.1 s in one long task). The v1.21.62 fixes were all in the disk-backed path and did not apply. Fix: `moreLinesThan(file, memoryEditorLines)` in `importFiles`; the file is then disk-backed. Same measurement after: opening 0.3 s, no long task, frames at 17 ms (p95) with Wrap, Highlight and the map on. Checks: `scripts/editor-scroll-cost.test.cjs` (the line count), and `scripts/editor-map-list.browser.cjs` drops a 300-line and a 5,000-line file on the real engine. Known limit: a page-held document of up to 4,000 lines still draws every line at once, and text typed or pasted into a page-held document is promoted by the existing size check, not by this one.
+
+Measured (standalone Text Editor on its real engine, Chromium 151): a dropped file took about 100 ms per MB, a file opened by path 16 MB in 0.4 s and 200 MB in 3 s. The engine handled a 1 MiB chunk in about 15 ms; the rest was the browser's upload of each chunk (about 70 ms for a 1.4 MB JSON body), whatever the chunk size.
+
+Owner request in the same release: "i'd also like the map to have it's own scrollbar, that way i can scroll through it and review it's overall content without loosing my current position in the actual document." A Document Map that scrolls (more rows than pixels) now has a scroll bar at its right edge, and the wheel over it scrolls the map alone (`ownScroll`, `scrollMap`, `placeBar` in editor-document-map.js; rule in the AGENTS.md map bullet). Checked by `scripts/editor-map-list.browser.cjs` on a 706-line page-held and a 16 MB disk-backed document.
+
+What changed (rule in AGENTS.md, "Browser file import"):
+- `sendBrowserFile` (file-editor.js) gzips each chunk with `CompressionStream` and sends it compressed when that is clearly smaller (`gzip:true`), reads and compresses four chunks ahead while sending in order, and sends 1 MiB per request (the engine's `MaxEditBytes`).
+- The buffer route expands a compressed chunk first (`gunzipEditorChunk`, editor_disk_upload.go): refused unless it is gzip, not empty and at most one chunk when expanded. `import-chunk` and `verify-chunk` are otherwise unchanged; plain chunks still work.
+
+Result here: 16 MB 1.8 s to 0.73 s, 100 MB 10 s to 3.7 s (a repetitive synthetic file; real text compresses less).
+
+Checks: `TestGunzipEditorChunkIsBounded` (the limit, a chunk that expands past it while tiny on the wire, not gzip, empty, truncated), `TestDiskEditorImportsCompressedChunks` (compressed, retried and plain chunks give the file that was sent), the editor's real-engine browser tests on Chromium 151.
+
+Known limits: not measured on Windows or in the main window. A dropped file is still slower than a path open (it must be copied to the engine); giving the engine the dropped file's path would need native WebView2 work. The duplicate branch `perf/editor-import-compressed` (first name of this branch; this checkout does not track that prefix) is removed by the cleanup workflow once main contains it.
+
 # v1.21.62 Beta 1 - Large files scroll smoothly
 
 Owner report on v1.21.61: "very large files load in slow, and are very laggy when scrolling", then "it's also slow with document map off".
