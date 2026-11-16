@@ -1,3 +1,7 @@
+## 1.21.65 Beta 1 - Document Map: one row per line with Wrap on
+
+- A disk-backed document whose average line is no longer than the wrap width is mapped by line with Wrap on too (`flowLines`, `lineOffset`, `lineLayout(..., flow)`); by offset, evenly spaced samples drew a long line twice and skipped short ones. A click or drag seeks to the line's character offset, taken from the held samples.
+
 ## 1.21.64 Beta 1 - Document Map: real text for large files, and it keeps what it read
 
 - A disk-backed document's map samples are kept in chunks of 1,024 rows (`CHUNK`, up to `CHUNKS` 64), read nearest to the map's window first and then around it, each with its own colours (`sampled`, `readSamples`, `colourSamples`). Before, one window of samples was replaced on every scroll, which dropped its colours and left the map stale while the wheel moved (3.2 s of a 3.5 s wheel run on a 12,000-line file; now none).

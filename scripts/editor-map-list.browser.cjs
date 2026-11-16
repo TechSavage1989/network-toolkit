@@ -1055,7 +1055,21 @@ async function engine(browser){
  {
   const wrapBox=page.locator('#networkToolkitFileEditor [data-ed-wrap]');
   await wrapBox.check();
-  await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.kind==='offsets');
+  // A file of ordinary lines is mapped line by line with Wrap on too (owner
+  // report on v1.21.64: mapped by character, a long line was drawn twice and
+  // short lines were left out): a row of the map is a line of the file.
+  await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l?.kind==='lines'&&l.fresh;},null,{timeout:15000});
+  {
+   const seen=await page.evaluate(()=>{const map=NetworkToolkitFileEditor.documentMap,l=map.layout;return {total:l.g.total,start:l.start,gutter:Number(document.querySelector('#networkToolkitFileEditor [data-ed-gutter-lines] [data-source-line]')?.dataset.sourceLine)};});
+   assert.equal(seen.total,d.lines,'with Wrap on the map still has one row for each line');
+   assert(Math.abs(seen.start+1-seen.gutter)<=3,'and its box starts at the line at the top of the text: '+JSON.stringify(seen));
+   const g=(await mapInfo(page)).layout.g;let y=g.used*0.6;if(y>=g.box.top-4&&y<=g.box.top+g.box.height+4)y=g.box.top+g.box.height+40;
+   const target=(y+g.offset)/g.scale;
+   await page.mouse.click(x,info.top+y);
+   await page.waitForFunction(target=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&Math.abs(l.start+l.g.span/2-target)<4;},target,{timeout:15000});
+   const top=await page.evaluate(()=>Number(document.querySelector('#networkToolkitFileEditor [data-ed-gutter-lines] [data-source-line]')?.dataset.sourceLine));
+   assert(Math.abs(top-target)<60,'a click on line '+Math.round(target)+' of the wrapped file shows it (first line '+top+')');
+  }
   await page.evaluate(()=>{window.scrollWrites=[];new MutationObserver(list=>{for(const m of list){const t=m.target;if(t===document.body||t.closest?.('.input-clear-button,.input-clear-host,.input-clear-enhanced'))scrollWrites.push(m.type+' '+(m.attributeName||'')+' '+t.tagName);}}).observe(document.body,{subtree:true,attributes:true,childList:false});});
   await editorArea.hover();
   const before=await page.evaluate(()=>NetworkToolkitFileEditor.active.diskSession.state().page.start);
@@ -1073,7 +1087,11 @@ async function engine(browser){
  await open('export.b64');
  d=await diskState();assert.equal(d.disk,true);assert.equal(d.lines,1,'one line');
  if(!await page.locator('#networkToolkitFileEditor [data-ed-wrap]').isChecked())await page.locator('#networkToolkitFileEditor [data-ed-wrap]').check();
- await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout?.kind==='offsets');
+ // The box has its size once the wrapped view is measured (before that it is
+ // the smallest box, and a press at its middle would not be at the middle of
+ // the box that is then dragged).
+ await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l?.kind==='offsets'&&l.g.span>100;});
+ await frames(page);
  info=await mapInfo(page);
  assert.equal(info.layout.g.total,d.units,'the map covers every character of the line');
  assert(info.layout.g.used>info.height*0.9,'a 1.7 MB line fills the map');
