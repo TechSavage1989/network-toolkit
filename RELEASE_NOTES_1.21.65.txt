@@ -1,0 +1,11 @@
+Network Toolkit 1.21.65
+
+## What's New
+
+- With Wrap on, the Document Map of a large file now shows each line of the file once. Before, a long line could appear twice in the map and short lines could be missing.
+
+## Additional Details
+
+- With Wrap on, the map of a large file was laid out by character count instead of by line, so its rows did not match the file's lines. A file of ordinary lines is now mapped line by line whether Wrap is on or off; a line longer than the map is narrowed and then cut at the map's edge.
+- A file whose lines are mostly longer than the text area is wide, such as an export on a single line, is still mapped by character.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

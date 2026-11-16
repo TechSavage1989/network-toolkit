@@ -473,6 +473,11 @@ function create(adapter){
    const paged=adapter.diskView();const state=paged?.mapState?.();
    if(!state||state.aligned||!state.lines)return null;
    if(state.whole)return textLayout(d,textarea,state.page.text,null,state.revision,height,width,paged,state.page);
+   // With Wrap on, a document of ordinary lines is still mapped line by
+   // line (a row of the map is a line of the document, cut at the map's
+   // edge); only one whose lines are mostly longer than the text area is
+   // wide (a Base64 export on one line) is mapped by character.
+   if(state.flow&&state.units/state.lines<=state.wrapColumns)return lineLayout(d,textarea,flowLines(state),height,width,paged,true);
    return state.flow?offsetLayout(d,textarea,state,height,width,paged):lineLayout(d,textarea,state,height,width,paged);
   }
   return textLayout(d,textarea,d.content,adapter.lineStarts(d),d.editRevision,height,width,null,null);
@@ -760,7 +765,31 @@ function create(adapter){
  }
 
  // Without word wrap the axis is the line number: one sample per line.
- function lineLayout(d,textarea,state,height,width,paged){
+ // The view of a wrapped document in lines: the line at the top of the view
+ // and the lines in it, counted in the page the view shows.
+ let flowCount=null;
+ function flowLines(state){
+  const page=state.page,key=[page.start,page.text.length,state.offset,state.visible,state.revision].join(':');
+  if(flowCount?.key!==key||flowCount.text!==page.text){
+   const text=page.text,from=clamp(Math.floor(state.offset-page.start),0,text.length),to=clamp(Math.ceil(state.offset+state.visible-page.start),from,text.length);
+   let before=0,inside=0;
+   for(let at=text.indexOf('\n');at!==-1&&at<to;at=text.indexOf('\n',at+1)){if(at<from)before++;else inside++;}
+   flowCount={key,text,top:page.line+before,rows:Math.max(1,inside)};
+  }
+  return {...state,top:flowCount.top,fraction:0,rows:flowCount.rows};
+ }
+ // The character offset of a line, for a wrapped view: from the samples the
+ // map holds (each is the start of its line), else from the page, else by
+ // proportion.
+ function lineOffset(state,line){
+  line=clamp(Math.floor(line),0,Math.max(0,state.lines-1));
+  const chunk=samples?.kind==='lines'?samples.chunks.get(Math.floor(line/CHUNK)):null,row=chunk?.rows[line-chunk.from];
+  if(row&&Number.isFinite(row.start))return row.start;
+  const page=state.page;
+  if(line>=page.line){let at=0,left=line-page.line;while(left>0&&(at=page.text.indexOf('\n',at)+1)>0)left--;if(!left)return page.start+at;}
+  return Math.floor(line/Math.max(1,state.lines)*state.units);
+ }
+ function lineLayout(d,textarea,state,height,width,paged,flow=false){
   const m=textMetrics(textarea),cw=state.characterWidth||m.charWidth,columns=Math.min(SAMPLE_COLUMNS,Math.max(16,Math.floor(textarea.clientWidth/Math.max(1,cw))));
   const start=state.top+(state.fraction||0),end=start+state.rows;
   const g=ownScroll(d.uid,blockGeometry({total:state.lines,rows:state.lines,height,start,end,least:SAMPLE_PITCH}),start);
@@ -768,7 +797,7 @@ function create(adapter){
   const found=sampled(d,'lines',state.revision,first,last,state.lines,columns,1);
   return diskLayout(d,'lines',g,found,columns,g.scale,height,width,{start,metrics:m,
    label:()=>Math.round(clamp(state.top/Math.max(1,state.lines-state.rows),0,1)*100),
-   seek:value=>paged.mapSeek({line:value}),
+   seek:value=>paged.mapSeek(flow?{offset:lineOffset(state,value)}:{line:value}),
    scroll:delta=>paged.wheelBy(delta),
    step:{line:1,page:Math.max(1,state.rows-1)}});
  }

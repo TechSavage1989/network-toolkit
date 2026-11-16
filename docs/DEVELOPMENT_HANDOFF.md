@@ -1,3 +1,13 @@
+# v1.21.65 Beta 1 - Document Map: one row per line with Wrap on
+
+v1.21.64 was published and verified: tag at merge commit 7d3dd43 (PR #195), release run 43935855123 green, both Checks runs green without a re-run, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.64", stable channel still at v1.21.34.
+
+Owner report on v1.21.64 (Wrap on, the 11,879-line file): "why does the map make it look like there are two lines when the document only has one". Cause: with Wrap on the map's axis was the character offset, with one sample per estimated row spaced evenly by character, so a line longer than the average was sampled twice and short lines were skipped. Now a document whose average line is no longer than the wrap width is mapped by line with Wrap on too (AGENTS.md map bullet). Checked on the owner's file locally (clicks land on the line under the pointer) and by a new step of `scripts/editor-map-list.browser.cjs` on the 16 MB file with Wrap on.
+
+Known: the "map work stays under 50 ms on a 16 MB document" step of that check fails when the machine is busy (three local failures directly after other browser runs, 45 to 65 ms; five instrumented runs in a row afterwards had no draw over 15 ms; one CI job on PR #194 at 51.8 ms). The map's own draw is not slow; the step measures wall time.
+
+Not done: a wrapped long line takes one map row (cut), not several. Not checked on real Windows.
+
 # v1.21.64 Beta 1 - Document Map: real text for large files, and it keeps what it read
 
 v1.21.63 was published and verified: tag at merge commit e203627 (PR #194), release run 43922570617 green, both Checks runs green (`browser-editor112` re-run once: the 16 MB page-held map timing step took 51.8 ms against 50 ms on one runner, cause not found; it also took 57 ms once locally on unchanged code, so that step is close to its limit), all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.63", stable channel still at v1.21.34.
