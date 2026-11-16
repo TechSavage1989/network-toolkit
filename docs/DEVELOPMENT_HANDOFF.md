@@ -1,3 +1,17 @@
+# v1.21.64 Beta 1 - Document Map: real text for large files, and it keeps what it read
+
+v1.21.63 was published and verified: tag at merge commit e203627 (PR #194), release run 43922570617 green, both Checks runs green (`browser-editor112` re-run once: the 16 MB page-held map timing step took 51.8 ms against 50 ms on one runner, cause not found; it also took 57 ms once locally on unchanged code, so that step is close to its limit), all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.63", stable channel still at v1.21.34.
+
+Owner report on v1.21.63 (the 11,879-line FortiGate file, local measurement only): "colors disappear from the map, and it takes a while to load the map when scrolling through it. otherwise scrolling is smoother", then, with a Notepad++ screenshot, "is there any way to make it work as smooth and clearly with real text as Notepad++".
+
+Cause: a disk-backed document's map held one window of samples and replaced it as the map moved: the new window had no colours until the worker coloured it again, and only one request ran at a time, so the map was stale for as long as the wheel moved (measured: 3.2 s of a 3.5 s wheel run; afterwards none, and the colours never drop). The language box said "Auto (Plain text)" for such a document because it detected from the page-held text, which a disk-backed document does not have.
+
+What changed (rule in the AGENTS.md Document Map bullet, "Real text, kept"): chunked samples that are kept with their colours and read ahead; sampled rows at 2.5 px as real characters; the Auto label from `diskSyntaxLanguage`. `scripts/editor-map-list.browser.cjs` checks the 2.5 px rows and that the map, scrolled back, is fresh and coloured at once and still holds its chunks. Map draws stayed at about 10 ms on the owner's file.
+
+Open: in one of eight local runs of `TestEditorSessionBrowserMapList` the step that drags the box of the 1.7 MB single-line file (Wrap on) to the middle of the map timed out; seven runs passed and the cause was not found. The step now prints the map's geometry, sample state and page when it times out (`DIAG`).
+
+Not done: page-held documents (up to 4,000 lines and 512 KiB) are drawn as before (text when every row fits at 4 px, else blocks down to 1 px). Not checked on real Windows.
+
 # v1.21.63 Beta 1 - Dropped and picked files open faster
 
 Owner (after v1.21.61, "very large files load in slow"): files are opened by drag and drop, from a few KB up to 100 MB.

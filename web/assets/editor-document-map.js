@@ -65,7 +65,12 @@ const TEXT_FONT=6,TEXT_FONT_MAX=9,TEXT_SHARE=0.6,TEXT_REFERENCE=120,TEXT_COLUMNS
 // and below that as blocks. A document that is not all in the page is drawn
 // from samples the engine reads over the whole of it (SAMPLE_ROWS rows of
 // SAMPLE_COLUMNS characters at most), SAMPLE_DELAY ms after an edit.
-const TEXT_FIT=4,SAMPLE_ROWS=4096,SAMPLE_COLUMNS=512,SAMPLE_DELAY=250;
+// Sampled rows are never under SAMPLE_PITCH px: at that size and above they
+// are drawn as the document's own characters, as small as SAMPLE_FONT of the
+// row (owner request after v1.21.63: real text, like Notepad++'s map), and a
+// row longer than the map is squeezed by at most SAMPLE_SQUEEZE, then cut.
+const SAMPLE_PITCH=2.5,SAMPLE_FONT=1.35,SAMPLE_SQUEEZE=0.5;
+const TEXT_FIT=4,CHUNK=1024,CHUNKS=64,COLOUR_COLUMNS=190,SAMPLE_COLUMNS=512,SAMPLE_DELAY=250;
 const SYNTAX_LIMIT=200000; // a disk page coloured for the map at most
 const SYNTAX_DELAY=150;    // milliseconds before a disk page is coloured
 const PARSE_SLICE=4;       // milliseconds of one slice of reading the editor's colours
@@ -165,9 +170,9 @@ function geometry({total,rows,height,start,end,row=ROW,scroll=false}){
 // Blocks: ROW pixels per text row while the document fits, then fewer, but
 // never less than one pixel row per text row (owner rule after v1.21.60): a
 // document with more rows than the map has pixels scrolls inside the map.
-function blockGeometry({total,rows,height,start,end}){
+function blockGeometry({total,rows,height,start,end,least=1}){
  rows=Math.max(1,rows);
- return geometry({total,rows,height,start,end,row:Math.max(1,Math.min(ROW,height/rows)),scroll:true});
+ return geometry({total,rows,height,start,end,row:Math.max(least,Math.min(ROW,height/rows)),scroll:true});
 }
 // The axis position to show at the top of the view for a pointer at map y,
 // with `grab` the pointer's distance from the box top (a click centres the
@@ -284,7 +289,7 @@ function rowCells(text,begin,end,{tab=4,columns=TEXT_COLUMNS,kindAt=null}={}){
 // ---- The panel ----
 function create(adapter){
  let host=null,handle=null,canvas=null,view=null,frame=0,timer=0,drawn='',drawnContent='',drawnDoc='',colors=null,colorKey='',drag=null,seen=null,widths=new Map(),pageCache=null,wrapCache=null,shown=null,lastLayout=null,pending=null,seekFrame=0;
- let inner=null,resize=null,dragWidth=null,range=null,textRows=[],stamps=0,parsing=null,diskSyntaxState=null,diskTimer=0,samples=null,sampleBusy=false,sampleFailed='',sampleTimer=0,bar=null,thumb=null,own=null,barDrag=null;
+ let inner=null,resize=null,dragWidth=null,range=null,textRows=[],stamps=0,parsing=null,diskSyntaxState=null,diskTimer=0,samples=null,sampleBusy=false,colourBusy=false,sampleTimer=0,bar=null,thumb=null,own=null,barDrag=null;
  const parsed=new WeakMap();
  const document=root.document;
 
@@ -620,78 +625,137 @@ function create(adapter){
  }
 
  // ---- A disk-backed document that is not all in the page ----
- // The map draws it from the engine's samples (editorbuffer.MapSamples): one
- // per map row over the part of the document in the map's window and a
- // window's length on each side, read again when the view nears their edge,
- // and SAMPLE_DELAY ms after an edit (the samples it has stay meanwhile).
- // `step` is axis units (lines, or characters with Wrap) per map row.
+ // The map draws it from the engine's samples (editorbuffer.MapSamples), one
+ // per map row, kept in chunks of CHUNK rows along the axis (lines, or
+ // characters with Wrap). The chunks under the map's window are read first,
+ // then the ones around it, nearest first, up to CHUNKS: what was read stays,
+ // with its colours, so scrolling the map or the text over a part that was
+ // read waits for nothing. After an edit the chunks are read again
+ // SAMPLE_DELAY ms later, and the earlier ones stay on screen until then.
+ // `step` is axis units per map row.
  function sampled(d,kind,revision,first,last,limit,columns,step){
-  const base=[d.uid,kind,revision,columns,step.toFixed(4)].join('|'),span=Math.max(1,last-first);
-  const have=samples?.base===base?samples:null;
-  const near=have&&((first-have.from<span/2&&have.from>0)||(have.to-last<span/2&&have.to<limit));
-  if(adapter.samples&&!sampleBusy&&(!have||first<have.from||last>have.to||near)){
-   let from=Math.max(0,Math.floor(first-span)),to=Math.min(limit,Math.ceil(last+span));
-   if((to-from)/step>SAMPLE_ROWS){from=Math.max(0,Math.floor(first-(SAMPLE_ROWS*step-span)/2));to=Math.min(limit,Math.floor(from+SAMPLE_ROWS*step));}
-   const count=clamp(Math.ceil((to-from)/step),1,SAMPLE_ROWS),key=base+'|'+from+'|'+to;
-   if(to>from&&sampleFailed!==key&&!(have&&have.from===from&&have.to===to)){
-    sampleBusy=true;
-    const done=()=>{sampleBusy=false;schedule();};
-    sampleTimer=root.setTimeout(()=>{
-     Promise.resolve(adapter.samples(d,{kind,limit:count,size:columns,from,to})).then(value=>{
-      if(!Array.isArray(value?.rows)){sampleFailed=key;return;}
-      samples={base,doc:d.uid,kind,columns,from,to,count,rows:value.rows,runs:null,starts:null,colour:'',stamp:++stamps};
-     }).catch(()=>{sampleFailed=key;}).then(done);
-    },samples?.doc===d.uid&&!have?SAMPLE_DELAY:0);
-   }
+  const base=[d.uid,kind,revision,columns,step.toFixed(4)].join('|');
+  if(samples?.base!==base){
+   const same=samples?.doc===d.uid&&samples.kind===kind&&samples.columns===columns;
+   const old=same?(samples.chunks.size?samples:samples.old):null;if(old)old.old=null;
+   samples={base,doc:d.uid,kind,columns,step,span:CHUNK*step,chunks:new Map(),failed:new Set(),old,wait:old?now()+SAMPLE_DELAY:0,stamp:++stamps,colour:null,view:[0,0],fresh:false};
   }
-  const found=samples?.doc===d.uid&&samples.kind===kind&&samples.columns===columns?samples:null;
-  if(found){found.fresh=found.base===base&&first>=found.from&&last<=found.to;sampleColours(d,found);}
-  return found;
+  const store=samples,count=Math.max(1,Math.ceil(limit/store.span));
+  const a=clamp(Math.floor(first/store.span),0,count-1),b=clamp(Math.floor(Math.max(first,last-1e-6)/store.span),a,count-1);
+  store.limit=limit;store.count=count;store.view=[a,b];
+  let fresh=true,coloured=true;
+  for(let i=a;i<=b;i++){const chunk=store.chunks.get(i);if(!chunk)fresh=false;else if(!chunk.runs)coloured=false;}
+  if(fresh&&store.old){store.old=null;store.stamp=++stamps;}
+  store.fresh=fresh;store.coloured=fresh&&coloured;
+  readSamples(d,store);colourSamples(d,store);
+  return store;
  }
- // The samples in the editor's colours: its language worker colours their
- // text on the map's own channel. Without Highlight, for plain text and past
- // SYNTAX_LIMIT they stay the normal text colour, as the document does.
- function sampleColours(d,found){
+ // The next chunk to read: the missing one nearest to the map's window. With
+ // CHUNKS held, the farthest one makes room, unless it is nearer than that.
+ function readSamples(d,store){
+  if(!adapter.samples||sampleBusy)return;
+  const left=store.wait-now();
+  if(left>0){root.clearTimeout(sampleTimer);sampleTimer=root.setTimeout(schedule,left+1);return;}
+  const [a,b]=store.view,away=i=>i<a?a-i:i>b?i-b:0;
+  let next=-1;
+  for(let reach=0;reach<=CHUNKS&&next<0;reach++)for(const i of reach?[b+reach,a-reach]:Array.from({length:b-a+1},(_,k)=>a+k)){
+   if(i>=0&&i<store.count&&!store.chunks.has(i)&&!store.failed.has(i)){next=i;break;}
+  }
+  if(next<0)return;
+  if(store.chunks.size>=CHUNKS){
+   let far=-1;for(const i of store.chunks.keys())if(far<0||away(i)>away(far))far=i;
+   if(away(far)<=away(next))return;
+   store.chunks.delete(far);
+  }
+  const from=Math.floor(next*store.span),to=Math.min(store.limit,Math.floor((next+1)*store.span)),rows=clamp(Math.ceil((to-from)/store.step),1,CHUNK);
+  if(!(to>from)){store.failed.add(next);return;}
+  sampleBusy=true;
+  Promise.resolve(adapter.samples(d,{kind:store.kind,limit:rows,size:store.columns,from,to})).then(value=>{
+   if(!Array.isArray(value?.rows)){store.failed.add(next);return;}
+   store.chunks.set(next,{index:next,from,to,count:rows,rows:value.rows,runs:null,starts:null,colour:''});store.stamp=++stamps;
+  }).catch(()=>{store.failed.add(next);}).then(()=>{sampleBusy=false;schedule();});
+ }
+ // The samples in the editor's colours: its language worker colours a
+ // chunk's text on the map's own channel, one chunk at a time, nearest to the
+ // window first, and a chunk keeps its colours while it is held. Without
+ // Highlight and for plain text they stay the normal text colour, as the
+ // document does. A row is coloured up to COLOUR_COLUMNS characters.
+ function colourSamples(d,store){
   const language=adapter.language(d)||'text',on=!!adapter.syntax()&&language!=='text',want=on?language:'';
-  if(found.colour===want)return;
-  found.colour=want;found.runs=null;found.stamp=++stamps;
-  if(!on)return;
-  const starts=new Int32Array(found.rows.length);let length=0;
-  const text=found.rows.map((row,k)=>{starts[k]=length;length+=(row.text||'').length+1;return row.text||'';}).join('\n');
-  const service=root.NTKEditorLanguageService;if(!service||!text||text.length>SYNTAX_LIMIT)return;
+  if(store.colour!==want){store.colour=want;for(const chunk of store.chunks.values()){chunk.runs=null;chunk.starts=null;chunk.colour='';}store.stamp=++stamps;store.coloured=false;}
+  if(!on||colourBusy)return;
+  const service=root.NTKEditorLanguageService;if(!service)return;
+  const [a,b]=store.view,away=i=>i<a?a-i:i>b?i-b:0;
+  let chunk=null;for(const c of store.chunks.values())if(c.colour!==want&&(!chunk||away(c.index)<away(chunk.index)))chunk=c;
+  if(!chunk)return;
+  chunk.colour=want;
+  const starts=new Int32Array(chunk.rows.length);let length=0;
+  const text=chunk.rows.map((row,k)=>{const part=(row.text||'').slice(0,COLOUR_COLUMNS);starts[k]=length;length+=part.length+1;return part;}).join('\n');
+  if(!text.trim())return;
+  colourBusy=true;
+  const done=()=>{colourBusy=false;schedule();};
   service.highlight(text,language,{channel:'map'}).then(value=>{
-   if(samples!==found||found.colour!==want||!value||value.limited)return;
-   // Read in slices between frames, like a page-held document's colours:
-   // the samples of a wide map are a few hundred kilobytes of HTML.
+   if(samples!==store||store.colour!==want||!value||value.limited||!store.chunks.has(chunk.index)){done();return;}
+   // Read in slices between frames, like a page-held document's colours.
    const reader=syntaxReader(value.html);
    const slice=()=>{
-    if(samples!==found||found.colour!==want)return;
+    if(samples!==store||store.colour!==want){done();return;}
     if(!timed(()=>reader.step(now()+PARSE_SLICE))){root.setTimeout(slice,0);return;}
     const runs=reader.result();
-    if(runs&&runs.length===text.length){found.runs=runs;found.starts=starts;found.stamp=++stamps;schedule();}
+    if(runs&&runs.length===text.length){chunk.runs=runs;chunk.starts=starts;store.stamp=++stamps;}
+    done();
    };
    slice();
-  }).catch(()=>{});
+  }).catch(done);
  }
- // Each sample at its place on the axis: its words as blocks.
- function drawSamples(ctx,found,g,width,pitch){
+ // Each sample at its place on the axis: its words as blocks. Chunks read
+ // before an edit are drawn under the ones read since.
+ function drawSamples(ctx,store,g,width,pitch,m){
   textRows=[];
-  const c=palette(),tab=adapter.tabSize(),rows=found.rows,columns=found.columns,cw=width/columns,kindAt=found.runs?syntaxCursor(found.runs):null;
-  const detail=pitch>=2,block=detail?Math.max(1,Math.min(pitch-0.5,pitch*0.7)):Math.max(0.5,pitch),alpha=detail?1:0.85,each=(found.to-found.from)/found.count;
+  const c=palette(),tab=adapter.tabSize(),columns=store.columns,cw=width/columns;
+  // Real characters when a row is tall enough for them.
+  const glyphs=pitch>=SAMPLE_PITCH&&m?sampleFont(ctx,m,pitch,width,columns):null;
+  const detail=pitch>=2,block=detail?Math.max(1,Math.min(pitch-0.5,pitch*0.7)):Math.max(0.5,pitch),alpha=detail?1:0.85;
   ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);
-  for(let k=0;k<rows.length;k++){
-   const y=(found.from+Math.floor(k*each))*g.scale-g.offset;if(y<-pitch)continue;if(y>g.used)break;
-   const text=rows[k].text||'';
-   for(const [col,length,kind] of kindRuns(text,0,text.length,{tab,limit:columns,kindAt,base:kindAt?found.starts[k]:0})){
-    ctx.fillStyle=c.kinds[kind]||c.fg;ctx.globalAlpha=alpha*(kind===TEXT?0.75:1);ctx.fillRect(col*cw,y,Math.max(0.6,Math.min(length,columns-col)*cw),block);
+  const chunkRows=(chunk,cover)=>{
+   const top=chunk.from*g.scale-g.offset,bottom=chunk.to*g.scale-g.offset;if(bottom<0||top>g.used)return;
+   if(cover){ctx.globalAlpha=1;ctx.fillStyle=c.bg;ctx.fillRect(0,top,glyphs?width/glyphs.squeeze:width,bottom-top);}
+   const rows=chunk.rows,each=(chunk.to-chunk.from)/chunk.count,cursor=chunk.runs?syntaxCursor(chunk.runs):null;
+   let k=Math.max(0,Math.floor((-pitch-top)/(each*g.scale)));
+   for(;k<rows.length;k++){
+    const y=(chunk.from+Math.floor(k*each))*g.scale-g.offset;if(y<-pitch)continue;if(y>g.used)break;
+    const text=rows[k].text||'',base=cursor?chunk.starts[k]:0,kindAt=cursor?i=>i<COLOUR_COLUMNS?cursor(base+i):TEXT:null;
+    if(glyphs){
+     const shown=rowCells(text,0,text.length,{tab,columns:glyphs.columns,kindAt}),middle=y+pitch/2;
+     for(const [col,part,kind] of shown.cells){ctx.fillStyle=c.kinds[kind]||c.fg;ctx.fillText(part,col*glyphs.cw,middle);}
+     continue;
+    }
+    for(const [col,length,kind] of kindRuns(text,0,text.length,{tab,limit:columns,kindAt})){
+     ctx.fillStyle=c.kinds[kind]||c.fg;ctx.globalAlpha=alpha*(kind===TEXT?0.75:1);ctx.fillRect(col*cw,y,Math.max(0.6,Math.min(length,columns-col)*cw),block);
+    }
    }
-  }
+  };
+  if(glyphs){ctx.save();ctx.font=glyphs.css;ctx.textBaseline='middle';ctx.textAlign='left';ctx.scale(glyphs.squeeze,1);}
+  if(store.old)for(const chunk of store.old.chunks.values())chunkRows(chunk,false);
+  for(const chunk of store.chunks.values())chunkRows(chunk,!!store.old);
+  if(glyphs)ctx.restore();
   ctx.globalAlpha=1;
  }
+ // The font of sampled rows of `pitch` px, its character width and how many
+ // columns the map shows: all of the row's when squeezing by no more than
+ // SAMPLE_SQUEEZE lets them fit, otherwise as many as fit at that squeeze.
+ let sampleFontCache=null;
+ function sampleFont(ctx,m,pitch,width,columns){
+  const size=Math.round(pitch*SAMPLE_FONT*4)/4,css=(m.weight?m.weight+' ':'')+size+'px '+m.family;
+  if(sampleFontCache?.css!==css){ctx.save();ctx.font=css;const cw=ctx.measureText('0000000000').width/10;ctx.restore();sampleFontCache={css,cw};}
+  const cw=sampleFontCache.cw;if(!(cw>0))return null;
+  const squeeze=clamp(width/(columns*cw),SAMPLE_SQUEEZE,1);
+  return {css,cw,squeeze,size,columns:Math.min(TEXT_COLUMNS,columns,Math.ceil(width/(cw*squeeze)))};
+ }
  function diskLayout(d,kind,g,found,columns,pitch,height,width,extra){
-  return {kind,mode:'blocks',zoom:null,g,columns,sampled:!!found,fresh:!!found?.fresh,colored:!!found?.runs,deferred:false,doc:d.uid,content:d.uid+':'+kind,
+  return {kind,mode:'blocks',zoom:null,g,columns,sampled:!!found&&(found.chunks.size>0||!!found.old),fresh:!!found?.fresh,colored:!!found?.coloured,deferred:false,doc:d.uid,content:d.uid+':'+kind,
    key:[d.uid,kind,common(d,height,width),columns,found?found.stamp:'none',Math.round(g.offset*2),pitch.toFixed(3)].join('|'),
-   draw:ctx=>{if(found)drawSamples(ctx,found,g,width,pitch);else{textRows=[];ctx.fillStyle=palette().bg;ctx.fillRect(0,0,width,g.used);}},
+   draw:ctx=>drawSamples(ctx,found,g,width,pitch,extra.metrics),
    ...extra};
  }
 
@@ -699,10 +763,10 @@ function create(adapter){
  function lineLayout(d,textarea,state,height,width,paged){
   const m=textMetrics(textarea),cw=state.characterWidth||m.charWidth,columns=Math.min(SAMPLE_COLUMNS,Math.max(16,Math.floor(textarea.clientWidth/Math.max(1,cw))));
   const start=state.top+(state.fraction||0),end=start+state.rows;
-  const g=ownScroll(d.uid,blockGeometry({total:state.lines,rows:state.lines,height,start,end}),start);
+  const g=ownScroll(d.uid,blockGeometry({total:state.lines,rows:state.lines,height,start,end,least:SAMPLE_PITCH}),start);
   const first=Math.floor(g.offset/g.scale),last=Math.min(state.lines,Math.ceil((g.offset+g.used)/g.scale));
   const found=sampled(d,'lines',state.revision,first,last,state.lines,columns,1);
-  return diskLayout(d,'lines',g,found,columns,g.scale,height,width,{start,
+  return diskLayout(d,'lines',g,found,columns,g.scale,height,width,{start,metrics:m,
    label:()=>Math.round(clamp(state.top/Math.max(1,state.lines-state.rows),0,1)*100),
    seek:value=>paged.mapSeek({line:value}),
    scroll:delta=>paged.wheelBy(delta),
@@ -714,10 +778,10 @@ function create(adapter){
  function offsetLayout(d,textarea,state,height,width,paged){
   const columns=Math.min(SAMPLE_COLUMNS,Math.max(1,state.wrapColumns||80));
   const start=state.offset,end=start+state.visible;
-  const g=ownScroll(d.uid,blockGeometry({total:state.units,rows:state.estimatedRows,height,start,end}),start);
+  const g=ownScroll(d.uid,blockGeometry({total:state.units,rows:state.estimatedRows,height,start,end,least:SAMPLE_PITCH}),start);
   const first=Math.floor(g.offset/g.scale),last=Math.min(state.units,Math.ceil((g.offset+g.used)/g.scale));
   const pitch=g.scale*state.units/Math.max(1,state.estimatedRows),found=sampled(d,'offsets',state.revision,first,last,state.units,columns,pitch/g.scale);
-  return diskLayout(d,'offsets',g,found,columns,pitch,height,width,{start,
+  return diskLayout(d,'offsets',g,found,columns,pitch,height,width,{start,metrics:textMetrics(textarea),
    label:()=>Math.round(clamp(start/Math.max(1,state.units-state.visible),0,1)*100),
    seek:value=>paged.mapSeek({offset:value}),
    scroll:delta=>paged.wheelBy(delta),
@@ -869,7 +933,7 @@ function create(adapter){
   // The rows text mode drew last ({line, row, y, text}); empty for blocks.
   get textRows(){return textRows;},
   // The samples a disk-backed document is drawn from (for the checks).
-  get sampleState(){return samples?{kind:samples.kind,from:samples.from,to:samples.to,count:samples.count,rows:samples.rows.length,columns:samples.columns,colored:!!samples.runs,first:samples.rows[0]||null,last:samples.rows.at(-1)||null}:null;},
+  get sampleState(){return samples?{kind:samples.kind,columns:samples.columns,view:[...samples.view],chunks:[...samples.chunks.keys()].sort((x,y)=>x-y),colored:[...samples.chunks.values()].filter(chunk=>chunk.runs).length,fresh:samples.fresh,stale:!!samples.old}:null;},
   get width(){return host&&!host.hidden?host.getBoundingClientRect().width:0;},
   limits:()=>host?limits():null,
   redraw(){drawn='';colors=null;schedule();},

@@ -966,10 +966,13 @@ async function engine(browser){
  const x=info.left+info.width/2;
  // Click at three places: the view centres there.
  for(const at of [0.5,0.9,0.1]){
-  // The map is one pixel per line and scrolls: a click shows the line under the pointer.
-  const g=(await mapInfo(page)).layout.g,target=(g.used*at+g.offset)/g.scale;
-  assert(Math.abs(g.scale-1)<=0.001&&g.used===info.height,'451,649 lines: one pixel per line, scrolling in the map');
-  await page.mouse.click(x,info.top+g.used*at);
+  // The map draws each line as a 2.5 px row of its own text and scrolls: a click shows the line under the pointer.
+  const g=(await mapInfo(page)).layout.g;
+  // A press on the box only drags it: click beside it.
+  let y=g.used*at;if(y>=g.box.top-4&&y<=g.box.top+g.box.height+4)y=g.box.top+g.box.height+40<g.used?g.box.top+g.box.height+40:g.box.top-40;
+  const target=(y+g.offset)/g.scale;
+  assert(Math.abs(g.scale-2.5)<=0.001&&g.used===info.height,'451,649 lines: 2.5 px per line, scrolling in the map');
+  await page.mouse.click(x,info.top+y);
   await page.waitForFunction(target=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&Math.abs(l.start+l.g.span/2-target)<3;},target,{timeout:15000});
   const cursor=await page.evaluate(()=>Number(document.querySelector('#networkToolkitFileEditor [data-ed-gutter-lines] [data-source-line]')?.dataset.sourceLine));
   assert(Math.abs(cursor-target)<60,'a click on line '+Math.round(target)+' shows it (first line '+cursor+')');
@@ -991,6 +994,16 @@ async function engine(browser){
   const now=await page.evaluate(()=>{const s=NetworkToolkitFileEditor.active.diskSession.state().page;return {start:s.start,line:s.line};});
   assert.deepEqual(now,{start:at.start,line:at.line},'the wheel over the map does not move the text');
   assert.equal((await mapPaint(page)).bands,20,'the part of the file the map moved to is drawn');
+  // What the map has read stays, with its colours (owner report on v1.21.63:
+  // the colours went and the map loaded again on every scroll): back over
+  // a part it has shown, nothing is read or coloured again.
+  await page.waitForFunction(()=>NetworkToolkitFileEditor.documentMap.layout.colored,null,{timeout:15000});
+  const held=await page.evaluate(()=>NetworkToolkitFileEditor.documentMap.sampleState);
+  for(let i=0;i<5;i++)await page.mouse.wheel(0,-300);
+  await frames(page);
+  const back=await page.evaluate(()=>{const map=NetworkToolkitFileEditor.documentMap,l=map.layout;return {fresh:l.fresh,colored:l.colored,own:l.g.own,state:map.sampleState};});
+  assert.deepEqual([back.fresh,back.colored,back.own],[true,true,true],'the map is drawn at once, in colour, where it has been: '+JSON.stringify(back));
+  assert(held.chunks.every(index=>back.state.chunks.includes(index)),'and keeps what it read: '+JSON.stringify({held,back}));
  }
  assert(dragged>=0);
  // Scrolling the text takes the map back to following it.
@@ -1066,7 +1079,7 @@ async function engine(browser){
  assert(info.layout.g.used>info.height*0.9,'a 1.7 MB line fills the map');
  // Drag the box to the middle of the map: the middle of the line.
  await page.mouse.move(x,info.top+info.box.top+info.box.height/2);await page.mouse.down();await page.mouse.move(x,info.top+info.layout.g.used*0.5,{steps:12});await page.mouse.up();
- await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&Math.abs((l.g.box.top+l.g.box.height/2)/l.g.used-0.5)<0.03;},null,{timeout:15000});
+ await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&Math.abs((l.g.box.top+l.g.box.height/2)/l.g.used-0.5)<0.03;},null,{timeout:15000}).catch(async error=>{console.log('DIAG',JSON.stringify(await page.evaluate(()=>{const m=NetworkToolkitFileEditor.documentMap,l=m.layout,s=NetworkToolkitFileEditor.active.diskSession.state();return {g:l.g,start:l.start,fresh:l.fresh,state:m.sampleState,page:{start:s.page.start,len:s.page.text.length},units:s.metadata.units};})));throw error;});
  const middle=await page.evaluate(()=>{const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]'),view=NetworkToolkitFileEditor.active.diskSession.state().page;return {start:view.start,end:view.start+view.text.length,shown:ta.value.slice(0,16)};});
  assert(middle.start>d.units*0.4&&middle.end<d.units*0.65,'the box in the middle shows the middle of the line: '+JSON.stringify(middle));
  // Drag the box to the very end: the last characters are shown.

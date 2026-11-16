@@ -1019,7 +1019,7 @@ function paintText(d){if(d?.disk){if(current()===d)diskView()?.refreshSyntax();r
  syncLanguageControls(d);
 }
 function syncLanguageControls(d){const selected=findEl('[data-ed-language-select]'),automatic=findEl('[data-ed-auto-language]'),language=languageOf(d),button=findEl('[data-ed="format"]'),kind=languageTools?.formatKind(language)||'';
- if(selected)selected.value=d.language||'';if(automatic)automatic.textContent='Auto ('+(languageTools?.label(languageFor(d.path,d.content))||'Plain text')+')';
+ if(selected)selected.value=d.language||'';if(automatic)automatic.textContent='Auto ('+(languageTools?.label(d.disk&&d.diskSyntaxLanguage||languageFor(d.path,d.content))||'Plain text')+')';
  if(button){button.disabled=!!d.loading||!!d.formatting||!!d.frozen||!!comparison||d.disk||!kind||d.content.length>250000;button.textContent=kind==='indent'?'Indent document':'Format document';button.title=kind==='indent'?'Adjust code indentation, preserving strings and comments (Ctrl+Shift+F)':kind?'Format '+languageTools.label(language)+' (Ctrl+Shift+F)':'Automatic formatting is unavailable for this language.';}
  if(overlay)overlay.style.setProperty('--nt-editor-tab',String(tabSpaces||4));
 }

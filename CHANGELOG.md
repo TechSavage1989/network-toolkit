@@ -1,3 +1,9 @@
+## 1.21.64 Beta 1 - Document Map: real text for large files, and it keeps what it read
+
+- A disk-backed document's map samples are kept in chunks of 1,024 rows (`CHUNK`, up to `CHUNKS` 64), read nearest to the map's window first and then around it, each with its own colours (`sampled`, `readSamples`, `colourSamples`). Before, one window of samples was replaced on every scroll, which dropped its colours and left the map stale while the wheel moved (3.2 s of a 3.5 s wheel run on a 12,000-line file; now none).
+- Sampled rows are never under 2.5 px (`SAMPLE_PITCH`) and are drawn as the document's own characters (`sampleFont`), squeezed by at most half and then cut.
+- The Auto language label of a disk-backed document names the language its view detected (`diskSyntaxLanguage`).
+
 ## 1.21.63 Beta 1 - Dropped and picked files open faster
 
 - A dropped or picked file over 4,000 lines is disk-backed like a path open (`moreLinesThan` in `importFiles`); before, only files over 512 KiB were, and a page-held 12,000-line document laid out and repainted 11,879 gutter rows and 23,476 highlight spans on every scroll step.

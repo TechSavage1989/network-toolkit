@@ -1,0 +1,14 @@
+Network Toolkit 1.21.64
+
+## What's New
+
+- The Document Map of a large file now shows the file's real text in small print, in the editor's colors, like the map in Notepad++.
+- The map keeps what it has already shown. Scrolling the map or the text no longer makes its colors disappear, and the map no longer reloads while you scroll through it.
+- The language box shows the detected language of a large file (for example "Auto (Fortinet FortiOS config)") instead of "Auto (Plain text)".
+
+## Additional Details
+
+- This applies to files the editor reads in sections: over 4,000 lines or 512 KB. Each line is a 2.5 pixel row of its own characters; a line longer than the map is narrowed and then cut at the map's edge. Such a map scrolls, with its own scroll bar.
+- The map reads the file in parts of 1,024 lines, the ones under the map first and then the ones around it, and keeps up to 64 parts with their colors. After an edit the parts are read again and the earlier ones stay on screen until then.
+- Smaller files are drawn as before.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
