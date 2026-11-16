@@ -663,8 +663,28 @@ function documentModel(){
 function mountDocumentView(){
  overlay.querySelector('[data-ed="colors"]')?.insertAdjacentHTML('afterend','<span class="nt-editor-more-heading" role="presentation">View</span><label class="nt-editor-close-preference" title="A miniature of the whole document at the right edge. Click or drag it to move through the document. Drag its left edge to widen it; wide enough, a short document shows its text."><input type="checkbox" data-ed-document-map> Document map</label><label class="nt-editor-close-preference" title="Docs on the sidebar rail: the open documents. Untick to remove it from the rail."><input type="checkbox" data-ed-sidebar-panel="documents"> Document list</label><label class="nt-editor-close-preference" title="Connect on the sidebar rail: saved and open connections. Untick to remove it from the rail."><input type="checkbox" data-ed-sidebar-panel="connections"> Connections</label><label class="nt-editor-close-preference" title="Files on the sidebar rail: the file browser. Untick to remove it from the rail."><input type="checkbox" data-ed-sidebar-panel="files"> Files</label><label class="nt-editor-close-preference nt-editor-toolbar-labels" title="Show the toolbar buttons as icons or as text. Point to an icon to see its name and shortcut.">Toolbar buttons <select data-ed-toolbar-labels><option value="icons">Icons</option><option value="text">Text</option></select></label>');
  overlay.querySelector('.nt-editor-workspace')?.insertAdjacentHTML('beforeend','<aside class="nt-editor-map" data-ed-map hidden aria-label="Document map"></aside>');
+ watchEditorPageState();
  overlay.addEventListener('change',event=>{const t=event.target;if(t.matches?.('[data-ed-document-map]'))setDocumentMap(t.checked);else if(t.matches?.('[data-ed-sidebar-panel]'))setSidebarPanel(t.dataset.edSidebarPanel,t.checked);else if(t.matches?.('[data-ed-toolbar-labels]'))setToolbarLabels(t.value);});
  documentMap=root.NTKEditorDocumentMap?.create(documentMapAdapter)||null;documentMap?.mount(overlay.querySelector('[data-ed-map]'));syncDocumentMapControl();syncSidebarPanelControls();syncToolbarLabels();
+}
+// Two page-level styles depend on the editor: the Tools page layout while the
+// editor is docked in it, and menus and messages above an open editor sidebar.
+// They are classes on <body> kept by this watcher, never `body:has(...)`: a
+// :has() on the body makes the browser re-check the whole page on every
+// change anywhere in it (each line-number redraw restyled over a thousand
+// elements and made large files stall while scrolling).
+function syncEditorPageState(){
+ const body=document.body;if(!body||!overlay)return;
+ const on=overlay.isConnected,side=overlay.querySelector('[data-ed-files-sidebar]');
+ body.classList.toggle('nt-editor-is-embedded',on&&overlay.classList.contains('nt-editor-embedded'));
+ body.classList.toggle('nt-editor-sidebar-open',on&&!overlay.hidden&&!!side&&!side.hidden);
+}
+function watchEditorPageState(){
+ if(typeof root.MutationObserver!=='function')return;
+ const watcher=new root.MutationObserver(syncEditorPageState);
+ watcher.observe(overlay,{attributes:true,attributeFilter:['class','hidden']});
+ const side=overlay.querySelector('[data-ed-files-sidebar]');if(side)watcher.observe(side,{attributes:true,attributeFilter:['hidden']});
+ syncEditorPageState();
 }
 function openTabMenuAt(uid,x,y,back=null){const d=[...documents.values()].find(item=>item.uid===uid);if(!d||!overlay||overlay.hidden)return false;openTabMenu(d,x,y,back);return true;}
 function focusText(){findEl('[data-ed-text]')?.focus({preventScroll:true});}

@@ -1,3 +1,22 @@
+# v1.21.62 Beta 1 - Large files scroll smoothly
+
+Owner report on v1.21.61: "very large files load in slow, and are very laggy when scrolling", then "it's also slow with document map off".
+
+v1.21.61 was published and verified: tag at merge commit 8324496 (PR #192), release run 43890585798 green, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.61", stable channel still at v1.21.34. Its CI had one job fail once and pass on its one re-run, cause unknown: `TestNativeEditorTransferInstalledWebView2`, "native detach ownership timed out" (the destination window never answered).
+
+Measured (standalone Text Editor on its real engine, Chromium 151, a 16 MB file of 451,649 lines, 150 wheel steps; Chrome traces): the Document Map was not the cause. Per scroll step with Wrap on the browser recalculated styles about 12 times (3.9 s of style work in 200 steps), and each new page stalled 80 to 150 ms.
+
+Causes and fixes (rules in AGENTS.md, "Scroll cost"):
+- `body:has(.nt-editor-embedded)` and `body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden]))` in file-editor.css: a `:has()` on `<body>` is re-checked on every change anywhere in the page, and each line-number redraw restyled every element a `:has()` rule could match (over 1,100 `div`s). They are now the classes `nt-editor-is-embedded` and `nt-editor-sidebar-open` on `<body>`, kept by `syncEditorPageState` (file-editor.js; a `MutationObserver` on the editor element's `class`/`hidden` and the sidebar's `hidden` only).
+- input-clear.js scheduled a pass over every field on every `scroll` event in the page and every child-list change, and each pass rewrote `hidden`, `aria-label`, `title` and classes. It now writes only what changed, reacts to a scroll only when it can move a field with a button, and ignores the editor's gutter, highlight, measure and map.
+- The wrap measure (`createMeasure` in editor-disk-view.js: one row per line of the page, 1,024 at most) now keeps its rows in a shadow tree, so new rows are not matched against the page's style sheets (they inherit font and wrapping from the host).
+
+Result, same measurement: no long task and frames at 17 ms (p95) in every combination of Wrap and map; style work 3.9 s to 0.6 s.
+
+Checks: `scripts/editor-scroll-cost.test.cjs` (no `:has()` on the page root in any style sheet; the Clear-button script's conditional writes; the shadow tree); `scripts/editor-map-list.browser.cjs` scrolls the 16 MB file with Wrap on and asserts that nothing is written to `<body>` or to a Clear button and that the measure's rows are in a shadow tree; the editor's real-engine tests, sidebar, toolbar, standalone and large-file (256 MB locally) checks on Chromium 151.
+
+Known limits: not measured in the main window with the editor docked (same rules and classes, larger page) or on Windows. Opening a file through the picker or a drop uploads it to the engine at about 100 ms per MB here (a path open: 16 MB in 0.4 s, 200 MB in 3 s); the time is the browser's upload of each chunk, not the engine (15 ms per MiB) and not the number of chunks. A compressed or binary upload is the next step. The comparison view still shows long tasks up to about 150 ms on 256 MB files (`TestEditorLargeFileBrowser` timing).
+
 # v1.21.61 Beta 1 - Document Map: the editor's colours only, one pixel per line at the smallest
 
 Owner report on v1.21.60 (a plain text log, 83,384 characters, 1,182 lines, Wrap on): "the document map has color where the actual document does not. the document map is allowed to be scrollable if it needs to extend beyond the length of the screen to fit an entire document with at least one pixel line representing 1 real line at the smallest."

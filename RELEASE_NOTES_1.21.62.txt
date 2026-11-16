@@ -1,0 +1,12 @@
+Network Toolkit 1.21.62
+
+## What's New
+
+- Scrolling large files in the Text Editor is smooth again, with the Document Map on or off.
+- With Wrap on, the short freezes while scrolling through a large file are gone.
+
+## Additional Details
+
+- The cause was in the app's page, not the Document Map: every scroll step made the browser re-check styles across the whole window several times. That is removed.
+- Opening a large file through the file picker or drag and drop is still slower than opening it by its path; that is being worked on next.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

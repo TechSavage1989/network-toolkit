@@ -33,8 +33,8 @@ function releaseHost(host){const saved=hosts.get(host);if(saved&&!--saved.count)
 function attach(record){
  if(record.existing)return;
  if(record.host!==record.control.parentElement){if(record.host)releaseHost(record.host);record.host=parentFor(record.control);}
- else if(hosts.get(record.host)?.added)record.host.classList.add('input-clear-host');
- record.control.classList.add('input-clear-enhanced');
+ else if(hosts.get(record.host)?.added&&!record.host.classList.contains('input-clear-host'))record.host.classList.add('input-clear-host');
+ if(!record.control.classList.contains('input-clear-enhanced'))record.control.classList.add('input-clear-enhanced');
  if(record.button.parentElement!==record.host)record.host.append(record.button);
 }
 function remove(record){
@@ -46,7 +46,7 @@ function remove(record){
  releaseHost(record.host);
 }
 function enhance(control){
- const previous=records.get(control);if(!eligible(control)){if(previous)remove(previous);return;}if(previous){if(previous.existing&&!previous.button.isConnected)remove(previous);else{control.classList.add('input-clear-enhanced');attach(previous);return;}}
+ const previous=records.get(control);if(!eligible(control)){if(previous)remove(previous);return;}if(previous){if(previous.existing&&!previous.button.isConnected)remove(previous);else{attach(previous);return;}}
  if(!control.id){do{control.id='input-clear-field-'+(++nextID);}while(document.getElementById(control.id)!==control);}
  const existing=legacy[control.id]&&document.querySelector(legacy[control.id]),button=existing||document.createElement('button'),existingPosition=existing?root.getComputedStyle(existing).position:'';
  const record={control,button,existing:!!existing,host:null,padding:control.style.getPropertyValue('padding-right'),priority:control.style.getPropertyPriority('padding-right'),basePadding:parseFloat(root.getComputedStyle(control).paddingRight)||8};
@@ -65,11 +65,13 @@ function visible(control){return control.isConnected&&eligible(control)&&!contro
 function layout(record){
  const {control,button}=record;if(!control.isConnected||!eligible(control)){remove(record);return;}
  if(record.existing&&!button.isConnected){remove(record);enhance(control);return;}attach(record);
- const shown=visible(control)&&String(control.value).length>0;button.hidden=!shown;
- const title=record.existing?(button.getAttribute('aria-label')||button.title||'Clear '+name(control)):'Clear '+name(control);button.setAttribute('aria-label',title);button.title=title;
+ // Write only what changed: this runs for every field after many page
+ // events, and an attribute written again still makes the browser restyle.
+ const shown=visible(control)&&String(control.value).length>0;if(button.hidden===shown)button.hidden=!shown;
+ const title=record.existing?(button.getAttribute('aria-label')||button.title||'Clear '+name(control)):'Clear '+name(control);if(button.getAttribute('aria-label')!==title)button.setAttribute('aria-label',title);if(button.title!==title)button.title=title;
  if(!button.querySelector('.input-clear-icon'))button.innerHTML=glyph;
  if(record.existing||!shown)return;
- const rect=control.getBoundingClientRect(),host=record.host,box=host.getBoundingClientRect();if(rect.width<48||rect.height<18){button.hidden=true;return;}
+ const rect=control.getBoundingClientRect(),host=record.host,box=host.getBoundingClientRect();if(rect.width<48||rect.height<18){if(!button.hidden)button.hidden=true;return;}
  const size=Math.min(22,rect.height-4),type=(control.getAttribute('type')||'text').toLowerCase();let end=type==='password'?24:type==='number'?16:0;
  if(control.tagName==='TEXTAREA')end=Math.max(end,(control.offsetWidth||rect.width)-(control.clientWidth||rect.width));
  for(const other of host.querySelectorAll('button')){if(other===button||other.hidden)continue;const bounds=other.getBoundingClientRect();if(bounds.width&&bounds.left>rect.left+rect.width/2&&bounds.right<=rect.right+2&&bounds.top<rect.bottom&&bounds.bottom>rect.top)end=Math.max(end,rect.right-bounds.left+3);}
@@ -83,7 +85,11 @@ function refresh(){schedule(true);}
 function init(){
  if(started||!document?.body)return;started=true;
  if(typeof root.ResizeObserver==='function')resizeObserver=new root.ResizeObserver(()=>schedule());
- for(const event of ['input','change','focusin','focusout','scroll'])document.addEventListener(event,()=>schedule(),true);
+ for(const event of ['input','change','focusin','focusout'])document.addEventListener(event,()=>schedule(),true);
+ // A scroll matters only when it moves a field with a button or is that
+ // field's own (a large text area scrolls on every wheel step, and the Text
+ // Editor's is not one of these fields).
+ document.addEventListener('scroll',event=>{const target=event.target;if(target===document||records.has(target)){schedule();return;}if(target?.nodeType!==1)return;for(const control of records.keys())if(target.contains(control)){schedule();return;}},true);
  root.addEventListener?.('resize',()=>schedule());document.addEventListener('transitionend',()=>schedule(),true);
  if(typeof root.MutationObserver==='function'){
   observer=new root.MutationObserver(changes=>{
@@ -91,6 +97,9 @@ function init(){
     // Terminal output rendering and its helper textarea mutate on every frame
     // and keystroke; nothing in there ever gets a clear button.
     if(mutation.target.closest?.('.xterm'))continue;
+    // So do the Text Editor's line numbers, colours and measuring layers
+    // while it scrolls; they hold no fields.
+    if(mutation.target.closest?.('[data-input-clear="off"],[data-ed-gutter-lines],.nt-editor-wrap-measure,.nt-editor-highlight,[data-ed-map]'))continue;
     if(mutation.type==='attributes'){if(['INPUT','TEXTAREA','FIELDSET'].includes(mutation.target.tagName)){changed=true;needsScan=true;}else if(mutation.attributeName==='hidden'||mutation.attributeName==='inert')changed=true;}
     else{for(const added of mutation.addedNodes||[]){if(added.nodeType!==1||added.classList?.contains('input-clear-button'))continue;if(added.matches?.('input,textarea')||added.querySelector?.('input,textarea'))needsScan=true;}changed=true;}
    }if(changed)schedule();

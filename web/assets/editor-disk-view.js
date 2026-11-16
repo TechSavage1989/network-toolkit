@@ -44,11 +44,23 @@ function measurementStyle(textarea) {
  return {width, font:style.font, height:parseFloat(style.lineHeight) || 20, letterSpacing:style.letterSpacing, tabSize:style.tabSize};
 }
 
+// The hidden element that wraps text like the text area, to measure it. Its
+// rows live in a shadow tree: the page's style sheets do not apply there, so a
+// thousand new rows per page cost the browser no selector matching (they
+// inherit the font and the wrapping from the host). Returns the element the
+// rows go into; remove() takes the whole thing away.
 function createMeasure(container) {
+ const host = document.createElement('div');
+ host.className = 'nt-editor-wrap-measure';
+ host.setAttribute('aria-hidden', 'true');
  const measure = document.createElement('div');
- measure.className = 'nt-editor-wrap-measure';
- measure.setAttribute('aria-hidden', 'true');
- container.append(measure);
+ if (typeof host.attachShadow === 'function') {
+  const shadow = host.attachShadow({mode:'open'}), style = document.createElement('style');
+  style.textContent = 'div>div{margin:0;padding:0;border:0;min-height:1em}';
+  shadow.append(style, measure);
+ } else host.append(measure);
+ measure.remove = () => host.remove();
+ container.append(host);
  return measure;
 }
 

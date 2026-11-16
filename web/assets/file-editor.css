@@ -72,11 +72,11 @@
 .nt-editor-status .error{color:var(--bad)}
 @media(max-width:680px){.nt-editor{padding:0}.nt-editor-window{border-radius:0}.nt-editor-toolbar{max-height:130px;overflow:auto}.nt-editor-gutter{flex-basis:40px}.nt-editor-options{gap:6px}.nt-editor-filetitle{display:none}}
 /* 1.17.48: the shared editor docks in Tools and opens from connected file browsers. */
-body:has(.nt-editor-embedded) #toolWorkspace{display:grid;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:minmax(0,1fr)!important;min-height:0;}
-body:has(.nt-editor-embedded) #toolWorkspace>#toolConfiguration,
-body:has(.nt-editor-embedded) #toolDivider,
-body:has(.nt-editor-embedded) #toolCommandBar{display:none!important;}
-body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;grid-column:1!important;min-height:min(660px,calc(100vh - 180px));min-width:0;display:flex;flex-direction:column;padding:0;overflow:hidden}
+body.nt-editor-is-embedded #toolWorkspace{display:grid;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:minmax(0,1fr)!important;min-height:0;}
+body.nt-editor-is-embedded #toolWorkspace>#toolConfiguration,
+body.nt-editor-is-embedded #toolDivider,
+body.nt-editor-is-embedded #toolCommandBar{display:none!important;}
+body.nt-editor-is-embedded #toolWorkspace>#pageContent{grid-row:1!important;grid-column:1!important;min-height:min(660px,calc(100vh - 180px));min-width:0;display:flex;flex-direction:column;padding:0;overflow:hidden}
 .nt-editor-page-toolbar{padding:8px;display:flex;gap:7px;flex-wrap:wrap;align-items:center;border:1px solid var(--border);border-radius:8px 8px 0 0;background:var(--panel);min-width:0;}
 .nt-editor-page-toolbar label{min-width:200px;flex:1 1 250px;display:flex;gap:8px;align-items:center;font-size:11px;color:var(--muted);}
 .nt-editor-page-toolbar label input{width:100%;min-width:0;flex:1;min-height:31px;font-size:11px;}
@@ -349,9 +349,9 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-files-connection[open]{max-height:55%;overflow:auto}
 .is-editor-sidebar[data-sidebar-side=local]>.nt-editor-files-connection{display:none}
 .is-editor-sidebar[data-delegated] [data-rb-action=openTerminal],.is-editor-sidebar[data-delegated] [data-rb-action=reconnect],.is-editor-sidebar[data-delegated] [data-rb-action=disconnect],.is-editor-sidebar[data-delegated] [data-rb-action=connectionSettings]{display:none}
-body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .modal-backdrop{z-index:400}
-body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .rb-context-menu{z-index:410}
-body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-stack{z-index:420}
+body.nt-editor-sidebar-open .modal-backdrop{z-index:400}
+body.nt-editor-sidebar-open .rb-context-menu{z-index:410}
+body.nt-editor-sidebar-open .toast-stack{z-index:420}
 .nt-editor-files-access{padding:10px;font-size:11px;line-height:1.5}
 .nt-editor-files-access-banner{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:430;display:flex;align-items:center;gap:8px;max-width:calc(100vw - 20px);padding:6px 10px;border:1px solid var(--border);border-radius:7px;box-shadow:var(--shadow);background:var(--panel);color:var(--text);font-size:11px}
 .is-editor-sidebar[data-sidebar-side=local] .rb-session-tools{display:none}
