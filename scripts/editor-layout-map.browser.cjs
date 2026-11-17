@@ -18,8 +18,10 @@ async function mapHome(page,sides){
  await page.waitForFunction(sides=>sides.every(side=>{const host=document.querySelector('[data-compare-pane="'+side+'"]'),scroll=host.querySelector('.cm-scroller'),line=host.querySelector('.cm-line[data-source-line="1"]'),gutter=[...host.querySelectorAll('.cm-lineNumbers .cm-gutterElement')].find(el=>el.textContent.trim()==='1');if(scroll.scrollTop!==0||!line||!gutter)return false;const r=line.getBoundingClientRect(),box=scroll.getBoundingClientRect();return r.top>=box.top&&r.bottom<=box.bottom&&Math.abs(r.top-gutter.getBoundingClientRect().top)<=2&&Number(document.querySelector('[data-compare-track="'+side+'"]').getAttribute('aria-valuenow'))===0;}),sides);
  await measuredMap(page,'Home '+sides.join('/'));
 }
-async function start(root,mode,label,initialSaved){
- const context=await browser.newContext({viewport:{width:1440,height:1000},deviceScaleFactor:Number(process.env.NTK_TEST_DPR)||1});contexts.push(context);const page=await context.newPage();lastPage=page;page.setDefaultTimeout(20000);
+async function start(root,mode,label,initialSaved,{withoutAlignment=false}={}){
+ const context=await browser.newContext({viewport:{width:1440,height:1000},deviceScaleFactor:Number(process.env.NTK_TEST_DPR)||1});contexts.push(context);const page=await context.newPage();
+ // The unaligned comparison (editor-compare.js) is what the editor uses when the aligned component cannot load.
+ if(withoutAlignment)await page.addInitScript(()=>Object.defineProperty(window,'NTKEditorAlignedCompare',{configurable:false,get(){return undefined;},set(){}}));lastPage=page;page.setDefaultTimeout(20000);
  const owned={},requests=[];let saved=initialSaved?structuredClone(initialSaved):{activePage:'editor',appUpdatePreferences:{enabled:false},editorPreferences:{wordWrap:true,syntax:true,fontSize:13,palette:'auto'}};
  page.on('pageerror',e=>report.errors.push(label+': '+e.message));
  await context.route('https://layout109.toolkit.test/**',async route=>{try{if(await handleEditorActivityMetadata(route,'https://layout109.toolkit.test',report))return;const req=route.request(),url=new URL(req.url()),p=url.pathname,body=req.postData()?req.postDataJSON():null;requests.push({method:req.method(),path:p});if(p.startsWith('/api/')){
@@ -98,10 +100,17 @@ async function compareOpen(p){await p.locator('[data-ed="compare"]').click();awa
     const mk=await p.locator('[data-compare-map-viewport="right"]').boundingBox();
     await p.mouse.move(x,mk.y+mk.height/2);await p.mouse.down();await p.mouse.move(x,mk.y+mk.height/2+4,{steps:2});
     const held=await scrollTop();await p.waitForTimeout(150);assert.equal(await scrollTop(),held,'the zoomed map stays where it is while the view is dragged inside it');
-    const down=held<(await map.evaluate(e=>e.scrollHeight-e.clientHeight))/2;
-    const before=held;await p.mouse.move(x,down?mb.y+mb.height+60:mb.y-60,{steps:6});await p.waitForTimeout(600);const moved=await scrollTop();
+    // Just inside the edge zone (a quarter of it deep), toward the farther end,
+    // so the map scrolls slowly and is still short of its end when released:
+    // otherwise "stops on release" could pass only because the map hit its end.
+    const max=await map.evaluate(e=>e.scrollHeight-e.clientHeight),down=held<max/2,size=mk.height,zone=Math.min(24,mb.height/4),inset=zone*.75;
+    const target=size>=mb.height-2*zone?(down?mb.y+mb.height-inset:mb.y+inset):(down?mb.y+mb.height-inset-size/2:mb.y+inset+size/2);
+    const before=held;await p.mouse.move(x,target,{steps:6});await p.waitForTimeout(600);const moved=await scrollTop();
     assert(Math.abs(moved-before)>20,'with the view at the map\'s edge the map scrolls by itself ('+before+' to '+moved+')');
-    await p.mouse.up();await p.waitForTimeout(150);const released=await scrollTop();await p.waitForTimeout(300);assert.equal(await scrollTop(),released,'the map stops when the button is released');
+    assert(Math.abs(moved-before)<600,'just inside the edge zone the map scrolls slowly ('+before+' to '+moved+')');
+    await p.mouse.up();await p.waitForTimeout(150);const released=await scrollTop();
+    assert(released>1&&released<max-1,'the map is released short of its end ('+released+' of '+max+')');
+    await p.waitForTimeout(300);assert.equal(await scrollTop(),released,'the map stops when the button is released');
    }
    check('all zoom choices visibly expand map, wheel pans/navigates without changing font or other document');
    await p.locator('.nt-compare-settings summary').click();await p.check('[data-compare-sync]');await p.selectOption('[data-compare-scale]','0');await p.locator('.nt-compare-settings summary').click();await track('left').press('Home');await mapHome(p,['left','right']);await track('right').hover();await p.mouse.wheel(0,123.5);await p.waitForFunction(()=>{const left=document.querySelector('[data-compare-pane="left"] .cm-scroller'),right=document.querySelector('[data-compare-pane="right"] .cm-scroller');return left.scrollTop>0&&right.scrollTop>0&&Math.abs(left.scrollTop-right.scrollTop)<2;});await measuredMap(p,'synced fractional wheel');assert(Math.abs(await left.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop)-await right.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop))<2);
@@ -128,6 +137,28 @@ async function compareOpen(p){await p.locator('[data-ed="compare"]').click();awa
    check('separate additions/removals/modifications/gaps and pixel-accurate per-document viewport markers');
   }
   await before.context.close();await after.context.close();
+ }
+ {
+  // The unaligned comparison's change map follows the same rules: a zoomed map
+  // scrolls alone under the wheel, and dragging the view to its edge scrolls it
+  // until the button is released (owner request after v1.21.68).
+  const fb=await start(current,'main','fallback',undefined,{withoutAlignment:true}),p=fb.page;lastPage=p;await compareOpen(p);
+  assert.match(await p.locator('[data-compare-summary]').textContent(),/Aligned editing is unavailable/);assert.equal(await p.locator('.nt-compare-surface .cm-editor').count(),0,'the unaligned comparison has no aligned editors');
+  await p.locator('.nt-compare-settings summary').click();await p.selectOption('[data-compare-scale]','4');await p.locator('.nt-compare-settings summary').click();
+  const map=p.locator('[data-compare-map]');await p.waitForFunction(()=>{const m=document.querySelector('[data-compare-map]');return m.scrollHeight>m.clientHeight*3;});
+  const pane=side=>p.locator('[data-compare-text="'+side+'"]').evaluate(e=>e.scrollTop),scrollTop=()=>map.evaluate(e=>e.scrollTop),track=p.locator('[data-compare-track="right"]');
+  const textBefore=await pane('right'),mapBefore=await scrollTop();await track.hover();await p.mouse.wheel(0,mapBefore>0?-110:110);await p.waitForFunction(top=>Math.abs(document.querySelector('[data-compare-map]').scrollTop-top)>1,mapBefore);await p.waitForTimeout(150);
+  assert.equal(await pane('right'),textBefore,'the wheel over a zoomed unaligned map scrolls the map, not the text');
+  const mb=await map.boundingBox(),x=(await track.boundingBox()).x+4;await p.mouse.click(x,mb.y+mb.height/2);await p.waitForTimeout(200);
+  const mk=await p.locator('[data-compare-map-viewport="right"]').boundingBox();await p.mouse.move(x,mk.y+mk.height/2);await p.mouse.down();await p.mouse.move(x,mk.y+mk.height/2+4,{steps:2});await p.waitForTimeout(150);
+  const held=await scrollTop(),max=await map.evaluate(e=>e.scrollHeight-e.clientHeight),down=held<max/2,zone=Math.min(24,mb.height/4),inset=zone*.75,size=mk.height;
+  const target=size>=mb.height-2*zone?(down?mb.y+mb.height-inset:mb.y+inset):(down?mb.y+mb.height-inset-size/2:mb.y+inset+size/2);
+  await p.mouse.move(x,target,{steps:6});await p.waitForTimeout(600);const moved=await scrollTop();
+  assert(Math.abs(moved-held)>20,'dragging the view to the unaligned map\'s edge scrolls the map ('+held+' to '+moved+')');
+  await p.mouse.up();await p.waitForTimeout(150);const released=await scrollTop();assert(released>1&&released<max-1,'the unaligned map is released short of its end ('+released+' of '+max+')');
+  await p.waitForTimeout(300);assert.equal(await scrollTop(),released,'the unaligned map stops when the button is released');
+  check('unaligned comparison: map-only wheel and edge scrolling while dragging, stopped on release');
+  await fb.context.close();
  }
  assert.deepEqual(report.errors,[]);assert.deepEqual(report.assetErrors,[]);report.passed=true;
 })().catch(async e=>{report.failure=e.stack||String(e);console.error(report.failure);if(lastPage&&!lastPage.isClosed()&&output)await lastPage.screenshot({path:path.join(output,'failure.png')}).catch(()=>{});process.exitCode=1;}).finally(async()=>{if(output)fs.writeFileSync(path.join(output,'editor-layout-map-results.json'),JSON.stringify(report,null,2));for(const c of contexts)await c.close().catch(()=>{});await browser?.close();});

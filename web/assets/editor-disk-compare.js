@@ -88,7 +88,7 @@ function create(options) {
  let ids = {left:'', right:''};
  let lastSide = options.activeSide?.() || 'left';
  let signature = '', listSignature = '', disposed = false, syncing = 0, scale = prefs.compareMapZoom ?? -3;
- let job = null, startTimer = null, selected = -1, drag = null;
+ let job = null, startTimer = null, selected = -1, drag = null, mapHeldUntil = 0;
  let mapFrame = 0, gestureSide = null;
  let mapTop = 0, mapExtent = 0, mapScrollMax = 0, mapScrollPosition = 0;
  let mapData = null, mapRequest = null, mapPaintKey = '';
@@ -510,7 +510,8 @@ function create(options) {
    if (comparing && panes[peerOf(side)].ranges.length) paintDifferences(peerOf(side));
   }
   scheduleMap();
-  if (pane.top !== previousTop && gestureSide === side && drag === null) revealMap(side);
+  // A text move still finishing just after a drag must not move the map the user just placed.
+  if (pane.top !== previousTop && gestureSide === side && drag === null && root.performance.now() >= mapHeldUntil) revealMap(side);
   const sync = !syncing && gestureSide === side && q('[data-compare-sync]').checked;
   if (sync) syncVertical(side);
   if (pane.top !== previousTop && job?.status && !coversViewport(side)) queueLocate(side, sync);
@@ -1014,8 +1015,8 @@ function create(options) {
  function dragDepth() {
   const docMap = root.NTKEditorDocumentMap, pane = drag && panes[drag.side];
   if (!docMap || !pane || !mapExtent) return 0;
-  const half = (parseFloat(pane.marker.style.height) || 0) / 2, y = drag.lastY - map.getBoundingClientRect().top;
-  return docMap.edgeDepth(y - half, y + half, map.clientHeight);
+  const size = parseFloat(pane.marker.style.height) || 0, y = drag.lastY - map.getBoundingClientRect().top;
+  return docMap.boxEdgeDepth(y - size / 2, size, map.clientHeight, y);
  }
  function autoStep(time) {
   autoFrame = 0;
@@ -1027,6 +1028,7 @@ function create(options) {
   const before = mapTop;
   setMapTop(mapTop + Math.sign(depth) * root.NTKEditorDocumentMap.autoSpeed(Math.abs(depth)) * passed / 1000);
   if (mapTop === before) return;
+  drag.scrolled = true;
   scheduleMap();
   pointOnMap({clientY:drag.lastY}, drag.side);
   autoFrame = root.requestAnimationFrame(autoStep);
@@ -1115,12 +1117,13 @@ function create(options) {
   });
   track.addEventListener('pointermove', event => { if (drag?.id === event.pointerId) { pointOnMap(event, side); autoStart(); } });
   track.addEventListener('pointerup', event => {
-   if (drag?.id === event.pointerId) autoStop();
-   if (drag?.id !== event.pointerId || Math.abs(event.clientY - drag.y) > 3) return;
+   if (drag?.id === event.pointerId) { autoStop(); mapHeldUntil = root.performance.now() + 600; }
+   // A press that scrolled the map at its edge is a drag, however little the pointer moved.
+   if (drag?.id !== event.pointerId || drag.scrolled || Math.abs(event.clientY - drag.y) > 3) return;
    setMapTop((drag.line + .5) * mapPitch() - map.clientHeight / 2);
    scheduleMap();
   });
-  track.addEventListener('lostpointercapture', () => { drag = null; autoStop(); });
+  track.addEventListener('lostpointercapture', () => { if (drag) mapHeldUntil = root.performance.now() + 600; drag = null; autoStop(); });
   track.addEventListener('keydown', event => {
    const targets = {Home:0, End:totalLines(pane) - 1, ArrowUp:pane.top - 1, ArrowDown:pane.top + 1,
     PageUp:pane.top - linesInView(pane), PageDown:pane.top + linesInView(pane)};
