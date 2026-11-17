@@ -198,11 +198,17 @@ function create(options){
  function paintFindMarks(side){
   if(disposed||inUpdate||isComposing()){scheduleFindMarks();return;}
   const view=views[side],d=bound[side],length=view.state.doc.length;
-  const ranges=d&&!d.loading?options.marks(d,view.viewport.from,view.viewport.to):[];
+  // The whole document's marks, as the single view asks for them (one engine
+  // request per search and revision, never one per scroll step), then the
+  // ones in view.
+  const ranges=d&&!d.loading?options.marks(d,0,length):[];
   if(ranges===null)return; // not known yet: the Find window repaints when it is
-  const list=[];for(const [from,to,kind] of ranges){const a=clamp(from,0,length),b=clamp(to,0,length);if(b>a)list.push((kind?findCurrent:findMark).range(a,b));}
+  const {from:top,to:bottom}=view.viewport,list=[];
+  for(const [from,to,kind] of ranges){if(from>bottom)break;if(to<top)continue;const a=clamp(from,0,length),b=clamp(to,0,length);if(b>a)list.push((kind?findCurrent:findMark).range(a,b));}
   const key=list.map(r=>r.from+'-'+r.to+(r.value===findCurrent?'c':'')).join(',');
-  if(key===findKeys[side])return;
+  // A replaced text (another document on the side, Swap sides) drops the
+  // decorations: paint again even when the key is the same.
+  if(key===findKeys[side]&&view.state.field(findMarkField).size===list.length)return;
   findKeys[side]=key;
   view.dispatch({effects:findMarkEffect.of(Decoration.set(list,true))});
  }

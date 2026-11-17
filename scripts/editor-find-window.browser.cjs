@@ -715,6 +715,13 @@ const step=name=>console.log('FIND WINDOW '+name);
    await win().locator('[data-ed-find-tab="mark"]').click();
    await win().locator('[data-ed-find-action="mark"]').click();
    await until(()=>[...document.querySelectorAll('[data-compare-pane="right"] .nt-find-mark')].map(el=>el.textContent).join('')==='alphaalpha');
+   // The marks belong to the document: Swap sides takes them along (a
+   // replaced text drops CodeMirror's decorations; review finding).
+   const swap=()=>page.locator('[data-compare="swap"]').first().click();
+   await swap();
+   await until(()=>[...document.querySelectorAll('[data-compare-pane="left"] .nt-find-mark')].map(el=>el.textContent).join('')==='alphaalpha');
+   await swap();
+   await until(()=>[...document.querySelectorAll('[data-compare-pane="right"] .nt-find-mark')].map(el=>el.textContent).join('')==='alphaalpha');
    await win().locator('[data-ed-find-action="clear-marks"]').click();
    await until(()=>!document.querySelector('[data-compare-pane="right"] .nt-find-mark:not(.is-current)'));
    await win().locator('[data-ed-find-tab="replace"]').click();
@@ -750,6 +757,17 @@ const step=name=>console.log('FIND WINDOW '+name);
    await until(()=>document.querySelector('[data-compare-pane="right"] .nt-editor-marks:not([hidden]) mark.is-current')?.textContent==='changed-000500',null,30000);
    const placed=await page.evaluate(()=>{const pane=document.querySelector('[data-compare-pane="right"]'),mark=pane.querySelector('.nt-editor-marks:not([hidden]) mark.is-current').getBoundingClientRect(),ta=pane.querySelector('[data-compare-text]'),r=ta.getBoundingClientRect();return {inside:mark.top>=r.top-1&&mark.bottom<=r.bottom+1,selected:ta.value.slice(ta.selectionStart,ta.selectionEnd)};});
    assert.deepEqual(placed,{inside:true,selected:'changed-000500'},'the current match is painted on its own row');
+   // Replace All in All Opened Documents from the other pane: the pane of the
+   // changed document shows its new text, so typing there goes where it is
+   // seen (review finding: it kept the old page).
+   await page.locator('[data-compare-text="left"]').click({position:{x:60,y:12}});
+   await win().locator('[data-ed-find-tab="replace"]').click();
+   await query('changed-000500');await page.locator('[data-ed-replacement]').fill('edited-000500');
+   await win().locator('[data-ed-find-action="replace-open"]').click();
+   await until(()=>{const ta=document.querySelector('[data-compare-text="right"]');return ta.value.includes('edited-000500')&&!ta.value.includes('changed-000500');},null,60000);
+   await clickClear(page.locator('[data-compare-text="right"]'));await page.keyboard.press('Control+z');
+   await until(()=>{const d=[...NetworkToolkitFileEditor.documents.values()].find(d=>d.path.endsWith('large2.txt'));return d&&!d.dirty&&!d.diskEditing;},null,60000);
+   await until(()=>document.querySelector('[data-compare-text="right"]').value.includes('changed-000500'),null,60000);
    await page.locator('#networkToolkitFileEditor [data-ed="compare"]').click();
    await until(()=>!document.querySelector('#networkToolkitFileEditor.is-comparing'));
    assert.ok(await page.evaluate(()=>NetworkToolkitFileEditor.closeAll()),'close the comparison documents');

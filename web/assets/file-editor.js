@@ -1398,6 +1398,7 @@ const textTools=root.NTKEditorTextTools?.create({
 // results panel, marks and bookmarks. Every search runs in the engine; this
 // is what the window needs of the editor.
 const paneShows=d=>!!paneWorkspace()&&Object.values(groups.selection()).includes(d?.id);
+const diskViewFor=d=>current()===d?diskView():paneWorkspace()?.diskViewOf?.(d)||null;
 function currentRange(){const d=current(),ta=findEl('[data-ed-text]');if(!d)return {start:0,end:0};if(d.disk){const r=diskView()?.selection();return r?{start:r.start,end:r.end}:{start:0,end:0};}const a=ta?.selectionStart||0,b=ta?.selectionEnd||0;return {start:Math.min(a,b),end:Math.max(a,b)};}
 // Marks on page-held text: a layer behind the text with its wrapping,
 // scrolled with it. A large document marks the lines in view.
@@ -1477,13 +1478,22 @@ const findAdapter={
  async diskReplaced(d,metadata){
   const session=ensureDiskSession(d);session.initialize(metadata);
   findWindow.edited(d,{bulk:true,lines:metadata.lines});
-  const view=current()===d?diskView():null;
-  if(view){const at=Math.min(view.selection().start,metadata.units);await view.position(at,at,false);await view.load({start:session.state().page.start});}
+  // The view that shows d: the active one, or the other pane of a comparison
+  // or split view (Replace All in All Opened Documents), so its page is the
+  // new text before anyone types there.
+  const view=diskViewFor(d);
+  // The replacement is committed whatever happens here: a reload another
+  // part of the editor cancels (a comparison realigning on the new revision)
+  // is tried again, and never reported as a failed Replace All.
+  if(view){
+   const reload=async()=>{const at=Math.min(view.selection().start,metadata.units);await view.position(at,at,false);await view.load({start:session.state().page.start});};
+   for(let attempt=0;;attempt++){try{await reload();break;}catch(error){if(error?.name!=='AbortError'||attempt>=2)break;}}
+  }
   // A compared document's comparison is worked out again for its new text.
   if(paneShows(d))paneWorkspace().refresh(true);
   drawTabs();status();
  },
- diskBusy(d,on){d.diskEditing=!!on;const view=current()===d?diskView():null;if(view)view.setReadOnly(on?true:notText(d));},
+ diskBusy(d,on){d.diskEditing=!!on;const view=diskViewFor(d);if(view)view.setReadOnly(on?true:notText(d));},
  refresh:()=>{paneWorkspace()?.refresh(true);drawTabs();},
  setMessage,focusText:()=>findEl('[data-ed-text]')?.focus({preventScroll:true}),
  copyText:text=>typeof root.copyText==='function'?root.copyText(text):root.navigator.clipboard.writeText(text),

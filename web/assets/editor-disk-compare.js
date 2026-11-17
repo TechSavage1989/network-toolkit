@@ -220,8 +220,15 @@ function create(options) {
   first = clamp(first - 8, 0, Math.max(0, lines.length - 1));
   const last = Math.min(lines.length, first + linesInView(pane) + 20);
   const from = lines[first] || 0, to = last < lines.length ? lines[last] : pane.text.length;
-  const ranges = options.marks(d, from, to);
-  if (ranges === null) return; // not known yet: the Find window repaints when it is
+  // The whole document's marks, as the single view asks for page-held text
+  // (one engine request per search and revision, not one per scroll step).
+  const all = options.marks(d, 0, pane.text.length);
+  if (all === null) return; // not known yet: the Find window repaints when it is
+  if (pane.findAll !== all || pane.findFrom !== from || pane.findTo !== to) {
+   pane.findAll = all; pane.findFrom = from; pane.findTo = to;
+   pane.findInView = all.filter(([a, b]) => b > from && a < to);
+  }
+  const ranges = pane.findInView;
   const key = [d.uid, d.editRevision, from, to, !!offsets, ta.clientWidth].join(':');
   if (!ranges.length) { layer.hidden = true; pane.findKey = ''; return; }
   if (pane.findKey !== key || pane.findRanges !== ranges) {
@@ -1247,6 +1254,8 @@ function create(options) {
    preview?.reflow();
   },
   get textarea() { return panes[activeSide()].textarea; },
+  // The disk view of the side that shows d, whether or not it has the focus.
+  diskViewOf(d) { return sides.map(side => panes[side]).find(pane => pane.doc === d)?.view || null; },
   // The Find window's marks changed for d: every side that shows it.
   repaintMarks(d) {
    for (const side of sides) {
