@@ -78,6 +78,13 @@ const TEXT_FONT=6,TEXT_FONT_MAX=9,TEXT_SHARE=0.6,TEXT_REFERENCE=120,TEXT_COLUMNS
 // box reaching the map's edge is one width; the rest is past it).
 const AUTO_EDGE=24,AUTO_START=120,AUTO_MAX=30000,AUTO_REACH=8;
 const autoSpeed=depth=>AUTO_START+(AUTO_MAX-AUTO_START)*Math.min(1,depth/AUTO_REACH)**3;
+// A row pitch counts as SAMPLE_PITCH when it is within rounding of it: the
+// pitch is recomputed from the geometry (scale x line height), which can come
+// out as 2.4999999999999996 for a row blockGeometry made exactly 2.5.
+const textPitch=pitch=>pitch>=SAMPLE_PITCH-1e-6;
+// The rows small text needs to fill a map `used` px tall at `pitch` px a row
+// (TEXT_ROWS caps readable text mode, whose rows are 4 px or more).
+const rowsFor=(used,pitch)=>Math.max(TEXT_ROWS,Math.ceil(used/Math.max(0.5,pitch))+2);
 const SAMPLE_PITCH=2.5,SAMPLE_FONT=1.35,SAMPLE_SQUEEZE=0.5;
 const TEXT_FIT=4,CHUNK=1024,CHUNKS=64,COLOUR_COLUMNS=190,SAMPLE_COLUMNS=512,SAMPLE_DELAY=250;
 const SYNTAX_LIMIT=200000; // a disk page coloured for the map at most
@@ -625,15 +632,15 @@ function create(adapter){
  // the row's height, as large documents' samples are drawn (sampleFont);
  // blocks only where a row is too short for any text.
  function drawSmallText(ctx,d,text,starts,m,wrapped,g,width,total,syntax){
-  const pitch=g.scale*m.lineHeight,font=pitch>=SAMPLE_PITCH?sampleFont(ctx,m,pitch,width,m.columns):null;
+  const pitch=g.scale*m.lineHeight,font=textPitch(pitch)?sampleFont(ctx,m,pitch,width,m.columns):null;
   if(!font){drawText(ctx,d,text,starts,m,wrapped,g,width,total,syntax);return;}
   ctx.save();ctx.scale(font.squeeze,1);
-  try{drawTextRows(ctx,d,text,starts,m,wrapped,g,width/font.squeeze,total,{css:font.css,cw:font.cw,columns:font.columns},syntax);}
+  try{drawTextRows(ctx,d,text,starts,m,wrapped,g,width/font.squeeze,total,{css:font.css,cw:font.cw,columns:font.columns},syntax,rowsFor(g.used,pitch));}
   finally{ctx.restore();}
  }
  // Text mode of a page-held document: the rows in the map's window only,
  // from the row at its top, as the text area wraps them.
- function drawTextRows(ctx,d,text,starts,m,wrapped,g,width,total,zoom,syntax){
+ function drawTextRows(ctx,d,text,starts,m,wrapped,g,width,total,zoom,syntax,limit=TEXT_ROWS){
   timedText(()=>{
    const c=palette(),tab=adapter.tabSize(),n=starts.length,usable=Math.max(1,total-m.top-m.bottom),out=[];
    const cumulative=wrapped?wrapRows(d,text,starts,m.columns,tab,m.lineHeight).cumulative:null;
@@ -642,7 +649,7 @@ function create(adapter){
    ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);textStart(ctx,zoom);
    const at=Math.max(0,(g.offset/g.scale-m.top)/rowPixels);
    let line=clamp(wrapped?findRow(cumulative,at):Math.floor(at),0,n-1),row=wrapped?Math.max(0,Math.floor(at-cumulative[line])):0;
-   for(let count=0;line<n&&count<TEXT_ROWS;){
+   for(let count=0;line<n&&count<limit;){
     const y=(m.top+((wrapped?cumulative[line]:line)+row)*rowPixels)*g.scale-g.offset;
     if(y>g.used)break;
     const stop=lineEnd(line),from=wrapped?Math.min(stop,starts[line]+row*m.columns):starts[line],to=wrapped?Math.min(stop,from+m.columns):stop;
@@ -743,7 +750,7 @@ function create(adapter){
   textRows=[];
   const c=palette(),tab=adapter.tabSize(),columns=store.columns,cw=width/columns;
   // Real characters when a row is tall enough for them.
-  const glyphs=pitch>=SAMPLE_PITCH&&m?sampleFont(ctx,m,pitch,width,columns):null;
+  const glyphs=textPitch(pitch)&&m?sampleFont(ctx,m,pitch,width,columns):null;
   const detail=pitch>=2,block=detail?Math.max(1,Math.min(pitch-0.5,pitch*0.7)):Math.max(0.5,pitch),alpha=detail?1:0.85;
   ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);
   const chunkRows=(chunk,cover)=>{
@@ -1045,7 +1052,7 @@ function create(adapter){
 }
 
 const api={create,commentMarkers,lineRuns,kindRuns,blockGeometry,lineShape,lineStarts,geometry,targetAt,dragTarget,widthLimits,storedWidth,shownWidth,textZoom,parseSyntax,syntaxReader,syntaxCursor,rowCells,
- ROW,MIN_BOX,PER_LINE,SAMPLE,WIDTH,NARROW_WIDTH,WIDTH_MAX,TEXT_FONT,TEXT_FONT_MAX,TEXT_REFERENCE,TEXT_COLUMNS,TEXT_ROWS,kinds:{TEXT,COMMENT,STRING,KEYWORD,NUMBER,PROPERTY}};
+ ROW,MIN_BOX,PER_LINE,SAMPLE,WIDTH,NARROW_WIDTH,WIDTH_MAX,TEXT_FONT,TEXT_FONT_MAX,TEXT_REFERENCE,TEXT_COLUMNS,TEXT_ROWS,SAMPLE_PITCH,textPitch,rowsFor,kinds:{TEXT,COMMENT,STRING,KEYWORD,NUMBER,PROPERTY}};
 root.NTKEditorDocumentMap=Object.freeze(api);
 if(typeof module==='object'&&module.exports)module.exports=api;
 })(globalThis);

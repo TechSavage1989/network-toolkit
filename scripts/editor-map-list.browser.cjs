@@ -318,6 +318,11 @@ async function mainWindow(browser){
   await frames(page);
   const rows=await textRows(page),lines=(await page.evaluate(()=>NetworkToolkitFileEditor.active.content)).split('\n');
   assert(rows.length>50,'the map draws the small document as text rows ('+rows.length+')');
+  {
+   // Down to the map's bottom edge (review finding: rows stopped at 400, 1,000 px).
+   const g=(await mapInfo(page)).layout.g,last=Math.max(...rows.map(row=>row.y));
+   assert(last>=g.used-2*2.5-1,'text rows reach the bottom of the map ('+last+' of '+g.used+' px)');
+  }
   for(const row of rows.slice(0,40))assert(lines[row.line].replace(/\t/g,' ').startsWith(row.text.trimEnd())||row.text.trim()==='','map row '+row.line+' is that line\'s text: '+JSON.stringify(row.text));
  }
  // A click centres the view there.
