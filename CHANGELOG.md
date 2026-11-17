@@ -1,3 +1,7 @@
+## 1.21.69 Beta 1 - Comparison change map: map-only wheel and edge scrolling like the Document Map
+
+- The change map's drag (`editor-aligned-compare.js`, `editor-compare.js`, `editor-disk-compare.js`) no longer scrolls a fixed 20 px per pointer move outside the map: while the view's box is in the map's top or bottom `AUTO_EDGE` zone or past it, the map scrolls each frame at the Document Map's `autoSpeed`, with depth from the shared `edgeDepth` (now exported by editor-document-map.js), the view following the pointer. On a zoomed map the wheel scrolls the map alone (the disk comparison already did); Dynamic fit keeps scrolling the text.
+
 ## 1.21.68 Beta 1 - Document Map: real text for smaller files; a gentler edge-scroll ramp
 
 - A page-held document whose rows do not fit as text (`zoomFor` null) uses `blockGeometry` with `least:SAMPLE_PITCH` and draws its rows as its own characters (`drawSmallText`: `sampleFont`, then `drawTextRows` under the font's squeeze), like a large document's samples; blocks only below `SAMPLE_PITCH`. Review findings fixed before release: the recomputed pitch is compared within rounding (`textPitch`; 2.4999999999999996 sent many document lengths back to blocks), and small text draws as many rows as fill the map (`rowsFor`; the `TEXT_ROWS` cap of 400 left the bottom of a map taller than 1,000 px blank).

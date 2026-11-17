@@ -436,6 +436,32 @@ async function main() {
       }));
       throw error;
     });
+    // Dragging the view on a map that scrolls holds the map, and once the
+    // view's box reaches the map's edge the map scrolls by itself on the
+    // Document Map's ramp; it stops on release (owner request after v1.21.68).
+    {
+      const marker = await map.locator('[data-compare-map-viewport="left"]').boundingBox(), box = await map.boundingBox();
+      const x = marker.x + marker.width / 2, scrollTop = () => map.evaluate(el => el.scrollTop);
+      await page.mouse.move(x, marker.y + marker.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(x, box.y + box.height * 0.4, {steps:6});
+      const held = await scrollTop();
+      await page.waitForTimeout(150);
+      assert.equal(await scrollTop(), held, 'the map stays where it is while the view is dragged inside it');
+      const before = held;
+      await page.mouse.move(x, box.y + box.height + 60, {steps:6});
+      await page.waitForTimeout(600);
+      const moved = await scrollTop();
+      assert(moved > before + 20, 'with the view at the map\'s bottom edge the map scrolls by itself (' + before + ' to ' + moved + ')');
+      await page.mouse.up();
+      await page.waitForTimeout(150);
+      const released = await scrollTop();
+      await page.waitForTimeout(300);
+      assert.equal(await scrollTop(), released, 'the map stops when the button is released');
+      await leftTrack.press('Home');
+      await map.locator('[data-compare-track="right"]').press('Home');
+      await page.waitForFunction(() => ['left','right'].every(side => document.querySelector('[data-compare-track="' + side + '"]').getAttribute('aria-valuenow') === '1'));
+    }
     const leftText = page.locator('[data-compare-text="left"]');
     await leftText.click({position:{x:30,y:30}});
     await page.waitForFunction(() => ['left','right'].every(side =>

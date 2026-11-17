@@ -93,8 +93,11 @@ async function converged(page){await page.waitForFunction(()=>{const c=NetworkTo
     const label=mode+'-'+width+'-'+side+'-map-'+scale+'-'+direction;if(only&&only!==label)continue;
     const track=page.locator('[data-compare-track='+side+']'),map=page.locator('[data-compare-map]'),rect=await map.boundingBox(),box=await track.boundingBox(),x=box.x+box.width/2,y=rect.y+rect.height*(direction>0?.25:.65);await page.mouse.move(x,y);await page.mouse.down();
     const summary=await captureGesture(page,label,side,async()=>{for(let step=0;step<40;step++){await page.mouse.move(x,y+direction*rect.height*.4*(step+1)/40);await page.waitForTimeout(12);}});await page.mouse.up();if(!process.env.TOOLKIT_MOTION_OBSERVE_ONLY)validateMotion(summary);await converged(page);
-    // Real wheel over both fit and zoomed map remains functional.
-    const before=await page.evaluate(side=>NetworkToolkitFileEditor.comparison.sourceView(side).scrollTop,side);await track.hover();await page.mouse.wheel(0,-120);await page.waitForFunction(({side,before})=>Math.abs(NetworkToolkitFileEditor.comparison.sourceView(side).scrollTop-before)>1,{side,before});await converged(page);
+    // Real wheel over the fit map scrolls the text; over a zoomed map it scrolls
+    // the map alone, like the Document Map (owner request after v1.21.68).
+    if(scale==='0'){const before=await page.evaluate(side=>NetworkToolkitFileEditor.comparison.sourceView(side).scrollTop,side);await track.hover();await page.mouse.wheel(0,-120);await page.waitForFunction(({side,before})=>Math.abs(NetworkToolkitFileEditor.comparison.sourceView(side).scrollTop-before)>1,{side,before});}
+    else{const before=await map.evaluate(el=>el.scrollTop),text=await page.evaluate(side=>NetworkToolkitFileEditor.comparison.sourceView(side).scrollTop,side);await track.hover();await page.mouse.wheel(0,before>0?-120:120);await page.waitForFunction(before=>Math.abs(document.querySelector('[data-compare-map]').scrollTop-before)>1,before);assert.equal(await page.evaluate(side=>NetworkToolkitFileEditor.comparison.sourceView(side).scrollTop,side),text,'the wheel over a zoomed map leaves the text where it is');}
+    await converged(page);
    }
   }
   assert.deepEqual(await page.evaluate(()=>[...NetworkToolkitFileEditor.documents.values()].map(d=>({uid:d.uid,content:d.content,undo:JSON.stringify(d.undo),redo:JSON.stringify(d.redo),revision:d.editRevision}))),original,'Scroll gestures must not change source/undo/dirty ownership');

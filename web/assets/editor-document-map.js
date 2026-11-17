@@ -78,6 +78,15 @@ const TEXT_FONT=6,TEXT_FONT_MAX=9,TEXT_SHARE=0.6,TEXT_REFERENCE=120,TEXT_COLUMNS
 // box reaching the map's edge is one width; the rest is past it).
 const AUTO_EDGE=24,AUTO_START=120,AUTO_MAX=30000,AUTO_REACH=8;
 const autoSpeed=depth=>AUTO_START+(AUTO_MAX-AUTO_START)*Math.min(1,depth/AUTO_REACH)**3;
+// How far a dragged box is pushed into a map's top or bottom edge, in edge
+// widths: negative at the top, 0 outside the edges, at most AUTO_REACH past
+// the map's end. `top` and `bottom` are the box's edges in map pixels; the
+// comparison's change map uses the same rule (editor-compare.js,
+// editor-disk-compare.js).
+function edgeDepth(top,bottom,height){
+ const edge=Math.min(AUTO_EDGE,height/4);
+ return clamp(top<edge?(top-edge)/edge:bottom>height-edge?(bottom-(height-edge))/edge:0,-AUTO_REACH,AUTO_REACH);
+}
 // A row pitch counts as SAMPLE_PITCH when it is within rounding of it: the
 // pitch is recomputed from the geometry (scale x line height), which can come
 // out as 2.4999999999999996 for a row blockGeometry made exactly 2.5.
@@ -998,8 +1007,8 @@ function create(adapter){
  // the edge (negative at the top; past the map's end it keeps growing, up
  // to AUTO_REACH).
  function autoDepth(g){
-  const edge=Math.min(AUTO_EDGE,g.used/4),top=drag.last-drag.grab,bottom=top+g.box.height;
-  return clamp(top<edge?(top-edge)/edge:bottom>g.used-edge?(bottom-(g.used-edge))/edge:0,-AUTO_REACH,AUTO_REACH);
+  const top=drag.last-drag.grab;
+  return edgeDepth(top,top+g.box.height,g.used);
  }
  function autoStep(time){
   autoFrame=0;
@@ -1052,7 +1061,7 @@ function create(adapter){
 }
 
 const api={create,commentMarkers,lineRuns,kindRuns,blockGeometry,lineShape,lineStarts,geometry,targetAt,dragTarget,widthLimits,storedWidth,shownWidth,textZoom,parseSyntax,syntaxReader,syntaxCursor,rowCells,
- ROW,MIN_BOX,PER_LINE,SAMPLE,WIDTH,NARROW_WIDTH,WIDTH_MAX,TEXT_FONT,TEXT_FONT_MAX,TEXT_REFERENCE,TEXT_COLUMNS,TEXT_ROWS,SAMPLE_PITCH,textPitch,rowsFor,kinds:{TEXT,COMMENT,STRING,KEYWORD,NUMBER,PROPERTY}};
+ ROW,MIN_BOX,PER_LINE,SAMPLE,WIDTH,NARROW_WIDTH,WIDTH_MAX,TEXT_FONT,TEXT_FONT_MAX,TEXT_REFERENCE,TEXT_COLUMNS,TEXT_ROWS,SAMPLE_PITCH,textPitch,rowsFor,AUTO_EDGE,AUTO_REACH,autoSpeed,edgeDepth,kinds:{TEXT,COMMENT,STRING,KEYWORD,NUMBER,PROPERTY}};
 root.NTKEditorDocumentMap=Object.freeze(api);
 if(typeof module==='object'&&module.exports)module.exports=api;
 })(globalThis);
