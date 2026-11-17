@@ -369,8 +369,8 @@ function refresh(force=false){if(disposed)return;if(inUpdate||isComposing()){pen
  let dragY=0,dragSide=null,autoFrame=0,autoTime=0,autoPos=0,autoMoved=false;
  function dragDepth(){const docMap=root.NTKEditorDocumentMap,marker=q('[data-compare-map-viewport="'+dragSide+'"]');if(!docMap||!marker||marker.hidden||map.scrollHeight<=map.clientHeight)return 0;const size=parseFloat(marker.style.height)||0,y=dragY-map.getBoundingClientRect().top;return docMap.boxEdgeDepth(y-size/2,size,map.clientHeight,y);}
  function autoStep(time){autoFrame=0;if(mapDrag===null||disposed)return;const depth=dragDepth();if(!depth)return;const passed=autoTime?Math.min(50,time-autoTime):16;autoTime=time;const max=Math.max(0,map.scrollHeight-map.clientHeight);
- // A fractional position of its own: scrollTop snaps to device pixels, and a step under a pixel must not end the loop.
- autoPos=Math.min(max,Math.max(0,autoPos+Math.sign(depth)*root.NTKEditorDocumentMap.autoSpeed(Math.abs(depth))*passed/1000));map.scrollTop=autoPos;autoMoved=true;mapPoint({clientY:dragY},dragSide);if((depth<0&&autoPos<=0)||(depth>0&&autoPos>=max))return;autoFrame=root.requestAnimationFrame(autoStep);}
+ // A fractional position of its own: scrollTop snaps to device pixels, and a step under a pixel must not end the loop. A move by anything else (the wheel, a clamp) is taken over, never undone.
+ if(Math.abs(map.scrollTop-autoPos)>=1)autoPos=map.scrollTop;const from=autoPos;autoPos=Math.min(max,Math.max(0,autoPos+Math.sign(depth)*root.NTKEditorDocumentMap.autoSpeed(Math.abs(depth))*passed/1000));map.scrollTop=autoPos;if(autoPos!==from)autoMoved=true;mapPoint({clientY:dragY},dragSide);if((depth<0&&autoPos<=0)||(depth>0&&autoPos>=max))return;autoFrame=root.requestAnimationFrame(autoStep);}
  function autoStart(){if(!autoFrame&&dragDepth()){autoTime=0;autoPos=map.scrollTop;autoFrame=root.requestAnimationFrame(autoStep);}}
  function autoStop(){if(autoFrame){root.cancelAnimationFrame(autoFrame);autoFrame=0;}}
  function mapPoint(event,side){if(!geometry)return;const y=event.clientY-map.getBoundingClientRect().top+map.scrollTop;

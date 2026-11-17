@@ -1075,7 +1075,8 @@ function create(options) {
    options.activate(pane.doc, side);
    for (const name of sides) panes[name].section.classList.toggle('is-active-view', name === side);
   });
-  const gesture = () => { gestureSide = side; horizontal.input(side); };
+  // A new gesture in the text ends the hold left by a map drag, so the map follows it again.
+  const gesture = () => { gestureSide = side; mapHeldUntil = 0; horizontal.input(side); };
   pane.container.addEventListener('pointerdown', gesture);
   pane.container.addEventListener('wheel', gesture, {passive:true});
   pane.container.addEventListener('keydown', gesture, true);
@@ -1125,6 +1126,7 @@ function create(options) {
   });
   track.addEventListener('lostpointercapture', () => { if (drag) mapHeldUntil = root.performance.now() + 600; drag = null; autoStop(); });
   track.addEventListener('keydown', event => {
+   mapHeldUntil = 0;
    const targets = {Home:0, End:totalLines(pane) - 1, ArrowUp:pane.top - 1, ArrowDown:pane.top + 1,
     PageUp:pane.top - linesInView(pane), PageDown:pane.top + linesInView(pane)};
    if (!Object.hasOwn(targets, event.key)) return;
