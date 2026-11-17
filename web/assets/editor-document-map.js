@@ -104,7 +104,7 @@ const textPitch=pitch=>pitch>=SAMPLE_PITCH-1e-6;
 // (TEXT_ROWS caps readable text mode, whose rows are 4 px or more).
 const rowsFor=(used,pitch)=>Math.max(TEXT_ROWS,Math.ceil(used/Math.max(0.5,pitch))+2);
 const SAMPLE_PITCH=2.5,SAMPLE_FONT=1.35,SAMPLE_SQUEEZE=0.5;
-const MAP_COLOUR_SEGMENT=160000,MAP_COLOUR_CONTEXT=40000; // characters of one colouring request, and of the text before and after it (the worker's limit is 250,000)
+const MAP_COLOUR_SEGMENT=90000,MAP_COLOUR_CONTEXT=75000; // characters of one colouring request, and of the text before and after it (the worker's limit is 250,000)
 const TEXT_FIT=4,CHUNK=1024,CHUNKS=64,SAMPLE_COLUMNS=512,SAMPLE_DELAY=250;
 const SYNTAX_LIMIT=200000; // a disk page coloured for the map at most
 const SYNTAX_DELAY=150;    // milliseconds before a disk page is coloured
@@ -764,8 +764,7 @@ function create(adapter){
     // (its colours there are plain text) within MAP_COLOUR_CONTEXT, so the
     // worker starts in the state the editor's own reading has there; a word
     // longer than that leaves only its end, as before.
-    const text=prior.text,stop=Math.max(0,text.length-Math.max(0,prior.end-first.start));
-    context=text.slice(neutralFrom(text,prior.runs.offsets,prior.runs.kinds,prior.runs.count,stop),stop);
+    context=contextAfter(prior,first);
    }else if(!prior)chunk.wants=true;
   }
   // Rows may repeat or overlap (two samples in one wrapped row): each
@@ -776,7 +775,6 @@ function create(adapter){
    if(k&&row.line===line&&Number.isFinite(row.start)&&row.start>=run&&row.start<=end){starts[k]=text.length-(end-row.start);if(row.start+part.length>end){text+=part.slice(end-row.start);end=row.start+part.length;}return;}
    if(k)text+='\n';starts[k]=text.length;text+=part;run=row.start;end=row.start+part.length;line=row.line;
   });
-  if(!text.trim())return;
   // The text after the chunk, when its line goes on into the next chunk: a
   // string is a string only with its closing quote, so the worker reads on.
   const following=store.chunks.get(chunk.index+1),last=rows[rows.length-1];let after='';chunk.ahead=false;
@@ -787,19 +785,32 @@ function create(adapter){
   }else if(!following&&last&&chunk.index+1<store.count)chunk.ahead=true;
   colourBusy=true;
   const stale=()=>samples!==store||store.colour!==want||!store.chunks.has(chunk.index);
+  // Whatever happens, the chunk ends with colours (plain text when the worker
+  // could not colour it), so the chunks after it are never kept waiting.
+  const finish=(offsets,kinds)=>{
+   if(!offsets?.length||offsets[0]!==0){offsets=[0,...(offsets||[])];kinds=[TEXT,...(kinds||[])];}
+   chunk.runs={offsets:Int32Array.from(offsets),kinds:Uint8Array.from(kinds),count:offsets.length,length:text.length};chunk.starts=starts;chunk.text=text;chunk.end=end;chunk.usedContext=context;store.stamp=++stamps;
+   // The chunk after, when it was coloured from other text before this one.
+   const next=store.chunks.get(chunk.index+1);
+   if(next&&next.colour===want&&next.rows[0]?.column>0&&continues(rows[rows.length-1],next.rows[0])&&next.usedContext!==contextAfter(chunk,next.rows[0]))next.colour='';
+  };
   // At most MAP_COLOUR_SEGMENT characters per request, ending at a row, each
   // after the MAP_COLOUR_CONTEXT characters before it, so the worker's limit
   // (250,000) is never reached whatever the wrap width.
+  store.colourings=(store.colourings||0)+1;
   void (async()=>{
    const offsets=[],kinds=[];let at=0,lead=context;
+   if(!text.trim()){finish(offsets,kinds);return;}
    while(at<text.length){
     let end=Math.min(text.length,at+MAP_COLOUR_SEGMENT);
     if(end<text.length){const k=before(starts,end)-1;if(k>=0&&starts[k]>at)end=starts[k];}
     const ahead=end<text.length?text.slice(end,end+MAP_COLOUR_CONTEXT):after,request=lead+text.slice(at,end)+ahead;
     const value=await service.highlight(request,language,{channel:'map'});
-    if(stale()||!value||value.limited)return;
+    if(stale())return;
+    if(!value||value.limited){finish(null,null);return;}
     const runs=await readRuns(value.html,stale);
-    if(!runs||runs.length!==request.length)return;
+    if(stale())return;
+    if(!runs||runs.length!==request.length){finish(null,null);return;}
     for(let i=0;i<runs.count;i++){
      const from=Math.max(lead.length,runs.offsets[i]),to=Math.min(request.length-ahead.length,i+1<runs.count?runs.offsets[i+1]:runs.length);if(to<=from)continue;
      const offset=from-lead.length+at;
@@ -810,11 +821,8 @@ function create(adapter){
     lead=text.slice(neutralFrom(text,offsets,kinds,offsets.length,end),end);
     at=end;
    }
-   if(!offsets.length||offsets[0]!==0){offsets.unshift(0);kinds.unshift(TEXT);}
-   chunk.runs={offsets:Int32Array.from(offsets),kinds:Uint8Array.from(kinds),count:offsets.length,length:text.length};chunk.starts=starts;chunk.text=text;chunk.end=end;store.stamp=++stamps;
-   // The chunk after, coloured before this one was, is coloured again from here.
-   const next=store.chunks.get(chunk.index+1);if(next&&next.colour===want&&next.rows[0]?.column>0&&continues(rows[rows.length-1],next.rows[0])){next.colour='';}
-  })().catch(()=>{}).then(()=>{colourBusy=false;schedule();});
+   finish(offsets,kinds);
+  })().catch(()=>{if(!stale())finish(null,null);}).then(()=>{colourBusy=false;schedule();});
  }
  // Where the worker may start reading text that ends at `stop`: the start of
  // the last plain-text run (outside any string or comment) within
@@ -830,6 +838,12 @@ function create(adapter){
    if(at<=from)return stop;
   }
   return from;
+ }
+ // The text before `first` (the first row of the next chunk) that the worker
+ // reads first: from the last plain-text place of `prior` (see neutralFrom).
+ function contextAfter(prior,first){
+  const text=prior.text,stop=Math.max(0,text.length-Math.max(0,prior.end-first.start));
+  return text.slice(neutralFrom(text,prior.runs.offsets,prior.runs.kinds,prior.runs.count,stop),stop);
  }
  // The editor's colours of html, read in slices between frames.
  function readRuns(html,stale){
@@ -1151,7 +1165,7 @@ function create(adapter){
   // The rows text mode drew last ({line, row, y, text}); empty for blocks.
   get textRows(){return textRows;},
   // The samples a disk-backed document is drawn from (for the checks).
-  get sampleState(){return samples?{kind:samples.kind,columns:samples.columns,view:[...samples.view],chunks:[...samples.chunks.keys()].sort((x,y)=>x-y),colored:[...samples.chunks.values()].filter(chunk=>chunk.runs).length,count:samples.count||0,waiting:[...samples.chunks.values()].filter(chunk=>chunk.wants||chunk.ahead).length,fresh:samples.fresh,stale:!!samples.old}:null;},
+  get sampleState(){return samples?{kind:samples.kind,columns:samples.columns,view:[...samples.view],chunks:[...samples.chunks.keys()].sort((x,y)=>x-y),colored:[...samples.chunks.values()].filter(chunk=>chunk.runs).length,count:samples.count||0,colourings:samples.colourings||0,waiting:[...samples.chunks.values()].filter(chunk=>chunk.wants||chunk.ahead).length,fresh:samples.fresh,stale:!!samples.old}:null;},
   // The characters of the held, coloured samples by kind (for the checks).
   get sampleKinds(){
    const names=['text','comment','string','keyword','number','property'],out={};

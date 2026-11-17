@@ -112,6 +112,14 @@ test('a one-line export up to the page-held size keeps its colours (span budget)
  let text='checksumVersion=1&shortProdName=TZ%20Lab';for(let i=0;text.length<512*1024;i++)text+='&addrObjId_'+i+'=Lab%20Host%20'+i+'&addrObjIp1_'+i+'=192.0.2.'+(i%250);
  text=text.slice(0,512*1024);assert.equal(api.detect(text),'network-sonicos-exp');const result=api.paint(text,'network-sonicos-exp');assert(!result.limited,result.reason);assert.equal(unpaint(result.html),text);
 });
+test('a one-line export with escapes in every value keeps its colours up to 512 KiB',()=>{
+ let text='checksumVersion=1&shortProdName=TZ%20Lab';for(let i=0;text.length<512*1024;i++)text+='&addrObjId_'+i+'=%22Lab%20Host%20'+i+'%22%2C%20x%3Dy&svcObjId_'+i+'=A%20B%20C%20D';
+ text=text.slice(0,512*1024);const result=api.paint(text,'network-sonicos-exp');assert(!result.limited,result.reason);assert.equal(unpaint(result.html),text);
+ assert(api.paint('set x 1\n'.repeat(80000),'network-fortios').limited,'other network formats keep their span budget');
+});
+test('an export that starts with blank or space-only lines is still recognized',()=>{
+ for(const lead of ['\n','\r\n\r\n','  \t\n','\uFEFF \n'])assert.equal(api.settingsExport(lead+sonicExport),'network-sonicos-exp',JSON.stringify(lead));
+});
 test('detection rejects other files at once and remembers its answer',()=>{
  const code='const a = 1;\n'.repeat(5000);let start=performance.now();for(let i=0;i<200;i++)api.settingsExport(code+i);assert(performance.now()-start<200,'quick rejection');
  const props=Array.from({length:3000},(_,i)=>'key_'+i+'=value'+i).join('\n');api.settingsExport(props);start=performance.now();for(let i=0;i<1000;i++)assert.equal(api.settingsExport(props),'');assert(performance.now()-start<100,'remembered');

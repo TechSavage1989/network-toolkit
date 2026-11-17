@@ -11,7 +11,9 @@ What changed (rules in AGENTS.md: Network configuration languages, the Find wind
 
 Review before release: nine findings, all confirmed and fixed (see CHANGELOG). The map's colouring went through three rounds against the new check: rows joined by offset, plain-text starting points (`neutralFrom`), text after each request (lookahead), and colouring in order.
 
-Known limits: the editor colours a disk-backed page from the page's own start, so a page that starts inside a string longer than a page can show that string's inside as plain text until its closing quote. In the map, a single string or comment longer than 40,000 characters, and the last few characters of a document that the samples never read, can still be coloured by guess. SonicOS export key families are inferred from exports (no published schema).
+Known limits: the editor colours a disk-backed page from the page's own start, so a page that starts inside a string longer than a page can show that string's inside as plain text until its closing quote. In the map, a single string or comment longer than 75,000 characters, and the last few characters of a document that the samples never read, can still be coloured by guess, and that guess can carry on along the line. **Join lines** turns empty lines at the very start of the text into one leading separator.
+
+Second review (six findings, all confirmed and fixed; see CHANGELOG): failed colourings no longer block later chunks, no recolour cascade, wider windows, the export's own span cap, blank first lines. SonicOS export key families are inferred from exports (no published schema).
 
 Not checked on real Windows.
 

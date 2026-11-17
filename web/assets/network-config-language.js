@@ -9,9 +9,12 @@ const languages=Object.freeze([
  ['network-panos-xml','Palo Alto PAN-OS XML config'],['network-cisco-ios','Cisco IOS / IOS-XE config'],
  ['network-cisco-nxos','Cisco NX-OS config'],['network-cisco-asa','Cisco ASA config']
 ].map(([id,label])=>Object.freeze({id,label,aliases:[]})));
+// A settings export colours several runs per pair; its page-held size (512 KiB) on one line needs more
+// spans than a CLI configuration, still within the 8 MiB HTML budget.
+const EXPORT_SPANS=200000;
 const ids=new Set(['network',...languages.map(x=>x.id)]),MAX_DETECT=65536,MAX_PAINT=1000000,MAX_SPANS=100000,MAX_HTML=8*1024*1024;
 let budget=null;
-function charge(chars,spans=0){if(!budget)return;budget.chars+=chars;budget.spans+=spans;if(budget.chars>MAX_HTML||budget.spans>MAX_SPANS)throw RangeError('Network syntax display budget exceeded.');}
+function charge(chars,spans=0){if(!budget)return;budget.chars+=chars;budget.spans+=spans;if(budget.chars>MAX_HTML||budget.spans>(budget.maxSpans||MAX_SPANS))throw RangeError('Network syntax display budget exceeded.');}
 const escape=s=>{const html=s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');charge(html.length);return html;};
 const span=(kind,s)=>{if(!s)return '';const open='<span class="nt-ed-'+kind+'">';charge(open.length+7,1);return open+escape(s)+'</span>';};
 // Walk physical lines without normalizing CRLF, CR, BOM, tabs or control bytes.
@@ -39,7 +42,7 @@ function settingsExport(text){
  const id=exportCheck(text);exportMemo={text,id};return id;
 }
 function exportCheck(text){
- const start=text.charCodeAt(0)===0xFEFF?1:0;let at=start;while(at<text.length&&(text[at]==='\r'||text[at]==='\n'))at++;
+ const start=text.charCodeAt(0)===0xFEFF?1:0;let at=start;while(at<text.length&&' \t\r\n'.includes(text[at]))at++;
  if(!/^[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)*=/.test(text.slice(at,at+256)))return '';
  const head=text.slice(start,MAX_DETECT);
  if(/[\x00-\x08\x0e-\x1f]/.test(head))return '';
@@ -112,7 +115,7 @@ function cliHighlight(text){let out='';const state={quote:'',banner:''};lines(te
 function xmlHighlight(text){let out='',at=0;while(at<text.length){const start=text.indexOf('<',at);if(start<0){out+=escape(text.slice(at));break;}out+=escape(text.slice(at,start));let end,kind='keyword';if(text.startsWith('<!--',start)){const close=text.indexOf('-->',start+4);end=close<0?text.length:close+3;kind='comment';}else if(text.startsWith('<![CDATA[',start)){const close=text.indexOf(']]>',start+9);end=close<0?text.length:close+3;kind='string';}else{let quote='';end=start+1;for(;end<text.length;end++){const ch=text[end];if(quote){if(ch===quote)quote='';}else if(ch==='"'||ch==="'")quote=ch;else if(ch==='>'){end++;break;}}}const tag=text.slice(start,end);if(kind!=='keyword')out+=span(kind,tag);else{let p=0;const attrs=/"[^"]*"|'[^']*'/g;let a;while((a=attrs.exec(tag))){out+=span('keyword',tag.slice(p,a.index))+span('string',a[0]);p=attrs.lastIndex;}out+=span('keyword',tag.slice(p));}at=end;}return out;}
 function paint(text,id){text=String(text);if(!ids.has(id))return {html:escape(text),limited:false,reason:''};
  const previous=budget;budget=null;try{if(text.length>MAX_PAINT)return {html:escape(text),limited:true,reason:'Network syntax display is limited to 1,000,000 characters; the complete source remains editable as plain text.'};
- budget={chars:0,spans:0};return {html:id==='network-panos-xml'?xmlHighlight(text):id==='network-sonicos-exp'?exportHighlight(text):cliHighlight(text),limited:false,reason:''};}
+ budget={chars:0,spans:0,maxSpans:id==='network-sonicos-exp'?EXPORT_SPANS:MAX_SPANS};return {html:id==='network-panos-xml'?xmlHighlight(text):id==='network-sonicos-exp'?exportHighlight(text):cliHighlight(text),limited:false,reason:''};}
  catch(error){if(!(error instanceof RangeError))throw error;budget=null;return {html:escape(text),limited:true,reason:'Network syntax display exceeded its token/HTML budget; the complete source remains editable as plain text.'};}
  finally{budget=previous;}
 }

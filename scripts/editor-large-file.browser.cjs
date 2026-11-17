@@ -299,6 +299,7 @@ async function verifyLongLineMapColours(page) {
     }
     const all = Object.values(kinds.map || {}).reduce((a, b) => a + b, 0);
     assert(kinds.state.columns > (px === '8' ? 190 : 0), 'row width at ' + px + ' px: ' + kinds.state.columns);
+    assert(kinds.state.colourings <= 3 * kinds.state.count, 'each chunk is coloured a few times at most, not once per chunk read before it: ' + JSON.stringify(kinds.state));
     assert(all > 0 && kinds.map.string / all > 0.9, 'the map shows the long strings as strings at ' + px + ' px: ' + JSON.stringify(kinds));
     assert(!kinds.map.number || kinds.map.number / all < 0.01, 'no digits inside strings drawn as numbers at ' + px + ' px: ' + JSON.stringify(kinds));
   }
