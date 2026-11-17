@@ -1,3 +1,15 @@
+# v1.21.71 Beta 1 - Find, Replace and Mark in a comparison
+
+v1.21.70 was published and verified: tag at merge commit 5e227c3 (PR #201), release run 44030640657 green, both Checks runs green without a re-run, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` passing, stable channel still v1.21.34.
+
+Owner request after v1.21.70: "Find and replace needs to work in compare mode."
+
+What changed (rule in the AGENTS.md Find window bullet): the Find window works in all three comparison kinds (aligned CodeMirror for page-held documents, its textarea fallback, and the disk comparison) on the pane that has or last had the focus, with marks and the current match painted in each pane, Replace and Replace All on the compared document (the comparison recalculates), and the window moving off the match it covers.
+
+Known limits: the textarea fallback of the page-held comparison (used only when the aligned comparison cannot load) shows no marks; the selection still shows the match. A results row of a document outside the comparison is refused rather than shown.
+
+Not checked on real Windows.
+
 # v1.21.70 Beta 1 - SonicWall settings exports recognized by content; Find window Quick searches; Document Map colours on long lines
 
 v1.21.69 was published and verified: tag at merge commit d6e9832 (PR #200), release run 44006081576 green, both Checks runs green (one re-run of an unrelated native job), all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` passing, stable channel still v1.21.34.

@@ -21,7 +21,7 @@ function paneMarkup(side) {
   '<div class="nt-editor-tabs" data-ed-tabs data-ed-view="' + side + '" role="tablist" aria-label="' + side + ' view document tabs"></div>' +
   '<div class="nt-disk-compare-code">' +
   '<div class="nt-editor-gutter" aria-hidden="true"><div data-disk-compare-gutter="' + side + '"></div></div>' +
-  '<div class="nt-editor-surface"><div class="nt-disk-compare-colors" aria-hidden="true"></div>' +
+  '<div class="nt-editor-surface"><div class="nt-disk-compare-colors" aria-hidden="true"></div><div class="nt-editor-marks nt-disk-compare-marks" aria-hidden="true" hidden></div>' +
   '<textarea id="ntCompare-' + side + '" data-compare-text="' + side + '" data-input-clear="off" wrap="off" spellcheck="false" aria-label="Edit ' + side + ' document"></textarea></div></div>' +
   '<div class="nt-compare-document-state" data-compare-state="' + side + '"></div></section>';
 }
@@ -77,6 +77,7 @@ function create(options) {
    textarea: q('[data-compare-text="' + side + '"]'),
    gutter: q('[data-disk-compare-gutter="' + side + '"]'),
    colors: section.querySelector('.nt-disk-compare-colors'),
+   findMarks: section.querySelector('.nt-disk-compare-marks'), findKey: '',
    track: q('[data-compare-track="' + side + '"]'),
    select: q('[data-compare-select="' + side + '"]'),
    markers: q('[data-compare-map-marks="' + side + '"]'),
@@ -196,6 +197,51 @@ function create(options) {
    (doc.saving ? ' · Saving…' : '') : 'Open or create a second document.';
   pane.section.classList.toggle('is-active-view', side === activeSide());
  }
+
+ // Marks of the Find window on a side held in the page (a disk-backed side
+ // paints its own, through its disk view): the lines in view, placed like
+ // the text area's rows and moved with its scroll.
+ function paintInlineMarks(side) {
+  const pane = panes[side], layer = pane.findMarks, d = pane.doc, ta = pane.textarea;
+  if (!layer) return;
+  if (!d || d.disk || !options.marks || ta.value !== pane.text) {
+   layer.hidden = true;
+   pane.findKey = '';
+   return;
+  }
+  const height = lineHeight(pane), offsets = inlineWrapOffsets(pane), lines = pane.lines;
+  let first = 0;
+  if (offsets) {
+   const row = ta.scrollTop / height;
+   let low = 0, high = lines.length - 1;
+   while (low < high) { const mid = (low + high + 1) >> 1; if (offsets[mid] <= row) low = mid; else high = mid - 1; }
+   first = low;
+  } else first = Math.floor(ta.scrollTop / height);
+  first = clamp(first - 8, 0, Math.max(0, lines.length - 1));
+  const last = Math.min(lines.length, first + linesInView(pane) + 20);
+  const from = lines[first] || 0, to = last < lines.length ? lines[last] : pane.text.length;
+  const ranges = options.marks(d, from, to);
+  if (ranges === null) return; // not known yet: the Find window repaints when it is
+  const key = [d.uid, d.editRevision, from, to, !!offsets, ta.clientWidth].join(':');
+  if (!ranges.length) { layer.hidden = true; pane.findKey = ''; return; }
+  if (pane.findKey !== key || pane.findRanges !== ranges) {
+   pane.findKey = key;
+   pane.findRanges = ranges;
+   let html = '', at = from;
+   for (const [a, b, kind] of ranges) {
+    const start = Math.max(a, at), stop = Math.min(b, to);
+    if (stop <= start) continue;
+    html += escapeMarks(pane.text.slice(at, start)) + (kind ? '<mark class="is-current">' : '<mark>') + escapeMarks(pane.text.slice(start, stop)) + '</mark>';
+    at = stop;
+   }
+   layer.innerHTML = html + escapeMarks(pane.text.slice(at, to)) + '\n';
+   layer.classList.toggle('is-wrapped', !!offsets);
+   layer.style.width = offsets ? ta.clientWidth + 'px' : '';
+  }
+  layer.hidden = false;
+  layer.style.transform = 'translate(' + (-ta.scrollLeft) + 'px,' + ((offsets ? offsets[first] : first) * height - ta.scrollTop) + 'px)';
+ }
+ const escapeMarks = value => value.replace(/[&<>]/g, c => c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;');
 
  function paintInlineGutter(pane) {
   const height = lineHeight(pane), offsets = inlineWrapOffsets(pane);
@@ -500,6 +546,7 @@ function create(options) {
   } else {
    paintInlineGutter(pane);
   }
+  paintInlineMarks(side);
   remember(side);
   paintDifferences(side);
   const source = pane.view?.comparisonPage();
@@ -1200,6 +1247,15 @@ function create(options) {
    preview?.reflow();
   },
   get textarea() { return panes[activeSide()].textarea; },
+  // The Find window's marks changed for d: every side that shows it.
+  repaintMarks(d) {
+   for (const side of sides) {
+    const pane = panes[side];
+    if (pane.doc !== d) continue;
+    if (pane.view) pane.view.refreshMarks();
+    else { pane.findKey = ''; paintInlineMarks(side); }
+   }
+  },
   get activeSide() { return lastSide; },
   get composing() { return composing(); },
   get result() { return job?.status || null; },

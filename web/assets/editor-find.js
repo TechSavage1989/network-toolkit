@@ -375,7 +375,7 @@ function create(a){
  function typed(){
   root.clearTimeout(typing?.timer);typing?.controller?.abort();
   const d=a.current(),input=el?.querySelector('[data-ed-query]');
-  if(!d||opts.mode!=='normal'||tab==='mark'||!input?.value||input.value.length>4096||!a.engine()||blockedRead(d)||a.comparing())return;
+  if(!d||opts.mode!=='normal'||tab==='mark'||!input?.value||input.value.length>4096||!a.engine()||blockedRead(d))return;
   if(!typing||typing.uid!==d.uid)typing={uid:d.uid,at:a.selection(d).start};
   const state=typing;
   state.timer=root.setTimeout(async()=>{
@@ -409,7 +409,7 @@ function create(a){
   lastFound={uid:d.uid,revision:a.revision(d),from:result.from,to:result.to};
   await a.select(d,result.from,result.to,false);
   lastFound.revision=a.revision(d);
-  refreshFound();
+  refreshFound();avoidMatch();
   if(scope&&area.within)scope.revision=lastFound.revision;
   status(result.wrapped?(backwards?'Find: Found the last occurrence from the bottom. The start of the '+(area.within?'selection':'document')+' has been reached.':'Find: Found the first occurrence from the top. The end of the '+(area.within?'selection':'document')+' has been reached.'):'Match on line '+count(result.line+1)+'.');
   return true;
@@ -562,15 +562,16 @@ function create(a){
   const f=item.f,state=fileState(f);
   if(state==='closed'){status(f.name+' was closed. Search again to find its matches.',true);return;}
   if(state==='changed'){status(f.name+' changed since this search. Search again to go to its matches.',true);scheduleRender();return;}
-  if(a.comparing()){status('Close the comparison first.',true);return;}
   if(f.gone){status(GONE,true);return;}
   const row=await rowData(f,item.index);if(!row)return;
   const hit=row.hits[Math.min(hitIndex,row.hits.length-1)]||[row.start,row.start];
   const d=a.byUid(f.uid);if(!d||fileState(f))return;
+  // In a comparison only its two documents can be shown; going to another one never closes it.
+  if(a.shown&&!a.shown(d)){status('Close the comparison to go to '+a.nameOf(d)+'.',true);return;}
   if(!a.activate(d)){status('Could not switch to '+f.name+'.',true);return;}
   lastFound={uid:d.uid,revision:a.revision(d),from:hit[0],to:hit[1]};
   await a.select(d,hit[0],hit[1],true);
-  lastFound.revision=a.revision(d);refreshFound();
+  lastFound.revision=a.revision(d);refreshFound();avoidMatch();
   status('Line '+count(row.line+1)+' of '+f.name+'.',false);
  }
  function selectedIndexes(){const low=Math.min(selection.anchor,selection.focus),high=Math.max(selection.anchor,selection.focus);return low<0?[]:Array.from({length:high-low+1},(_,k)=>low+k);}
@@ -1016,6 +1017,28 @@ function create(a){
   if(focus){const input=el.querySelector('[data-ed-query]');input.focus({preventScroll:true});input.select();}
   place();
  }
+ // When the window covers the match it just showed, it moves out of the
+ // way, as Notepad++'s Find dialog does: to the other side of the document
+ // area, else above or below the match. The match is the painted current
+ // mark (single view, comparison and split panes, disk-backed views).
+ function avoidMatch(){
+  if(!el||el.hidden)return;
+  let tries=0;
+  const check=()=>{
+   if(!el||el.hidden)return;
+   const host=a.windowEl(),mark=host?.querySelector('.nt-find-mark.is-current,.nt-editor-marks:not([hidden]) mark.is-current');
+   if(!mark){if(++tries<8)root.requestAnimationFrame(check);return;}
+   const m=mark.getBoundingClientRect(),w=el.getBoundingClientRect();
+   if(!m.width&&!m.height)return;
+   if(m.right<=w.left||m.left>=w.right||m.bottom<=w.top||m.top>=w.bottom)return;
+   const box=host.getBoundingClientRect(),area=(host.querySelector('.nt-editor-document-area')||host).getBoundingClientRect();
+   const left=(m.left+m.right)/2>(area.left+area.right)/2?area.left+12:area.right-w.width-12;
+   let top=w.top;
+   if(!(m.right<=left||m.left>=left+w.width))top=m.bottom+12+w.height<=area.bottom?m.bottom+12:Math.max(area.top,m.top-12-w.height);
+   pos={left:left-box.left,top:top-box.top};place();
+  };
+  root.requestAnimationFrame(check);
+ }
  function place(){
   if(!el||el.hidden)return;
   const host=a.windowEl(),box=host.getBoundingClientRect(),rect=el.getBoundingClientRect();
@@ -1025,7 +1048,6 @@ function create(a){
  }
  async function open(next=tab){
   if(!mount())return;
-  if(a.comparing()){a.setMessage('Find is not available while documents are compared. Close the comparison first.',true);return;}
   const d=a.current(),input=el.querySelector('[data-ed-query]');
   const wasHidden=el.hidden;el.hidden=false;typing=null;
   if(d){
@@ -1207,7 +1229,6 @@ function create(a){
   const inWindow=!!el&&el.contains(event.target),inPanel=!!panel&&panel.contains(event.target)||!!menu&&menu.contains(event.target);
   if(event.isComposing)return inWindow||inPanel;
   const ctrl=event.ctrlKey||event.metaKey,k=event.key.length===1?event.key.toLowerCase():event.key;
-  if(a.comparing())return false;
   if(ctrl&&!event.shiftKey&&!event.altKey&&(k==='f'||k==='h'||k==='m')){event.preventDefault();toggle(k==='f'?'find':k==='h'?'replace':'mark');return true;}
   if(event.key==='F3'&&!ctrl&&!event.altKey){event.preventDefault();if(!el?.querySelector('[data-ed-query]')?.value){void open('find');return true;}void findNext(event.shiftKey);return true;}
   if(inPanel)return panelKey(event)||true;
@@ -1229,7 +1250,6 @@ function create(a){
  }
  function draw(){
   if(!el)return;
-  if(a.comparing()&&!el.hidden){closeSwapMenu();el.hidden=true;}
   selectionChanged();place();
  }
  function setPreferences(value){
