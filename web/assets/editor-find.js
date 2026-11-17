@@ -110,6 +110,37 @@ function shiftRange(range,edit){
  return [start,Math.max(start,end)];
 }
 
+// ---- Quick searches ----
+// One click fills Find what, Replace with and the Search Mode; the user still
+// presses Find Next, Replace All or Mark All. General searches only (owner
+// request after v1.21.69: "quick options for find and replace, like replace
+// & with \n"). The list between the markers is JSON: TestFindQuickSearches
+// checks every pattern with the engine and runs each on its example.
+const QUICK=
+// QUICK-BEGIN
+[
+ {"group":"Replace","label":"Each & on a new line","title":"name=value&name=value → one pair per line","find":"&","replace":"\\n","mode":"extended","example":["a=1&b=2","a=1\nb=2"]},
+ {"group":"Replace","label":"Each comma on a new line","title":"a,b,c → one item per line","find":",","replace":"\\n","mode":"extended","example":["a,b,c","a\nb\nc"]},
+ {"group":"Replace","label":"Each semicolon on a new line","title":"a;b;c → one item per line","find":";","replace":"\\n","mode":"extended","example":["a;b;c","a\nb\nc"]},
+ {"group":"Replace","label":"Each space on a new line","title":"One word per line: a b  c → a, b and c on three lines","find":"[ \\t]+","replace":"\\n","mode":"regex","example":["a b  c","a\nb\nc"]},
+ {"group":"Replace","label":"Join lines with &","title":"Lines a=1 and b=2 → a=1&b=2","find":"\\n","replace":"&","mode":"extended","example":["a=1\nb=2","a=1&b=2"]},
+ {"group":"Replace","label":"Join lines with a comma","title":"Lines a, b and c → a,b,c","find":"\\n","replace":",","mode":"extended","example":["a\nb\nc","a,b,c"]},
+ {"group":"Replace","label":"Tabs to commas","title":"Tab-separated a⇥b → a,b","find":"\\t","replace":",","mode":"extended","example":["a\tb","a,b"]},
+ {"group":"Replace","label":"Remove spaces at line ends","title":"Deletes spaces and tabs before each line break","find":"[ \\t]+$","replace":"","mode":"regex","example":["a  \nb\t","a\nb"]},
+ {"group":"Replace","label":"Remove spaces at line starts","title":"Deletes the indentation of each line","find":"^[ \\t]+","replace":"","mode":"regex","example":["  a\n\tb","a\nb"]},
+ {"group":"Replace","label":"Several spaces to one","title":"a   b → a b","find":" {2,}","replace":" ","mode":"regex","example":["a   b","a b"]},
+ {"group":"Replace","label":"Backslashes to slashes","title":"C:\\temp\\a → C:/temp/a","find":"\\","replace":"/","mode":"normal","example":["C:\\temp\\a","C:/temp/a"]},
+ {"group":"Find","label":"IPv4 addresses","title":"Finds 192.0.2.10 and other dotted addresses","find":"\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b","mode":"regex","example":["host 192.0.2.10 up","192.0.2.10"]},
+ {"group":"Find","label":"MAC addresses","title":"Finds 00:1a:2b:3c:4d:5e, 00-1A-2B-3C-4D-5E and 001a.2b3c.4d5e","find":"\\b(?:[0-9A-Fa-f]{2}(?:[:-][0-9A-Fa-f]{2}){5}|[0-9A-Fa-f]{4}\\.[0-9A-Fa-f]{4}\\.[0-9A-Fa-f]{4})\\b","mode":"regex","example":["mac 001a.2b3c.4d5e","001a.2b3c.4d5e"]},
+ {"group":"Find","label":"Email addresses","title":"Finds name@example.com","find":"[\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)+","mode":"regex","example":["to: ops@example.com.","ops@example.com"]},
+ {"group":"Find","label":"Web addresses","title":"Finds http:// and https:// links up to the next space","find":"https?://[^\\s\"'<>]+","mode":"regex","example":["see https://example.com/a now","https://example.com/a"]},
+ {"group":"Find","label":"Spaces at line ends","title":"Finds the spaces and tabs before a line break","find":"[ \\t]+$","mode":"regex","example":["a  \nb","  "]},
+ {"group":"Find","label":"Tabs","title":"Finds every tab character","find":"\\t","mode":"extended","example":["a\tb","\t"]},
+ {"group":"Find","label":"Characters outside ASCII","title":"Finds letters such as é, symbols and invisible characters such as a no-break space","find":"[^\\x00-\\x7F]","mode":"regex","example":["café","é"]},
+ {"group":"Find","label":"Empty lines","title":"Finds lines that hold nothing","find":"^$","mode":"regex","example":["a\n\nb",""]}
+]
+// QUICK-END
+;
 // ---- The syntax guide and the line that explains the caret ----
 // Every search runs in the engine (Go's regular expressions), so this lists
 // exactly what works for every document; what the engine refuses is named
@@ -878,6 +909,13 @@ function create(a){
  }
 
  // ---- The window ----
+ // The Quick menu: a button and its list, like the Swap menu.
+ function quickMarkup(){
+  const item=(entry,i)=>'<button type="button" role="menuitem" data-ed-find-quick="'+i+'" title="'+escapeHTML(entry.title)+'">'+escapeHTML(entry.label)+'</button>';
+  const group=name=>'<span class="nt-find-quick-heading" role="presentation">'+escapeHTML(name)+'</span>'+QUICK.map((entry,i)=>entry.group===name?item(entry,i):'').join('');
+  return '<span class="nt-find-quick"><button type="button" class="btn small ghost" data-ed-find-quick-menu aria-haspopup="menu" aria-expanded="false" aria-controls="ntFindQuickList" title="Quick searches: fill Find what, Replace with and the Search Mode with a common search">Quick ▾</button>'+
+   '<span class="nt-find-quick-list" id="ntFindQuickList" role="menu" aria-label="Quick searches" hidden>'+group('Replace')+group('Find')+'</span></span>';
+ }
  function markup(){
   const tabs=TABS.map(([id,label])=>'<button type="button" role="tab" id="ntFindTab-'+id+'" data-ed-find-tab="'+id+'" aria-controls="ntFindPanel" aria-selected="false" tabindex="-1">'+label+'</button>').join('');
   // Every option says what it does when the pointer rests on it.
@@ -894,7 +932,7 @@ function create(a){
   return '<div class="nt-find-head" data-ed-find-drag title="Drag to move the Find window"><div class="nt-find-tabs" role="tablist" aria-label="Find, Replace or Mark">'+tabs+'</div><button type="button" class="nt-find-x" data-ed-find-close aria-label="Close the Find window" title="Close (Esc)">×</button></div>'+
   '<div class="nt-find-panel" id="ntFindPanel" role="tabpanel" aria-labelledby="ntFindTab-find">'+
    '<div class="nt-find-main"><div class="nt-find-fields">'+
-    '<label class="nt-find-field"><span>Find what:</span><span class="nt-find-input"><input type="text" data-ed-query list="ntEditorFindHistory" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Find what" aria-describedby="ntFindExplain"></span></label><datalist id="ntEditorFindHistory"></datalist>'+
+    '<div class="nt-find-field"><label for="ntFindQuery">Find what:</label><span class="nt-find-input"><input type="text" id="ntFindQuery" data-ed-query list="ntEditorFindHistory" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Find what" aria-describedby="ntFindExplain"></span>'+quickMarkup()+'</div><datalist id="ntEditorFindHistory"></datalist>'+
     '<div class="nt-find-explain" id="ntFindExplain" data-ed-find-explain aria-live="polite" hidden></div>'+
     '<div class="nt-find-field" data-ed-replace-fields data-tabs="replace"><label for="ntFindReplacement">Replace with:</label><span class="nt-find-input"><input type="text" id="ntFindReplacement" data-ed-replacement list="ntEditorReplaceHistory" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Replace with"></span>'+
      '<span class="nt-find-swap"><button type="button" class="btn small ghost" data-ed-find-swap="swap" title="Swap Find what and Replace with" aria-label="Swap Find what and Replace with">⇅</button><button type="button" class="btn small ghost nt-find-swap-more" data-ed-find-swap-menu aria-haspopup="menu" aria-expanded="false" aria-label="More swap choices" title="More swap choices">▾</button>'+
@@ -1018,7 +1056,22 @@ function create(a){
    button.title=(on?'Close the Find window':'Open the Find window on '+(id==='find'?'Find':'Replace'))+' ('+(id==='find'?'Ctrl+F':'Ctrl+H')+')';
   }
  }
- function closeSwapMenu(){const list=el?.querySelector('.nt-find-swap-list');if(list&&!list.hidden){list.hidden=true;el.querySelector('[data-ed-find-swap-menu]').setAttribute('aria-expanded','false');}}
+ function closeSwapMenu(){const list=el?.querySelector('.nt-find-swap-list');if(list&&!list.hidden){list.hidden=true;el.querySelector('[data-ed-find-swap-menu]').setAttribute('aria-expanded','false');}closeQuickMenu();}
+ function closeQuickMenu(){const list=el?.querySelector('.nt-find-quick-list');if(list&&!list.hidden){list.hidden=true;el.querySelector('[data-ed-find-quick-menu]').setAttribute('aria-expanded','false');}}
+ // A quick search fills the fields and the Search Mode; a replacement shows
+ // the Replace tab. Nothing runs until the user presses a button.
+ function useQuick(index){
+  const entry=QUICK[index];if(!entry)return;
+  const find=el.querySelector('[data-ed-query]'),replace=el.querySelector('[data-ed-replacement]');
+  find.value=entry.find;if('replace' in entry)replace.value=entry.replace;
+  opts.mode=entry.mode;opts.dotAll=false;opts.word=false;
+  closeQuickMenu();
+  if('replace' in entry&&tab!=='replace')setTab('replace',false);
+  else if(!('replace' in entry)&&tab==='replace')setTab('find',false);
+  syncControls();renderGuide();explainCaret(true);
+  status('replace' in entry?entry.label+': press Replace All to change every match (Ctrl+Z undoes it), or Replace for one at a time.':entry.label+': press Find Next, Count, Find All or Mark All.',false,false);
+  find.focus({preventScroll:true});
+ }
  function swap(kind){
   const find=el.querySelector('[data-ed-query]'),replace=el.querySelector('[data-ed-replacement]');
   if(kind==='to-replace')replace.value=find.value;
@@ -1049,7 +1102,11 @@ function create(a){
   el.addEventListener('click',event=>{
    const tabButton=event.target.closest('[data-ed-find-tab]');if(tabButton){setTab(tabButton.dataset.edFindTab,true);return;}
    if(event.target.closest('[data-ed-find-close]')){close();return;}
-   if(event.target.closest('[data-ed-find-swap-menu]')){const list=el.querySelector('.nt-find-swap-list'),openNow=list.hidden;list.hidden=!openNow;event.target.closest('[data-ed-find-swap-menu]').setAttribute('aria-expanded',String(openNow));if(openNow)list.querySelector('button').focus();return;}
+   if(event.target.closest('[data-ed-find-quick-menu]')){const list=el.querySelector('.nt-find-quick-list'),openNow=list.hidden;closeSwapMenu();list.hidden=!openNow;event.target.closest('[data-ed-find-quick-menu]').setAttribute('aria-expanded',String(openNow));
+    // The list scrolls inside the window, which would cut it off.
+    if(openNow){list.style.maxHeight='';list.style.maxHeight=Math.max(120,Math.floor(el.querySelector('.nt-find-panel').getBoundingClientRect().bottom-list.getBoundingClientRect().top-6))+'px';list.querySelector('button').focus();}return;}
+   const quickButton=event.target.closest('[data-ed-find-quick]');if(quickButton){useQuick(Number(quickButton.dataset.edFindQuick));return;}
+   if(event.target.closest('[data-ed-find-swap-menu]')){closeQuickMenu();const list=el.querySelector('.nt-find-swap-list'),openNow=list.hidden;list.hidden=!openNow;event.target.closest('[data-ed-find-swap-menu]').setAttribute('aria-expanded',String(openNow));if(openNow)list.querySelector('button').focus();return;}
    const swapButton=event.target.closest('[data-ed-find-swap]');if(swapButton){swap(swapButton.dataset.edFindSwap);return;}
    if(event.target.closest('[data-ed-find-cancel]')){for(const entry of running)entry.cancel();return;}
    const guideToggle=event.target.closest('[data-ed-find-guide-toggle]');
@@ -1075,7 +1132,8 @@ function create(a){
   el.addEventListener('focusin',applyTransparency);
   el.addEventListener('focusout',()=>root.setTimeout(applyTransparency,0));
   el.addEventListener('pointerdown',event=>{
-   if(!event.target.closest('.nt-find-swap'))closeSwapMenu();
+   if(!event.target.closest('.nt-find-swap,.nt-find-quick'))closeSwapMenu();
+   else if(!event.target.closest('.nt-find-quick'))closeQuickMenu();
    const head=event.target.closest('[data-ed-find-drag]');
    if(!head||event.button!==0||event.target.closest('button,input'))return;
    event.preventDefault();
@@ -1148,7 +1206,7 @@ function create(a){
   if(event.key==='F3'&&!ctrl&&!event.altKey){event.preventDefault();if(!el?.querySelector('[data-ed-query]')?.value){void open('find');return true;}void findNext(event.shiftKey);return true;}
   if(inPanel)return panelKey(event)||true;
   if(inWindow){
-   if(event.key==='Escape'){event.preventDefault();if(!el.querySelector('.nt-find-swap-list').hidden){closeSwapMenu();el.querySelector('[data-ed-find-swap-menu]').focus();return true;}close();return true;}
+   if(event.key==='Escape'){event.preventDefault();if(!el.querySelector('.nt-find-quick-list').hidden){closeQuickMenu();el.querySelector('[data-ed-find-quick-menu]').focus();return true;}if(!el.querySelector('.nt-find-swap-list').hidden){closeSwapMenu();el.querySelector('[data-ed-find-swap-menu]').focus();return true;}close();return true;}
    if(event.key==='Enter'&&event.target.matches('input[type="text"]')&&!event.defaultPrevented){event.preventDefault();if(tab==='mark')void markAll();else void findNext(event.shiftKey?!opts.backward:opts.backward);return true;}
    const tabs=event.target.closest('[data-ed-find-tab]');
    if(tabs&&['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const ids=TABS.map(([id])=>id),at=ids.indexOf(tab),next=event.key==='Home'?0:event.key==='End'?ids.length-1:(at+(event.key==='ArrowLeft'?-1:1)+ids.length)%ids.length;setTab(ids[next],false);el.querySelector('[data-ed-find-tab="'+ids[next]+'"]').focus();return true;}
@@ -1195,6 +1253,6 @@ function create(a){
   get renderedRows(){return panel?panel.querySelectorAll('.nt-find-row').length:0;}
  });
 }
-root.NTKEditorFind=Object.freeze({create,layout,rowAt,rowHTML,shiftLines,shiftRange,explain,GUIDE,MODE_HELP});
-if(typeof module==="object"&&module.exports)module.exports={create,layout,rowAt,rowHTML,shiftLines,shiftRange,explain,GUIDE,MODE_HELP};
+root.NTKEditorFind=Object.freeze({create,layout,rowAt,rowHTML,shiftLines,shiftRange,explain,GUIDE,MODE_HELP,QUICK});
+if(typeof module==="object"&&module.exports)module.exports={create,layout,rowAt,rowHTML,shiftLines,shiftRange,explain,GUIDE,MODE_HELP,QUICK};
 })(globalThis);

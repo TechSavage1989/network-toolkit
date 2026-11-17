@@ -181,6 +181,13 @@ For example, `bmFtZT1PZmZpY2UlMjAxJmFkZHJlc3M9MTkyLjAuMi4xMCY=&&` becomes `name=
 
 **Find what** and **Replace with** keep the last 20 searches and replacements: open the list with the arrow at the end of the field. The list is shared by the editor windows of one app and lasts until the app closes. It is never saved: search text can contain passwords.
 
+**Quick ▾** beside **Find what** fills in a common search, so you do not have to remember its pattern. Choose one, then press the button you want (nothing changes until you do):
+
+- **Replace** (shows the Replace tab; press **Replace All**, which one Undo takes back): **Each & on a new line** (`a=1&b=2` becomes two lines), **Each comma on a new line**, **Each semicolon on a new line**, **Each space on a new line**, **Join lines with &**, **Join lines with a comma**, **Tabs to commas**, **Remove spaces at line ends**, **Remove spaces at line starts**, **Several spaces to one** and **Backslashes to slashes**.
+- **Find** (press **Find Next**, **Count**, **Find All** or, on the Mark tab, **Mark All**): **IPv4 addresses**, **MAC addresses** (`00:1a:2b:3c:4d:5e`, `00-1A-…` and `001a.2b3c.4d5e`), **Email addresses**, **Web addresses**, **Spaces at line ends**, **Tabs**, **Characters outside ASCII** and **Empty lines**.
+
+A quick search sets **Search Mode** to what it needs (Extended or Regular expression) and turns off **Match whole word only**; the pointer over an entry shows what it does. You can edit the fields before you press a button.
+
 ### Options
 - **Backward direction**: **Find Next** goes up instead of down (Find and Replace tabs).
 - **Match whole word only** and **Match case**.
@@ -290,3 +297,5 @@ Text sent from the Terminal app with **Send to Text Editor** arrives here as a n
 
 ## Configuration text
 For network configuration syntax, choose Auto, the network language or plain text. This affects highlighting only; review actual device commands independently before applying configuration.
+
+A decoded SonicWall settings export (the `.exp` file after **Base64 decode**, as one `name=value` pair per line or still joined by `&`) is recognized whatever the file is called, also as `.txt`, `.ini` or without an extension, and shown as **SonicWall SonicOS settings export**: names, their index numbers (`_0`, `_1`), numbers and addresses, `on`/`off`, and `%XX` escapes each have their own colour, and the values of passwords, keys and community strings stay one plain run. Names alone identify it, such as `checksumVersion`, `shortProdName` and `addrObjId_0`; see [Make a one-line encoded settings file readable](#make-a-one-line-encoded-settings-file-readable).

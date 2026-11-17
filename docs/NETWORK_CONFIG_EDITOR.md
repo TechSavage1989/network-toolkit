@@ -11,7 +11,10 @@ Supported lexical families:
 - Aruba AOS-CX (including older ArubaOS-CX headers), ArubaOS-Switch/ProCurve,
   and HPE/H3C Comware.
 - Fortinet **FortiOS**, not every Fortinet product or export format.
-- SonicWall **SonicOS CLI text**, not an encoded/binary `.exp` decoder.
+- SonicWall **SonicOS CLI text**, and a **decoded SonicOS settings export**: the
+  `name=value` pairs of an `.exp` file after Base64 decoding (one per line, or
+  still joined by `&`; values URL-encoded or not). The editor does not decode
+  the `.exp` file itself; its Base64 decode tool does that.
 - Palo Alto PAN-OS set-style and structurally identifiable XML exports.
 - Cisco IOS/IOS-XE (combined unless the source itself distinguishes them),
   NX-OS and ASA. Ordinary overlapping switch syntax receives the neutral
@@ -25,6 +28,15 @@ brand mentioned inside a description, or a lone `interface`, `vlan`, or `set`
 command is not proof of a vendor. Conflicting vendor evidence stays generic.
 Quoted values and banner bodies are excluded from detection. Generic XML does
 not become PAN-OS merely because it has a `config` root.
+
+A decoded SonicOS settings export is the one format recognized **whatever the
+file's extension** (also over code and data extensions): at least 95% of the
+first 65,536 characters' lines must be `name=value` pairs, with SonicOS's own
+names from two families (such as `checksumVersion`, `shortProdName`,
+`addrObjId_0`, `zoneObj…_0`) or four names of one (a sorted export starts with
+`addrObj…` only). Its display colors names, their `_N` indexes, numbers and
+addresses, `on`/`off` and `%XX` escapes; the values of names that hold a
+password, key, secret, PSK, token or community string stay one opaque run.
 
 Highlighting is **lexical display**, not a parser, correctness check, security
 review, configuration conversion or device action. The editor does not execute

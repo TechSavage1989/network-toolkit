@@ -5,7 +5,7 @@
 const languages=Object.freeze([
  ['network-aruba-cx','Aruba AOS-CX config'],['network-aruba-switch','ArubaOS-Switch / ProCurve config'],
  ['network-comware','HPE / H3C Comware config'],['network-fortios','Fortinet FortiOS config'],
- ['network-sonicos','SonicWall SonicOS CLI config'],['network-panos-set','Palo Alto PAN-OS set config'],
+ ['network-sonicos','SonicWall SonicOS CLI config'],['network-sonicos-exp','SonicWall SonicOS settings export'],['network-panos-set','Palo Alto PAN-OS set config'],
  ['network-panos-xml','Palo Alto PAN-OS XML config'],['network-cisco-ios','Cisco IOS / IOS-XE config'],
  ['network-cisco-nxos','Cisco NX-OS config'],['network-cisco-asa','Cisco ASA config']
 ].map(([id,label])=>Object.freeze({id,label,aliases:[]})));
@@ -19,9 +19,38 @@ function lines(text,visit){let at=0;while(at<text.length){let end=at;while(end<t
 function quoteEnd(s,start,quote){for(let i=start;i<s.length;i++){if(s[i]==='\\'){i++;continue;}if(s[i]===quote)return i+1;}return -1;}
 function bannerStart(line){const m=/^\s*banner\s+(?:motd|login|exec)\s+(\^.|[^\s])([\s\S]*)$/i.exec(line);return m&&!m[2].includes(m[1])?m[1]:'';}
 function shape(text){const rows=[];let quote='',banner='';lines(text,(line)=>{if(banner){if(line.includes(banner))banner='';return;}if(quote){const end=quoteEnd(line,0,quote);if(end<0)return;quote='';return;}banner=bannerStart(line);if(banner)return;if(/^\s*[!#;]/.test(line)){rows.push(line);return;}let safe='',at=0;for(let i=0;i<line.length;i++){if(line[i]!== '"'&&line[i]!=="'"||i>0&&/[\w]/.test(line[i-1]))continue;safe+=line.slice(at,i);const end=quoteEnd(line,i+1,line[i]);if(end<0){quote=line[i];at=line.length;break;}safe+=' ';i=end-1;at=end;}safe+=line.slice(at);rows.push(safe);});return rows;}
+// A decoded SonicOS settings export (.exp): one key=value pair per line (values
+// URL-encoded, or decoded too), or the decoded pairs still joined by '&'. Its key
+// names are SonicOS's own, so they identify it whatever the file is called.
+const exportPair=/^[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)*=/;
+const exportJoin=/&(?=[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)*=)/;
+const exportMarkers=[['checksumVersion',/^checksumVersion=\d/],['shortProdName',/^shortProdName=/],['sonicOsApi',/^sonicOsApi[A-Za-z]*=/],['passwordUniqueNum',/^passwordUniqueNum=/],
+ ['addrObj',/^addrObj[A-Za-z]*_\d+=/],['addro',/^addro_[A-Za-z]+_\d+=/],['svcObj',/^svcObj[A-Za-z]*_\d+=/],['so',/^so_[A-Za-z]+_\d+=/],['zoneObj',/^zoneObj[A-Za-z]*_\d+=/],
+ ['schedObj',/^schedObj[A-Za-z]*_\d+=/],['userObj',/^userObj[A-Za-z]*_\d+=/],['adminObj',/^adminObj[A-Za-z]*=/],['policy',/^policy(?:Src|Dst|Action|Svc)[A-Za-z]*_\d+=/],['iface',/^iface_[a-z]+_\d+=/],['logEvt',/^logEvt[A-Za-z]*_\d+=/],['pnac',/^pnac[A-Za-z]+_\d+=/]];
+// Lines, or the '&'-joined pairs of a file of only a few lines.
+function exportRows(head){let rows=[];lines(head,(line)=>{if(line.trim())rows.push(line);});if(rows.length<8)rows=rows.flatMap(row=>row.split(exportJoin));return rows;}
+function settingsExport(text){
+ if(typeof text!=='string'||!text)return '';const head=text.slice(0,MAX_DETECT).replace(/^\uFEFF/,'');
+ if(/[\x00-\x08\x0e-\x1f]/.test(head))return '';
+ const rows=exportRows(head);if(text.length>MAX_DETECT&&rows.length>1)rows.pop(); // The cut may split the last pair.
+ if(rows.length<8)return '';let pairs=0;const found=new Set(),keys=new Set();
+ // Two marker families, or four marker keys of one (a sorted export starts with addrObj… only).
+ for(const row of rows){if(!exportPair.test(row))continue;pairs++;for(const [name,re] of exportMarkers)if(re.test(row)){found.add(name);if(keys.size<4)keys.add(row.slice(0,row.indexOf('=')).replace(/(?:_\d+)+$/,''));break;}}
+ return pairs>=rows.length*0.95&&(found.size>=2||keys.size>=4)?'network-sonicos-exp':'';
+}
+// Display only: key, its numeric index, '=', then the value. A value is never
+// decoded; URL escapes are shown as such and secrets stay one opaque run.
+const exportSecret=/(?:(?<!by)pass(?:word|wd|phrase)?|secret|psk|(?:shared|priv|auth|crypt|totp|access|api|pre)key|community|token)(?:_\d+)*$/i;
+const exportNumber=/^(?:-?\d+(?:\.\d+)*(?:\/\d+)?|0x[0-9a-f]+|#[0-9a-f]{3,8}|(?=[0-9a-f]*:)[0-9a-f:.]*(?:\/\d+)?|-?\d+(?:[,-]\d+)+)$/i;
+function exportValue(value,secret){if(!value)return '';if(secret)return span('string',value);if(exportNumber.test(value))return span('number',value);if(/^(?:on|off|true|false|yes|no|enabled?|disabled?)$/i.test(value))return span('keyword',value);
+ let out='',at=0;const re=/(?:%[0-9a-f]{2})+/gi;let m;while((m=re.exec(value))){out+=span('string',value.slice(at,m.index))+span('punctuation',m[0]);at=re.lastIndex;}return out+span('string',value.slice(at));}
+function exportPairHTML(part){const m=/^([A-Za-z][A-Za-z0-9]*(?:_[A-Za-z][A-Za-z0-9]*)*)((?:_\d+)*)(=)([\s\S]*)$/.exec(part);if(!m)return escape(part);
+ const index=m[2]?m[2].replace(/(_)(\d+)/g,(all,u,n)=>escape(u)+span('number',n)):'';return span('property',m[1])+index+span('operator',m[3])+exportValue(m[4],exportSecret.test(m[1]));}
+function exportHighlight(text){let out='';lines(text,(line,eol)=>{charge(eol.length);const parts=line.split(exportJoin);parts.forEach((part,i)=>{if(i)out+=span('punctuation','&');out+=exportPairHTML(part);});out+=eol;});return out;}
 function detect(text){
  if(typeof text!=='string'||!text)return '';const head=text.slice(0,MAX_DETECT).replace(/^\uFEFF/,'');
  if(/[\x00-\x08\x0e-\x1f]/.test(head))return ''; // Binary/terminal-control export: do not reinterpret it.
+ const exported=settingsExport(text);if(exported)return exported;
  const rows=shape(head),has=re=>rows.some(s=>re.test(s)),count=re=>rows.filter(s=>re.test(s)).length;
  const hits=new Set();
  if(has(/^\s*!\s*Version\s+(?:ArubaOS-CX|AOS-CX)\s+(?:[a-z]{1,5}\.)?\d/i))hits.add('network-aruba-cx');
@@ -72,10 +101,10 @@ function cliHighlight(text){let out='';const state={quote:'',banner:''};lines(te
 function xmlHighlight(text){let out='',at=0;while(at<text.length){const start=text.indexOf('<',at);if(start<0){out+=escape(text.slice(at));break;}out+=escape(text.slice(at,start));let end,kind='keyword';if(text.startsWith('<!--',start)){const close=text.indexOf('-->',start+4);end=close<0?text.length:close+3;kind='comment';}else if(text.startsWith('<![CDATA[',start)){const close=text.indexOf(']]>',start+9);end=close<0?text.length:close+3;kind='string';}else{let quote='';end=start+1;for(;end<text.length;end++){const ch=text[end];if(quote){if(ch===quote)quote='';}else if(ch==='"'||ch==="'")quote=ch;else if(ch==='>'){end++;break;}}}const tag=text.slice(start,end);if(kind!=='keyword')out+=span(kind,tag);else{let p=0;const attrs=/"[^"]*"|'[^']*'/g;let a;while((a=attrs.exec(tag))){out+=span('keyword',tag.slice(p,a.index))+span('string',a[0]);p=attrs.lastIndex;}out+=span('keyword',tag.slice(p));}at=end;}return out;}
 function paint(text,id){text=String(text);if(!ids.has(id))return {html:escape(text),limited:false,reason:''};
  const previous=budget;budget=null;try{if(text.length>MAX_PAINT)return {html:escape(text),limited:true,reason:'Network syntax display is limited to 1,000,000 characters; the complete source remains editable as plain text.'};
- budget={chars:0,spans:0};return {html:id==='network-panos-xml'?xmlHighlight(text):cliHighlight(text),limited:false,reason:''};}
+ budget={chars:0,spans:0};return {html:id==='network-panos-xml'?xmlHighlight(text):id==='network-sonicos-exp'?exportHighlight(text):cliHighlight(text),limited:false,reason:''};}
  catch(error){if(!(error instanceof RangeError))throw error;budget=null;return {html:escape(text),limited:true,reason:'Network syntax display exceeded its token/HTML budget; the complete source remains editable as plain text.'};}
  finally{budget=previous;}
 }
 function highlight(text,id){return paint(text,id).html;}
-root.NTKNetworkConfig=Object.freeze({languages,detect,supports:id=>ids.has(id),highlight,paint,MAX_DETECT,MAX_PAINT,MAX_SPANS,MAX_HTML});
+root.NTKNetworkConfig=Object.freeze({languages,detect,settingsExport,supports:id=>ids.has(id),highlight,paint,MAX_DETECT,MAX_PAINT,MAX_SPANS,MAX_HTML});
 })(globalThis);

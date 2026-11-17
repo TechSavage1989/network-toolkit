@@ -73,3 +73,45 @@ test('network-only worker size extension never raises Prism or formatting limits
  await w.onmessage({data:{id:2,action:'highlight',language:'javascript',text}});assert.match(reply.error,/250,000/);
  await w.onmessage({data:{id:3,action:'format',language:'network',text}});assert.match(reply.error,/250,000/);
 });
+// A decoded SonicOS settings export, made up for the test (documentation addresses only).
+const sonicExport=['checksumVersion=1','buildNum=7.1.0-0000-R0000','shortProdName=TZ%20Lab','userIV=0011223344556677','passwordUniqueNum=0',
+ 'addrObjId_0=Lab%20Host','addrObjIdDisp_0=Lab%20Host','addrObjType_0=1','addrObjZone_0=LAN','addrObjIp1_0=192.0.2.10','addrObjIp2_0=255.255.255.255',
+ 'addrObjIp1VN_0_1=2001:db8::10','iface_name_0=X0','iface_lan_ip_0=192.0.2.1','smtpServerAuthPassword=123456','snmp_GetCommunity=synthetic',
+ 'tsAgentsAllowSvcBypass=on','prefs_color_0=#00ff00','emptyValue=','schedObjDaysOfWeek_0=0,1,2'].join('\n')+'\n';
+test('a decoded SonicOS settings export is recognized by its keys whatever the file is called',()=>{
+ for(const name of ['sonicwall.exp','sample.txt','sample.ini','sample.properties','sample.json','source.js','hosts','noextension','sample.cfg'])assert.equal(language.detect(name,sonicExport),'network-sonicos-exp',name);
+ assert.equal(api.detect(sonicExport),'network-sonicos-exp');assert.equal(language.valid('network-sonicos-exp'),'network-sonicos-exp');assert.equal(language.label('network-sonicos-exp'),'SonicWall SonicOS settings export');
+ const rows=sonicExport.trim().split('\n');
+ assert.equal(language.detect('a.txt',rows.join('&')+'&&'),'network-sonicos-exp','decoded pairs still joined by &');
+ assert.equal(language.detect('a.txt',[...rows].sort().join('\r\n')),'network-sonicos-exp','sorted, CRLF');
+ assert.equal(language.detect('a.txt',unescape(sonicExport)),'network-sonicos-exp','URL-decoded values');
+ assert.equal(language.detect('a.txt','﻿'+sonicExport),'network-sonicos-exp');
+ const sortedHead=['addrObjId_0=A','addrObjIdDisp_0=A','addrObjType_0=1','addrObjZone_0=LAN','addrObjId_1=B','addrObjIdDisp_1=B','addrObjType_1=1','addrObjZone_1=LAN'].join('\n');
+ assert.equal(api.settingsExport(sortedHead),'network-sonicos-exp','four keys of one family');
+});
+test('ordinary key=value files and mentions of SonicOS keys are not a SonicOS export',()=>{
+ const ini=Array.from({length:20},(_,i)=>'name'+i+'=value'+i).join('\n');
+ for(const text of [ini,ini+'\nshortProdName=x',ini+'\naddrObjId_0=x\naddrObjType_0=1','checksumVersion=1\nshortProdName=x\naddrObjId_0=x','# checksumVersion=1\n# shortProdName=x\n'+'text line\n'.repeat(10),'checksumVersion=1\nshortProdName=x\n'+'not a pair\n'.repeat(10),'\0'+sonicExport])assert.equal(api.settingsExport(text),'',JSON.stringify(text.slice(0,40)));
+ assert.equal(language.detect('sample.ini',ini),'ini');assert.equal(language.detect('settings.properties',ini),'properties');
+ const code='const checksumVersion=1;\nconst shortProdName="x";\n'.repeat(6);assert.equal(language.detect('source.js',code),'javascript');
+});
+test('SonicOS export highlighting: keys, indexes, numbers, escapes and opaque secrets, exact text',()=>{
+ const html=api.highlight(sonicExport,'network-sonicos-exp');assert.equal(unpaint(html),sonicExport);
+ const row=key=>html.split('\n').find(line=>unpaint(line).startsWith(key+'='));
+ assert.equal(row('shortProdName'),'<span class="nt-ed-property">shortProdName</span><span class="nt-ed-operator">=</span><span class="nt-ed-string">TZ</span><span class="nt-ed-punctuation">%20</span><span class="nt-ed-string">Lab</span>');
+ assert.equal(row('addrObjIp1VN_0_1'),'<span class="nt-ed-property">addrObjIp1VN</span>_<span class="nt-ed-number">0</span>_<span class="nt-ed-number">1</span><span class="nt-ed-operator">=</span><span class="nt-ed-number">2001:db8::10</span>');
+ assert.match(row('addrObjIp1_0'),/nt-ed-number">192\.0\.2\.10</);assert.match(row('prefs_color_0'),/nt-ed-number">#00ff00</);assert.match(row('schedObjDaysOfWeek_0'),/nt-ed-number">0,1,2</);
+ assert.match(row('smtpServerAuthPassword'),/nt-ed-string">123456</,'a numeric secret is one opaque run');assert.match(row('snmp_GetCommunity'),/nt-ed-string">synthetic</);
+ assert.match(row('tsAgentsAllowSvcBypass'),/nt-ed-keyword">on</,'Bypass is not a password');
+ assert.equal(row('emptyValue'),'<span class="nt-ed-property">emptyValue</span><span class="nt-ed-operator">=</span>');
+ const joined=sonicExport.trim().split('\n').slice(0,3).join('&')+'&&';const painted=api.highlight(joined,'network-sonicos-exp');assert.equal(unpaint(painted),joined);assert.equal((painted.match(/nt-ed-property/g)||[]).length,3);
+ const hostile='addrObjId_0=<img src=x onerror=alert(1)>&"\r\nkey=a&b=c\r';const safe=api.highlight(hostile,'network-sonicos-exp');assert.equal(unpaint(safe),hostile);assert(!safe.includes('<img'));
+ assert.equal(language.formatKind('network-sonicos-exp'),'');assert.equal(language.commentStyle('network-sonicos-exp'),null);
+});
+test('a long SonicOS export paints quickly and the worker colours it',async()=>{
+ const body=Array.from({length:12000},(_,i)=>'addrObjId_'+i+'=Host%20'+i+'\naddrObjIp1_'+i+'=192.0.2.'+(i%250)).join('\n'),text=sonicExport+body;
+ const start=performance.now(),slice=text.slice(0,200000),result=api.paint(slice,'network-sonicos-exp');assert(!result.limited);assert.equal(unpaint(result.html),slice);assert(performance.now()-start<1000);
+ let reply;const w={};w.self=w;w.postMessage=x=>reply=x;vm.createContext(w);w.importScripts=(...names)=>names.forEach(name=>vm.runInContext(read(name),w,{filename:name}));vm.runInContext(read('editor-language-worker.js'),w);
+ await w.onmessage({data:{id:1,action:'highlight',language:'network-sonicos-exp',text:sonicExport}});assert.equal(unpaint(reply.html),sonicExport);assert.match(reply.html,/nt-ed-property/);
+ assert.equal(language.detect('large.txt',text),'network-sonicos-exp');
+});

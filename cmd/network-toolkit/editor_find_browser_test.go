@@ -63,6 +63,7 @@ func TestEditorSessionBrowserFindWindow(t *testing.T) {
 		"large.txt":  large.String(),
 		"image.bin":  "\x89PNG\r\n\x1a\n\x00vlan\x00data\x00vlan\x00",
 		"blank.txt":  "a\n\nb\n\nc\n",
+		"pairs.txt":  "name=Lab%20A&address=192.0.2.10&zone=LAN\n",
 	}
 	for name, text := range contents {
 		if err := os.WriteFile(filepath.Join(files, name), []byte(text), 0600); err != nil {

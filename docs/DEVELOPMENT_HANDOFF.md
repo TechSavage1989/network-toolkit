@@ -1,3 +1,18 @@
+# v1.21.70 Beta 1 - SonicWall settings exports recognized by content; Find window Quick searches; Document Map colours on long lines
+
+v1.21.69 was published and verified: tag at merge commit d6e9832 (PR #200), release run 44006081576 green, both Checks runs green (one re-run of an unrelated native job), all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` passing, stable channel still v1.21.34.
+
+Owner requests after v1.21.69, with one of their own SonicWall exports (decoded and split into lines; used only locally to measure, never committed or used in tests): "text editor must be able to automatically detect this base64 decoded and reorganized format as sonicwall config regardless of it's file extension", "it must highlight correctly", "also add some quick options for find and replace, like replace & with \n, and other relevant ones", and, with a screenshot of a one-line JSON file, "Colors in the document map don't match the document".
+
+What changed (rules in AGENTS.md: Network configuration languages, the Find window's Quick searches, the map bullet's sample colouring):
+- `network-sonicos-exp` (SonicWall SonicOS settings export) with its own detector and display; it wins over every extension. On the owner's 1.7 MB export: recognized under every extension tried, from its first disk page, sorted, `&`-joined and URL-decoded; 400,000 characters painted exactly in about 80 ms.
+- Find window **Quick ▾**: 11 replacements and 8 searches that fill the fields and Search Mode only.
+- Document Map: contiguous sample rows are coloured as one text (with the previous chunk's tail as context), not rows joined by line breaks. The screenshot's file was a disk-backed one-line JSON of long Base64 strings: the map broke every string at each of its rows.
+
+Known limits: the editor and the map colour a disk-backed page from its own start, so a page (or map chunk without its predecessor held) that starts inside a string longer than a page can still show that string's inside as plain text until its closing quote; both now read the same text, so they agree. SonicOS export key families are inferred from exports (no published schema).
+
+Not checked on real Windows.
+
 # v1.21.69 Beta 1 - Comparison change map: map-only wheel and edge scrolling like the Document Map
 
 v1.21.68 was published and verified: tag at merge commit 8005751 (PR #199), release run 43993620406 green, both Checks runs green without a re-run, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.68", stable channel still at v1.21.34. Before merging, a review (four reviewers, each finding checked by two skeptics) found two defects in the small-file map, fixed in the same PR.
