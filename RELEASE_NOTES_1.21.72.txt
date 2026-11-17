@@ -1,0 +1,11 @@
+Network Toolkit 1.21.72
+
+## What's New
+
+- While you compare two documents, the other side now follows when Find shows a match, so the lines stay side by side even after you scrolled the other side last.
+
+## Additional Details
+
+- This works in both kinds of comparison, for small and very large files.
+- Replace All in All Opened Documents now shows the new text in a compared side that shows the same lines as the other side; before, that side could keep showing the old text.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
