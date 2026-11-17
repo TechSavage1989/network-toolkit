@@ -1,0 +1,13 @@
+Network Toolkit 1.21.69
+
+## What's New
+
+- The comparison's change map now works like the Document Map. When the map is zoomed in and scrolls, the mouse wheel over it scrolls only the map, so you can look through the changes without moving the text.
+- Dragging the view on the change map works like dragging the Document Map's box: the map holds still while you drag, and when the view reaches the top or bottom of the map, the map scrolls by itself, slowly at first and faster the further past the edge you pull.
+
+## Additional Details
+
+- The change map keeps its purpose: it still shows where the changes are on both sides, and "Dynamic fit" still shows every change in the whole comparison at once. In "Dynamic fit" the wheel over the map scrolls the text as before.
+- The scrolling speed is the same as the Document Map's: about 120 pixels a second at the edge, rising on a curve to about 30,000 pixels a second when pulled well past it.
+- This applies to every comparison: documents held in the page, aligned comparisons and large files compared from disk.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

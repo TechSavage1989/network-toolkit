@@ -78,6 +78,24 @@ const TEXT_FONT=6,TEXT_FONT_MAX=9,TEXT_SHARE=0.6,TEXT_REFERENCE=120,TEXT_COLUMNS
 // box reaching the map's edge is one width; the rest is past it).
 const AUTO_EDGE=24,AUTO_START=120,AUTO_MAX=30000,AUTO_REACH=8;
 const autoSpeed=depth=>AUTO_START+(AUTO_MAX-AUTO_START)*Math.min(1,depth/AUTO_REACH)**3;
+// How far a dragged box is pushed into a map's top or bottom edge, in edge
+// widths: negative at the top, 0 outside the edges, at most AUTO_REACH past
+// the map's end. `top` and `bottom` are the box's edges in map pixels; the
+// comparison's change map uses the same rule (editor-compare.js,
+// editor-disk-compare.js).
+function edgeDepth(top,bottom,height){
+ const edge=Math.min(AUTO_EDGE,height/4);
+ return clamp(top<edge?(top-edge)/edge:bottom>height-edge?(bottom-(height-edge))/edge:0,-AUTO_REACH,AUTO_REACH);
+}
+// The depth of a dragged box `size` px tall whose top is at `top`, the
+// pointer at `pointer` (all in map px). A box that cannot sit between the two
+// edge zones would always be in one of them, so the map would scroll on every
+// move (PR review finding on v1.21.69: a zoomed change map's view box is often
+// taller than the map); then the pointer itself is measured.
+function boxEdgeDepth(top,size,height,pointer){
+ const edge=Math.min(AUTO_EDGE,height/4);
+ return size>=height-2*edge?edgeDepth(pointer,pointer,height):edgeDepth(top,top+size,height);
+}
 // A row pitch counts as SAMPLE_PITCH when it is within rounding of it: the
 // pitch is recomputed from the geometry (scale x line height), which can come
 // out as 2.4999999999999996 for a row blockGeometry made exactly 2.5.
@@ -828,7 +846,7 @@ function create(adapter){
   const found=sampled(d,'lines',state.revision,first,last,state.lines,columns,1);
   return diskLayout(d,'lines',g,found,columns,g.scale,height,width,{start,metrics:m,
    label:()=>Math.round(clamp(state.top/Math.max(1,state.lines-state.rows),0,1)*100),
-   seek:value=>paged.mapSeek(flow?{offset:lineOffset(state,value)}:{line:value}),
+   seek:value=>paged.mapSeek(flow?{offset:value>=state.lines?state.units:lineOffset(state,value)}:{line:value}),
    scroll:delta=>paged.wheelBy(delta),
    step:{line:1,page:Math.max(1,state.rows-1)}});
  }
@@ -992,14 +1010,17 @@ function create(adapter){
   // (Only there: elsewhere the box may reach past the map's edge with the pointer.)
   if(target<=0)own.offset=0;
   else if(target>=g.total-g.span)own.offset=clamp(Math.max(own.offset,top+g.box.height-g.used),0,g.max);
-  seekTo(layout,target);
+  // Pinned at the end, ask for the end itself: targetAt stops at total - span
+  // with the span of the last measurement, and a disk-backed view decides
+  // "show the end" against its own current span, so the old value could leave
+  // the text a few characters short of the end (CI on v1.21.69).
+  seekTo(layout,target>=g.total-g.span?g.total:target);
  }
  // How far the dragged box's own edge is into the map's edge, as a share of
  // the edge (negative at the top; past the map's end it keeps growing, up
  // to AUTO_REACH).
  function autoDepth(g){
-  const edge=Math.min(AUTO_EDGE,g.used/4),top=drag.last-drag.grab,bottom=top+g.box.height;
-  return clamp(top<edge?(top-edge)/edge:bottom>g.used-edge?(bottom-(g.used-edge))/edge:0,-AUTO_REACH,AUTO_REACH);
+  return boxEdgeDepth(drag.last-drag.grab,g.box.height,g.used,drag.last);
  }
  function autoStep(time){
   autoFrame=0;
@@ -1052,7 +1073,7 @@ function create(adapter){
 }
 
 const api={create,commentMarkers,lineRuns,kindRuns,blockGeometry,lineShape,lineStarts,geometry,targetAt,dragTarget,widthLimits,storedWidth,shownWidth,textZoom,parseSyntax,syntaxReader,syntaxCursor,rowCells,
- ROW,MIN_BOX,PER_LINE,SAMPLE,WIDTH,NARROW_WIDTH,WIDTH_MAX,TEXT_FONT,TEXT_FONT_MAX,TEXT_REFERENCE,TEXT_COLUMNS,TEXT_ROWS,SAMPLE_PITCH,textPitch,rowsFor,kinds:{TEXT,COMMENT,STRING,KEYWORD,NUMBER,PROPERTY}};
+ ROW,MIN_BOX,PER_LINE,SAMPLE,WIDTH,NARROW_WIDTH,WIDTH_MAX,TEXT_FONT,TEXT_FONT_MAX,TEXT_REFERENCE,TEXT_COLUMNS,TEXT_ROWS,SAMPLE_PITCH,textPitch,rowsFor,AUTO_EDGE,AUTO_REACH,autoSpeed,edgeDepth,boxEdgeDepth,kinds:{TEXT,COMMENT,STRING,KEYWORD,NUMBER,PROPERTY}};
 root.NTKEditorDocumentMap=Object.freeze(api);
 if(typeof module==='object'&&module.exports)module.exports=api;
 })(globalThis);

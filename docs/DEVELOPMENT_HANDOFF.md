@@ -1,3 +1,17 @@
+# v1.21.69 Beta 1 - Comparison change map: map-only wheel and edge scrolling like the Document Map
+
+v1.21.68 was published and verified: tag at merge commit 8005751 (PR #199), release run 43993620406 green, both Checks runs green without a re-run, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.68", stable channel still at v1.21.34. Before merging, a review (four reviewers, each finding checked by two skeptics) found two defects in the small-file map, fixed in the same PR.
+
+Owner request after v1.21.68: "can we get the compar map working similarly while maintaining its purpose?" Also asked to line up the two tracks by comparison rows, then withdrew it ("never mind about lining up the change map. it's fine. it look like notepad++ might handle it the same way"), so the tracks keep each document's own line positions.
+
+What changed (rule in the AGENTS.md map bullet): in all three comparison implementations the change map's drag now auto-scrolls on the Document Map's ramp once the view's box reaches the map's edge (it used to step 20 px per pointer move only when the pointer left the map), and the wheel over a zoomed map scrolls only the map (the page-held comparisons also moved the text; the disk comparison already scrolled only the map). Dynamic fit is unchanged. Checks: `scripts/editor-layout-map.browser.cjs` (aligned comparison) and `scripts/editor-large-file.browser.cjs` (disk comparison) drag the view to the map's edge and check the map holds, then scrolls, then stops on release; `editor-workflows108.browser.cjs`, `editor-layout-map.browser.cjs` and `editor-motion114.browser.cjs` now expect the wheel over a zoomed map to leave the text where it is. `editor-compare.js` (the fallback without alignment) has the same change but no browser check drives it.
+
+Review before release (seven findings, all confirmed and fixed): a view box taller than the map less both edge zones always sat in one of them, so every drag scrolled (now measured at the pointer, `boxEdgeDepth`, shared with the Document Map); `scrollTop` snaps to device pixels, so a slow step could end the loop (`autoPos`); a release after an auto-scroll was taken for a click (`autoMoved`, `drag.scrolled`); and the disk comparison could move a released map on a late line change (`mapHeldUntil`, 600 ms). The layout-map check was weak (the map could reach its end, so "stops on release" proved nothing): it now pulls just inside the edge zone toward the farther end and asserts a slow scroll released short of the end. The unaligned comparison (`editor-compare.js`, used when the aligned component cannot load) had no check: the same script now blocks `NTKEditorAlignedCompare` and checks it.
+
+CI on the first head: `TestEditorSessionBrowserMapList` timed out holding a drag at the end of the 1.7 MB single-line file (also once locally on v1.21.68): `holdAt` asked for total − span with the span of the last measurement, while the disk view decides "the end" against its current span, so the text stayed 21 characters short. A drag pinned at the end now asks for the end itself.
+
+Not checked on real Windows.
+
 # v1.21.68 Beta 1 - Document Map: real text for smaller files; a gentler edge-scroll ramp
 
 v1.21.67 was published and verified: tag at merge commit 4e1dd34 (PR #198), release run 43983414644 green, both Checks runs green without a re-run, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.67", stable channel still at v1.21.34.

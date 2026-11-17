@@ -88,7 +88,7 @@ function create(options) {
  let ids = {left:'', right:''};
  let lastSide = options.activeSide?.() || 'left';
  let signature = '', listSignature = '', disposed = false, syncing = 0, scale = prefs.compareMapZoom ?? -3;
- let job = null, startTimer = null, selected = -1, drag = null;
+ let job = null, startTimer = null, selected = -1, drag = null, mapHeldUntil = 0;
  let mapFrame = 0, gestureSide = null;
  let mapTop = 0, mapExtent = 0, mapScrollMax = 0, mapScrollPosition = 0;
  let mapData = null, mapRequest = null, mapPaintKey = '';
@@ -510,7 +510,8 @@ function create(options) {
    if (comparing && panes[peerOf(side)].ranges.length) paintDifferences(peerOf(side));
   }
   scheduleMap();
-  if (pane.top !== previousTop && gestureSide === side && drag === null) revealMap(side);
+  // A text move still finishing just after a drag must not move the map the user just placed.
+  if (pane.top !== previousTop && gestureSide === side && drag === null && root.performance.now() >= mapHeldUntil) revealMap(side);
   const sync = !syncing && gestureSide === side && q('[data-compare-sync]').checked;
   if (sync) syncVertical(side);
   if (pane.top !== previousTop && job?.status && !coversViewport(side)) queueLocate(side, sync);
@@ -998,11 +999,45 @@ function create(options) {
 
  function pointOnMap(event, side) {
   const pane = panes[side];
+  if (drag) drag.lastY = event.clientY;
   const line = clamp(Math.floor((event.clientY - map.getBoundingClientRect().top + mapTop) / mapPitch()), 0, totalLines(pane) - 1);
   const halfView = Math.floor(pane.textarea.clientHeight / lineHeight(pane) / 2);
   gestureSide = side;
   go(goLine(side, line - halfView));
   return line;
+ }
+
+ // Dragging on a map that scrolls works like the Document Map's box: the map
+ // stays where it is and the view follows the pointer; once the view's box
+ // reaches the map's top or bottom edge the map scrolls by itself on the
+ // Document Map's ramp (NTKEditorDocumentMap.edgeDepth/autoSpeed).
+ let autoFrame = 0, autoTime = 0;
+ function dragDepth() {
+  const docMap = root.NTKEditorDocumentMap, pane = drag && panes[drag.side];
+  if (!docMap || !pane || !mapExtent) return 0;
+  const size = parseFloat(pane.marker.style.height) || 0, y = drag.lastY - map.getBoundingClientRect().top;
+  return docMap.boxEdgeDepth(y - size / 2, size, map.clientHeight, y);
+ }
+ function autoStep(time) {
+  autoFrame = 0;
+  if (!drag || disposed) return;
+  const depth = dragDepth();
+  if (!depth) return;
+  const passed = autoTime ? Math.min(50, time - autoTime) : 16;
+  autoTime = time;
+  const before = mapTop;
+  setMapTop(mapTop + Math.sign(depth) * root.NTKEditorDocumentMap.autoSpeed(Math.abs(depth)) * passed / 1000);
+  if (mapTop === before) return;
+  drag.scrolled = true;
+  scheduleMap();
+  pointOnMap({clientY:drag.lastY}, drag.side);
+  autoFrame = root.requestAnimationFrame(autoStep);
+ }
+ function autoStart() {
+  if (!autoFrame && dragDepth()) { autoTime = 0; autoFrame = root.requestAnimationFrame(autoStep); }
+ }
+ function autoStop() {
+  if (autoFrame) { root.cancelAnimationFrame(autoFrame); autoFrame = 0; }
  }
 
  map.addEventListener('scroll', () => { if (readMapScroll()) scheduleMap(); });
@@ -1040,7 +1075,8 @@ function create(options) {
    options.activate(pane.doc, side);
    for (const name of sides) panes[name].section.classList.toggle('is-active-view', name === side);
   });
-  const gesture = () => { gestureSide = side; horizontal.input(side); };
+  // A new gesture in the text ends the hold left by a map drag, so the map follows it again.
+  const gesture = () => { gestureSide = side; mapHeldUntil = 0; horizontal.input(side); };
   pane.container.addEventListener('pointerdown', gesture);
   pane.container.addEventListener('wheel', gesture, {passive:true});
   pane.container.addEventListener('keydown', gesture, true);
@@ -1075,19 +1111,22 @@ function create(options) {
   track.addEventListener('pointerdown', event => {
    if (!pane.doc || event.button !== 0) return;
    event.preventDefault();
-   drag = {id:event.pointerId, line:0, y:event.clientY};
+   drag = {id:event.pointerId, line:0, y:event.clientY, lastY:event.clientY, side};
    track.setPointerCapture?.(event.pointerId);
    track.focus({preventScroll:true});
    drag.line = pointOnMap(event, side);
   });
-  track.addEventListener('pointermove', event => { if (drag?.id === event.pointerId) pointOnMap(event, side); });
+  track.addEventListener('pointermove', event => { if (drag?.id === event.pointerId) { pointOnMap(event, side); autoStart(); } });
   track.addEventListener('pointerup', event => {
-   if (drag?.id !== event.pointerId || Math.abs(event.clientY - drag.y) > 3) return;
+   if (drag?.id === event.pointerId) { autoStop(); mapHeldUntil = root.performance.now() + 600; }
+   // A press that scrolled the map at its edge is a drag, however little the pointer moved.
+   if (drag?.id !== event.pointerId || drag.scrolled || Math.abs(event.clientY - drag.y) > 3) return;
    setMapTop((drag.line + .5) * mapPitch() - map.clientHeight / 2);
    scheduleMap();
   });
-  track.addEventListener('lostpointercapture', () => { drag = null; });
+  track.addEventListener('lostpointercapture', () => { if (drag) mapHeldUntil = root.performance.now() + 600; drag = null; autoStop(); });
   track.addEventListener('keydown', event => {
+   mapHeldUntil = 0;
    const targets = {Home:0, End:totalLines(pane) - 1, ArrowUp:pane.top - 1, ArrowDown:pane.top + 1,
     PageUp:pane.top - linesInView(pane), PageDown:pane.top + linesInView(pane)};
    if (!Object.hasOwn(targets, event.key)) return;
@@ -1202,6 +1241,7 @@ function create(options) {
    if (disposed) return;
    clearJob();
    disposed = true;
+   autoStop();
    preview?.dispose?.();
    splitter.dispose();
    observer?.disconnect();
