@@ -1254,6 +1254,25 @@ function create(options) {
    preview?.reflow();
   },
   get textarea() { return panes[activeSide()].textarea; },
+  // Something other than the user's own scroll moved the active side (the
+  // Find window showing a match): the other side follows it, as it follows a
+  // scroll. Sync scroll follows only the side of the last gesture, and that
+  // can be the other one.
+  follow() {
+   if (!comparing || disposed) return;
+   const side = activeSide();
+   gestureSide = side;
+   const step = tries => {
+    if (disposed || gestureSide !== side) return;
+    if (syncing) { if (tries < 60) root.setTimeout(() => step(tries + 1), 50); return; }
+    // The view may have reported its new place already, so ask for the line
+    // mapping here too; its answer moves the other side.
+    changed(side);
+    const pane = panes[side];
+    if (!(pane.view && panes[peerOf(side)].view && pane.alignedTop != null) && job?.status && !coversViewport(side)) queueLocate(side, true);
+   };
+   step(0);
+  },
   // The disk view of the side that shows d, whether or not it has the focus.
   diskViewOf(d) { return sides.map(side => panes[side]).find(pane => pane.doc === d)?.view || null; },
   // The Find window's marks changed for d: every side that shows it.

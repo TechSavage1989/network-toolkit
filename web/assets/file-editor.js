@@ -1452,8 +1452,11 @@ const findAdapter={
  selectionText:async d=>{const r=currentRange();if(d.disk)return await diskView()?.selectedText(1024)??'';return d.content.slice(r.start,r.end);},
  async select(d,from,to,focus){
   if(current()!==d&&!activateDocument(d.id))return;
-  if(d.disk){const view=diskView();if(view){await view.ready;await view.position(from,to,focus);}status();return;}
-  positionAt(from,focus);const view=captureView();restoreView(view,from,to,focus);status();
+  // In a comparison the other side follows the pane the match was shown in,
+  // as it follows the user's own scroll (owner report on v1.21.71: after
+  // Find Next the lines no longer lined up).
+  if(d.disk){const view=diskView();if(view){await view.ready;await view.position(from,to,focus);}comparison?.follow?.();status();return;}
+  positionAt(from,focus);const view=captureView();restoreView(view,from,to,focus);comparison?.follow?.();status();
  },
  activate:d=>current()===d||activateDocument(d.id),
  // In a comparison only its two documents can be shown without closing it.
@@ -1482,6 +1485,9 @@ const findAdapter={
   // or split view (Replace All in All Opened Documents), so its page is the
   // new text before anyone types there.
   const view=diskViewFor(d);
+  // A compared document's comparison is worked out again for its new text,
+  // first: a page read for the old comparison is refused once the text changed.
+  const compared=paneShows(d);if(compared)paneWorkspace().refresh(true);
   // The replacement is committed whatever happens here: a reload another
   // part of the editor cancels (a comparison realigning on the new revision)
   // is tried again, and never reported as a failed Replace All.
@@ -1489,8 +1495,6 @@ const findAdapter={
    const reload=async()=>{const at=Math.min(view.selection().start,metadata.units);await view.position(at,at,false);await view.load({start:session.state().page.start});};
    for(let attempt=0;;attempt++){try{await reload();break;}catch(error){if(error?.name!=='AbortError'||attempt>=2)break;}}
   }
-  // A compared document's comparison is worked out again for its new text.
-  if(paneShows(d))paneWorkspace().refresh(true);
   drawTabs();status();
  },
  diskBusy(d,on){d.diskEditing=!!on;const view=diskViewFor(d);if(view)view.setReadOnly(on?true:notText(d));},

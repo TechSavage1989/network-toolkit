@@ -1,3 +1,13 @@
+# v1.21.72 Beta 1 - The other side of a comparison follows Find
+
+v1.21.71 was published and verified: tag at merge commit 34f9058 (PR #202), release run 44041838584 green, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` passing, stable channel still v1.21.34.
+
+Owner report on v1.21.71, a screenshot of a compared configuration with "lines not lining up"; the sides were lined up at first, then the owner "scrolled a lot, Find Next / Find". Alignment itself was never lost: sync scroll follows only the side of the last manual gesture, and Find moves a pane by code, so a pane moved by Find after a scroll of the other side was never followed. Reproduced locally with a made-up pair and with the owner's file (used only locally, never committed).
+
+What changed (rule in the AGENTS.md Find window bullet): `follow()` in both comparisons after Find shows a match; Replace All in All Opened Documents restarts the comparison before it reloads a compared pane (found by the new check: the reload was refused while the old comparison's alignment was asked for).
+
+Known limits: the textarea fallback of the page-held comparison has no sync to follow with. Not checked on real Windows.
+
 # v1.21.71 Beta 1 - Find, Replace and Mark in a comparison
 
 v1.21.70 was published and verified: tag at merge commit 5e227c3 (PR #201), release run 44030640657 green, both Checks runs green without a re-run, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` passing, stable channel still v1.21.34.

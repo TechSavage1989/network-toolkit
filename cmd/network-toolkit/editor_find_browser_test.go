@@ -66,7 +66,19 @@ func TestEditorSessionBrowserFindWindow(t *testing.T) {
 		}
 		fmt.Fprintf(&large2, "host-%06d.example.com 192.0.2.%d port %d\n", i, i%250, 1000+i%9000)
 	}
+	// Two page-held documents long enough to scroll in the aligned comparison.
+	var longA, longB strings.Builder
+	for i := 1; i <= 3000; i++ {
+		fmt.Fprintf(&longA, "item-%04d value %d\n", i, i*7)
+		if i%100 == 0 {
+			fmt.Fprintf(&longB, "moved-%04d value %d\n", i, i*7)
+		} else {
+			fmt.Fprintf(&longB, "item-%04d value %d\n", i, i*7)
+		}
+	}
 	contents := map[string]string{
+		"longa.txt":  longA.String(),
+		"longb.txt":  longB.String(),
 		"left.txt":   "alpha one\nbeta two\nalpha three\nshared line\n",
 		"right.txt":  "alpha one\nbeta 2\ngamma\nalpha four\nshared line\n",
 		"large2.txt": large2.String(),

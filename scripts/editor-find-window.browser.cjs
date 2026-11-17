@@ -737,6 +737,20 @@ const step=name=>console.log('FIND WINDOW '+name);
    await win().locator('[data-ed-find-action="count"]').click();
    await messageIs(/^Count: 2 matches\.$/);
    assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.active.path.split(/[\\/]/).pop()),'left.txt','Count follows the pane that has the focus');
+   // The other side follows the pane Find moved, also when the user last
+   // scrolled that other side (owner report on v1.21.71).
+   await open('longa.txt');await open('longb.txt');
+   await compareOn('longa.txt','longb.txt');
+   await until(()=>document.querySelector('[data-compare-pane="right"] .cm-content')?.textContent.includes('item-0001')&&document.querySelector('[data-compare-pane="left"] .cm-content')?.textContent.includes('item-0001'));
+   const cmTop=side=>page.evaluate(side=>{const pane=document.querySelector('[data-compare-pane="'+side+'"]'),r0=pane.querySelector('.cm-scroller').getBoundingClientRect();const row=[...pane.querySelectorAll('.cm-lineNumbers .cm-gutterElement')].find(r=>r.textContent.trim()&&r.getBoundingClientRect().top>=r0.top-1);return row?Number(row.textContent):0;},side);
+   {const box=await page.locator('[data-compare-pane="left"] .cm-scroller').boundingBox();await page.mouse.move(box.x+80,box.y+box.height-60);for(let i=0;i<20;i++){await page.mouse.wheel(0,2000);await page.waitForTimeout(40);}}
+   for(let tries=0;await cmTop('left')<1500;tries++){if(tries>60)assert.fail('the left side scrolls');await page.waitForTimeout(250);}
+   await clickClear(pane('right'));
+   await query('moved-0100');
+   await win().locator('[data-ed="next"]').click();
+   await until(()=>document.querySelector('[data-compare-pane="right"] .nt-find-mark.is-current')?.textContent==='moved-0100',null,15000);
+   for(let tries=0;;tries++){const [l,r]=[await cmTop('left'),await cmTop('right')];if(l&&l===r&&l<1000)break;if(tries>60)assert.fail('the left side follows the right side to its match: left '+l+', right '+r);await page.waitForTimeout(250);}
+   await query('alpha');
    // With a disk-backed document open, the comparison is the disk one; its
    // sides held in the page paint the marks too.
    await open('large.txt');
@@ -757,6 +771,16 @@ const step=name=>console.log('FIND WINDOW '+name);
    await until(()=>document.querySelector('[data-compare-pane="right"] .nt-editor-marks:not([hidden]) mark.is-current')?.textContent==='changed-000500',null,30000);
    const placed=await page.evaluate(()=>{const pane=document.querySelector('[data-compare-pane="right"]'),mark=pane.querySelector('.nt-editor-marks:not([hidden]) mark.is-current').getBoundingClientRect(),ta=pane.querySelector('[data-compare-text]'),r=ta.getBoundingClientRect();return {inside:mark.top>=r.top-1&&mark.bottom<=r.bottom+1,selected:ta.value.slice(ta.selectionStart,ta.selectionEnd)};});
    assert.deepEqual(placed,{inside:true,selected:'changed-000500'},'the current match is painted on its own row');
+   // The other side follows the pane Find moved, also when the user last
+   // scrolled that other side (owner report on v1.21.71: after scrolling and
+   // Find Next the lines no longer lined up). The two files have the same
+   // number of lines, so aligned sides show the same line at the top.
+   const topLine=side=>page.evaluate(side=>{const ta=document.querySelector('[data-compare-text="'+side+'"]'),r0=ta.getBoundingClientRect();const row=[...document.querySelectorAll('[data-disk-compare-gutter="'+side+'"] > *')].find(r=>!r.hasAttribute('data-alignment-gap')&&r.getBoundingClientRect().top>=r0.top-1);return row?Number(row.textContent):0;},side);
+   {const lb=await page.locator('[data-compare-text="left"]').boundingBox();await page.mouse.move(lb.x+80,lb.y+lb.height-60);for(let i=0;i<20;i++){await page.mouse.wheel(0,2000);await page.waitForTimeout(40);}}
+   await until(()=>{const ta=document.querySelector('[data-compare-text="left"]'),r0=ta.getBoundingClientRect();const row=[...document.querySelectorAll('[data-disk-compare-gutter="left"] > *')].find(r=>!r.hasAttribute('data-alignment-gap')&&r.getBoundingClientRect().top>=r0.top-1);return row&&Number(row.textContent)>1500;},null,15000);
+   await win().locator('[data-ed="next"]').click();
+   await until(()=>document.querySelector('[data-compare-pane="right"] .nt-editor-marks:not([hidden]) mark.is-current')?.textContent==='changed-000500',null,30000);
+   for(let tries=0;;tries++){const [l,r]=[await topLine('left'),await topLine('right')];if(l&&l===r&&l<1000)break;if(tries>60)assert.fail('the left side follows the right side to its match: left '+l+', right '+r);await page.waitForTimeout(250);}
    // Replace All in All Opened Documents from the other pane: the pane of the
    // changed document shows its new text, so typing there goes where it is
    // seen (review finding: it kept the old page).
