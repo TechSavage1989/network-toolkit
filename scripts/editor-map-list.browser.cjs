@@ -145,17 +145,18 @@ function expectedBox(info,ta){
  const share=Math.max(0,Math.min(1,ta.scrollTop/Math.max(1,ta.scrollHeight-ta.clientHeight)));
  return {scrolls:true,top:share*(g.used-size),height:size};
 }
-// Blocks: 3 px per row while the document fits, then fewer, never under 1 px
+// Blocks: 3 px per row while the document fits, then fewer, never under 2.5 px
+// (rows of real text, as large documents; owner request after v1.21.67)
 // per row; then the map scrolls.
 async function assertBoxMatches(page,label){
  const [info,ta]=await Promise.all([mapInfo(page),activeArea(page)]);
  assert(!info.hidden&&info.box&&info.layout,label+': the map shows a box');
  assert.equal(info.layout.kind,'text',label+': a page-held document is mapped by its text area');
- const g=info.layout.g,rows=ta.scrollHeight/ta.lineHeight,pitch=Math.max(1,Math.min(3,info.height/rows));
+ const g=info.layout.g,rows=ta.scrollHeight/ta.lineHeight,pitch=Math.max(2.5,Math.min(3,info.height/rows));
  assert(Math.abs(g.total-ta.scrollHeight)<=1,label+': the map covers the whole scroll height ('+g.total+' / '+ta.scrollHeight+')');
  assert(Math.abs(g.scale*ta.lineHeight-pitch)<=0.02,label+': '+pitch.toFixed(2)+' px per row ('+(g.scale*ta.lineHeight)+')');
  const want=expectedBox(info,ta);
- assert.equal(want.scrolls,rows>info.height+0.5,label+': the map scrolls only when the rows do not fit at 1 px');
+ assert.equal(want.scrolls,rows*2.5>info.height+0.5,label+': the map scrolls only when the rows do not fit at 2.5 px');
  assert(Math.abs(g.used-Math.min(info.height,rows*pitch))<=1,label+': the map is as tall as its rows, at most its own height');
  if(!want.scrolls)assert.equal(g.offset,0,label);
  // A map held by a drag, its wheel or its bar: the box is on the text's real place.
@@ -311,7 +312,19 @@ async function mainWindow(browser){
  // The box is the visible share at every scroll position.
  for(const fraction of [0,0.25,0.5,0.8,1])await setActiveScroll(page,fraction),await assertBoxMatches(page,'scroll '+fraction);
  info=await mapInfo(page);
- assert(Math.abs(info.layout.g.scale*(await activeArea(page)).lineHeight-1)<=0.02,'a 705-line document is drawn at one pixel per line and scrolls in the map');
+ assert(Math.abs(info.layout.g.scale*(await activeArea(page)).lineHeight-2.5)<=0.02,'a 705-line document is drawn at 2.5 px per line and scrolls in the map');
+ {
+  // Its rows are its own text, like a large document's (owner request after v1.21.67).
+  await frames(page);
+  const rows=await textRows(page),lines=(await page.evaluate(()=>NetworkToolkitFileEditor.active.content)).split('\n');
+  assert(rows.length>50,'the map draws the small document as text rows ('+rows.length+')');
+  {
+   // Down to the map's bottom edge (review finding: rows stopped at 400, 1,000 px).
+   const g=(await mapInfo(page)).layout.g,last=Math.max(...rows.map(row=>row.y));
+   assert(last>=g.used-2*2.5-1,'text rows reach the bottom of the map ('+last+' of '+g.used+' px)');
+  }
+  for(const row of rows.slice(0,40))assert(lines[row.line].replace(/\t/g,' ').startsWith(row.text.trimEnd())||row.text.trim()==='','map row '+row.line+' is that line\'s text: '+JSON.stringify(row.text));
+ }
  // A click centres the view there.
  await setActiveScroll(page,0);
  const used=info.layout.g.used;
@@ -704,7 +717,8 @@ async function mainWindow(browser){
 
  // ---- The map always shows the whole document (owner request after v1.21.59) ----
  // At every width all of the document is in the map and nothing scrolls inside
- // it: its real text when every row fits at 4 px or more, else blocks.
+ // it: its real text when every row fits at 4 px or more, else rows of 2.5 px
+ // (drawn as its small text) that scroll in the map.
  const whole=async label=>{
   const [info,size,ta]=await Promise.all([mapInfo(page),mapSize(page),activeArea(page)]),g=info.layout.g;
   assert(g.used<=info.height+0.5&&Math.abs(g.total-ta.scrollHeight)<=1,label+': the map covers the whole document');
@@ -713,7 +727,7 @@ async function mainWindow(browser){
   const want=expectedBox(info,ta);
   if(size.fit)assert.equal(want.scrolls,false,label+': text is drawn only when the whole document fits');
   if(!want.scrolls)assert.equal(g.offset,0,label+': a document that fits does not scroll in the map');
-  else assert(Math.abs(g.scale*ta.lineHeight-1)<=0.02,label+': a scrolling map is one pixel per row');
+  else assert(Math.abs(g.scale*ta.lineHeight-2.5)<=0.02,label+': a scrolling map is 2.5 px of real text per row');
   assert(Math.abs(info.box.top-want.top)<=1&&Math.abs(info.box.height-want.height)<=1,label+': the box is the part on screen');
   return {info,size,ta};
  };
@@ -1110,8 +1124,9 @@ async function engine(browser){
  }
  // Once the box's own bottom edge is near the map's bottom (owner request
  // after v1.21.66: start as soon as the box crosses the threshold) the map
- // scrolls by itself, from about 500 px a second, and very fast the further
- // the box is pushed past the edge; it stops when the button is released.
+ // scrolls by itself, slowly at first (owner request after v1.21.67: a slower
+ // start and a longer curve), and very fast when the box is pulled far past
+ // the edge; it stops when the button is released.
  const mapOffset=()=>page.evaluate(()=>NetworkToolkitFileEditor.documentMap.layout.g.offset);
  info=await mapInfo(page);
  {
@@ -1121,16 +1136,20 @@ async function engine(browser){
   await page.mouse.move(x,info.top+info.height-10-info.box.height+grab,{steps:6});
  }
  let from=await mapOffset();await page.waitForTimeout(600);const slow=await mapOffset()-from;
- await page.mouse.move(x,info.top+info.height+120,{steps:4});
+ // Two zone widths in: still well under the top speed.
+ await page.mouse.move(x,info.top+info.height-10-info.box.height+info.box.height/2+40,{steps:4});
+ from=await mapOffset();await page.waitForTimeout(600);const middle=await mapOffset()-from;
+ await page.mouse.move(x,info.top+info.height+240,{steps:4});
  from=await mapOffset();await page.waitForTimeout(300);const fast=(await mapOffset()-from)*2;
- assert(slow>150&&slow<1200,'as soon as the box is in the edge zone the map scrolls ('+slow+' px in 0.6 s)');
+ assert(slow>30&&slow<300,'as soon as the box is in the edge zone the map scrolls, slowly ('+slow+' px in 0.6 s)');
+ assert(middle>slow&&middle<2500,'pulled a little further it is faster but far from the top speed ('+middle+' px in 0.6 s)');
  assert(fast>8000,'pushed far past the edge it scrolls very fast ('+fast+' px in 0.6 s)');
  {
   const l=await page.evaluate(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return {under:(l.g.box.top+l.g.offset)/l.g.scale,start:l.start,span:l.g.span};});
   assert(Math.abs(l.start-l.under)<=l.span*3,'the text follows the box while the map scrolls: '+JSON.stringify(l));
  }
  // Kept there, it reaches the very end: the last characters are shown.
- await page.waitForFunction(units=>{const s=NetworkToolkitFileEditor.active.diskSession.state().page;const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]');return s.start+s.text.length>=units&&ta.scrollTop+ta.clientHeight>=ta.scrollHeight-2;},d.units,{timeout:60000});
+ await page.waitForFunction(units=>{const s=NetworkToolkitFileEditor.active.diskSession.state().page;const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]');return s.start+s.text.length>=units&&ta.scrollTop+ta.clientHeight>=ta.scrollHeight-2;},d.units,{timeout:60000}).catch(async error=>{console.log('DIAG',JSON.stringify(await page.evaluate(()=>{const l=NetworkToolkitFileEditor.documentMap.layout,s=NetworkToolkitFileEditor.active.diskSession.state(),ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]');return {g:l.g,start:l.start,page:{start:s.page.start,len:s.page.text.length},units:s.metadata.units,ta:[ta.scrollTop,ta.clientHeight,ta.scrollHeight]};})));throw error;});
  await page.mouse.up();
  const tail=await page.evaluate(()=>document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]').value.slice(-32));
  const expectedTail=fs.readFileSync(path.join(engineFiles,'export.b64'),'utf8').slice(-32);

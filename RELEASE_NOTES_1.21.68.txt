@@ -1,0 +1,12 @@
+Network Toolkit 1.21.68
+
+## What's New
+
+- Smaller files now get the same Document Map as large ones: when a file has too many lines to show as readable text in the map, each line is a small row of its own text in the editor's colors, instead of colored blocks.
+- Dragging the map's view box to the top or bottom edge now starts scrolling slowly and speeds up gradually the further you pull, reaching full speed only when you pull well past the edge.
+
+## Additional Details
+
+- This applies to files the editor holds in the page (up to 4,000 lines and 512 KB). As with large files, each line is a 2.5 pixel row, and the map scrolls when the file is longer than the map. A file short enough to fit in the map is shown as before.
+- The edge scrolling starts at about 120 pixels a second and follows a cubic curve: about 600 pixels a second two edge widths in, about 4,000 at four, and about 30,000 when the pointer is pulled around 170 pixels past the edge.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

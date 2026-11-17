@@ -196,3 +196,26 @@ test('blocks take their colours from the editor only, and never draw a row under
  g=map.blockGeometry({total:100000,rows:5000,height:600,start:99500,end:100000});
  assert.equal(g.offset,4400);assert.equal(Math.round(g.box.top+g.box.height),600);
 });
+
+test('small text: a 2.5 px row is text whatever rounding the geometry brings, and its rows fill the map',()=>{
+ // PR review finding (v1.21.68): the pitch drawSmallText recomputes as scale x
+ // line height came out as 2.4999999999999996 for many scroll heights, and those
+ // documents fell back to blocks. Every scroll height of a document taller than
+ // the map at 2.5 px must give text rows.
+ let below=0,checked=0;
+ for(const lineHeight of [16,17,18,20,21])for(let total=4000;total<=40000;total++){
+  const rows=total/lineHeight,height=900;
+  if(rows*2.5<=height)continue;
+  const g=map.blockGeometry({total,rows,height,start:0,end:600,least:map.SAMPLE_PITCH});
+  const pitch=g.scale*lineHeight;checked++;
+  assert(Math.abs(pitch-2.5)<1e-9,'the row is 2.5 px ('+pitch+')');
+  if(pitch<map.SAMPLE_PITCH)below++;
+  assert(map.textPitch(pitch),'a '+total+' px document at '+lineHeight+' px lines is drawn as text');
+ }
+ assert(below>1000,'the rounding the tolerance covers does occur ('+below+' of '+checked+')');
+ assert.equal(map.textPitch(2.49),false,'a real smaller row is not text');
+ // TEXT_ROWS (400) is 1,000 px of 2.5 px rows: a taller map needs more.
+ assert(map.rowsFor(1200,2.5)*2.5>=1200,'a 1,200 px map is filled with 2.5 px rows ('+map.rowsFor(1200,2.5)+')');
+ assert(map.rowsFor(2160,2.5)*2.5>=2160);
+ assert.equal(map.rowsFor(600,6),map.TEXT_ROWS,'readable text keeps its cap');
+});

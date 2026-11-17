@@ -1,3 +1,19 @@
+# v1.21.68 Beta 1 - Document Map: real text for smaller files; a gentler edge-scroll ramp
+
+v1.21.67 was published and verified: tag at merge commit 4e1dd34 (PR #198), release run 43983414644 green, both Checks runs green without a re-run, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.67", stable channel still at v1.21.34.
+
+Owner requests on v1.21.67: "make the small files map the same way too" and "make the ramp start slower and more of a curve to high speed. it seems to get fast really fast with little extra motion".
+
+What changed (rules in the AGENTS.md map bullet):
+- A page-held document whose rows do not fit in the map at a readable text size was drawn as coloured blocks down to 1 px per row; it is now drawn like a large document: 2.5 px rows of its own characters in the editor's colours (`drawSmallText`), the map scrolling when it is longer than the map.
+- Edge scrolling: 120 px/s at the start, cubic in depth, 30,000 px/s at eight zone widths (before: 500 px/s, quadratic, at four). About 600 px/s two zone widths in and 4,000 at four.
+
+Review before release (four reviewers, each finding checked by two skeptics; both survived every vote): the pitch `drawSmallText` recomputes as scale × line height came out as 2.4999999999999996 for many document lengths (over 15,000 of the scroll heights from 4,000 to 80,000 px at a 17 px line), which sent them back to blocks; it is now compared within rounding (`textPitch`). And `drawTextRows` stopped at `TEXT_ROWS` (400 rows = 1,000 px at 2.5 px), leaving the bottom of a taller map blank; small text now draws `rowsFor(g.used, pitch)` rows. The unit test in `scripts/editor-document-map.test.cjs` fails without these fixes; the browser check's window is under 1,000 px tall, so it does not exercise the row cap itself.
+
+Checks: `scripts/editor-map-list.browser.cjs` expects 2.5 px rows for the 706-line page-held document and checks its map rows against its lines, and checks a slow start (30 to 300 px in 0.6 s), a still moderate speed a little further in, and over 8,000 px a second pulled far past. In one of six local runs the step that holds the box past the bottom of the 1.7 MB single-line file until its end is shown timed out; five runs passed and the cause was not found. The step now prints the map's geometry, the page and the text area's scroll when it times out (`DIAG`).
+
+Not checked on real Windows.
+
 # v1.21.67 Beta 1 - Document Map: edge scrolling starts sooner and ends very fast
 
 v1.21.66 was published and verified: tag at merge commit 57703a0 (PR #197), release run 43968906604 green, both Checks runs green after one re-run of their failed jobs (`TestNativeEditorTransferInstalledWebView2`, `editor-workflows108.browser.cjs:35` and the `windows-setup` uninstaller's two-minute wait, none in code the PR touched, causes not found), all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.66", stable channel still at v1.21.34.
