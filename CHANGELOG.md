@@ -1,3 +1,8 @@
+## 1.21.68 Beta 1 - Document Map: real text for smaller files; a gentler edge-scroll ramp
+
+- A page-held document whose rows do not fit as text (`zoomFor` null) uses `blockGeometry` with `least:SAMPLE_PITCH` and draws its rows as its own characters (`drawSmallText`: `sampleFont`, then `drawTextRows` under the font's squeeze), like a large document's samples; blocks only below `SAMPLE_PITCH`.
+- Edge scrolling: `AUTO_START` 120 px/s, cubic in depth, `AUTO_MAX` 30,000 px/s at `AUTO_REACH` 8 zone widths.
+
 ## 1.21.67 Beta 1 - Document Map: edge scrolling starts sooner and ends very fast
 
 - The edge depth is measured at the dragged box's edge (`autoDepth`: `drag.last - drag.grab`, plus the box height at the bottom), in a 24 px zone (`AUTO_EDGE`), and the speed is `AUTO_START` (500 px/s) rising with the square of the depth to `AUTO_MAX` (30,000 px/s) at `AUTO_REACH` (4) zone widths.

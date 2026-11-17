@@ -72,11 +72,12 @@ const TEXT_FONT=6,TEXT_FONT_MAX=9,TEXT_SHARE=0.6,TEXT_REFERENCE=120,TEXT_COLUMNS
 // Dragging the box of a map that scrolls: once the box's own top or bottom
 // edge comes within AUTO_EDGE px of the map's edge, the map scrolls at once
 // (owner request after v1.21.66: start sooner, end very fast). Its speed in
-// px a second grows from AUTO_START with the square of how far the box is
-// pushed in, up to AUTO_MAX once it is AUTO_REACH edge widths in (the box
-// reaching the map's edge is one width; the rest is past it).
-const AUTO_EDGE=24,AUTO_START=500,AUTO_MAX=30000,AUTO_REACH=4;
-const autoSpeed=depth=>AUTO_START+(AUTO_MAX-AUTO_START)*Math.min(1,depth/AUTO_REACH)**2;
+// px a second grows from AUTO_START with the cube of how far the box is
+// pushed in (owner request after v1.21.67: a slower start and a longer curve
+// to high speed), up to AUTO_MAX once it is AUTO_REACH edge widths in (the
+// box reaching the map's edge is one width; the rest is past it).
+const AUTO_EDGE=24,AUTO_START=120,AUTO_MAX=30000,AUTO_REACH=8;
+const autoSpeed=depth=>AUTO_START+(AUTO_MAX-AUTO_START)*Math.min(1,depth/AUTO_REACH)**3;
 const SAMPLE_PITCH=2.5,SAMPLE_FONT=1.35,SAMPLE_SQUEEZE=0.5;
 const TEXT_FIT=4,CHUNK=1024,CHUNKS=64,COLOUR_COLUMNS=190,SAMPLE_COLUMNS=512,SAMPLE_DELAY=250;
 const SYNTAX_LIMIT=200000; // a disk page coloured for the map at most
@@ -560,7 +561,10 @@ function create(adapter){
   if(!starts){if(pageCache?.text!==text)pageCache={text,starts:lineStarts(text)};starts=pageCache.starts;}
   const total=Math.max(1,textarea.scrollHeight),start=textarea.scrollTop,end=start+textarea.clientHeight,rows=total/m.lineHeight;
   const zoom=zoomFor(m,width,m.columns,0,rows,height);
-  const g=zoom?geometry({total,rows,height,start,end,row:m.lineHeight*zoom.scale}):ownScroll(d.uid,blockGeometry({total,rows,height,start,end}),start);
+  // A document whose rows do not fit as readable text is drawn like a large
+  // one (owner request after v1.21.67): rows of SAMPLE_PITCH px of its own
+  // characters, scrolling in the map.
+  const g=zoom?geometry({total,rows,height,start,end,row:m.lineHeight*zoom.scale}):ownScroll(d.uid,blockGeometry({total,rows,height,start,end,least:SAMPLE_PITCH}),start);
   // Blocks and text take their colours from the editor's own highlighting.
   const syntax=page?diskSyntax(d,page):pageSyntax(d,text);
   const content=[d.uid+':'+(d.disk?'p':'t'),revision,text.length].join('|');
@@ -568,7 +572,7 @@ function create(adapter){
   return {kind:'text',mode:zoom?'text':'blocks',zoom,g,start,columns:m.columns,wrapped,colored:!!syntax,deferred:!d.disk&&text.length>LARGE,doc:d.uid,content,
    key:content+'|'+rest+'#'+Math.round(g.offset),
    label:()=>Math.round(clamp(start/Math.max(1,total-textarea.clientHeight),0,1)*100),
-   draw:ctx=>zoom?drawTextRows(ctx,d,text,starts,m,wrapped,g,width,total,zoom,syntax):drawText(ctx,d,text,starts,m,wrapped,g,width,total,syntax),
+   draw:ctx=>zoom?drawTextRows(ctx,d,text,starts,m,wrapped,g,width,total,zoom,syntax):drawSmallText(ctx,d,text,starts,m,wrapped,g,width,total,syntax),
    seek:value=>{textarea.scrollTop=value;},
    scroll:delta=>{if(paged?.wheelBy)paged.wheelBy(delta);else textarea.scrollTop+=delta;},
    step:{line:m.lineHeight,page:Math.max(m.lineHeight,textarea.clientHeight-m.lineHeight)}};
@@ -617,6 +621,16 @@ function create(adapter){
   ctx.globalAlpha=1;
  }
 
+ // Small rows of a page-held document: the document's own characters at
+ // the row's height, as large documents' samples are drawn (sampleFont);
+ // blocks only where a row is too short for any text.
+ function drawSmallText(ctx,d,text,starts,m,wrapped,g,width,total,syntax){
+  const pitch=g.scale*m.lineHeight,font=pitch>=SAMPLE_PITCH?sampleFont(ctx,m,pitch,width,m.columns):null;
+  if(!font){drawText(ctx,d,text,starts,m,wrapped,g,width,total,syntax);return;}
+  ctx.save();ctx.scale(font.squeeze,1);
+  try{drawTextRows(ctx,d,text,starts,m,wrapped,g,width/font.squeeze,total,{css:font.css,cw:font.cw,columns:font.columns},syntax);}
+  finally{ctx.restore();}
+ }
  // Text mode of a page-held document: the rows in the map's window only,
  // from the row at its top, as the text area wraps them.
  function drawTextRows(ctx,d,text,starts,m,wrapped,g,width,total,zoom,syntax){
