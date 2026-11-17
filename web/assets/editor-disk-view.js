@@ -771,16 +771,20 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
  function paintMarks() {
   if (!markLayer) return;
   const text = textarea.value;
-  if (projection || text !== page.text) {
+  // A comparison's aligned rows (projection) hold filler rows: the marks are
+  // found in the page's own text and placed through the row mapping.
+  if (projection ? text !== projection.text : text !== page.text) {
    markLayer.hidden = true;
    return;
   }
-  const top = displayRow(), bottom = Math.min(starts.length,
+  const rows = projection?.offsets || starts;
+  const top = displayRow(), bottom = Math.min(rows.length,
    wrapped ? rowAt(textarea.scrollTop + textarea.clientHeight) + 3 : top + clientRows + 2);
-  const first = Math.max(0, top - 8), end = Math.min(starts.length, bottom + 12);
-  const from = starts[first] || 0, to = end < starts.length ? starts[end] : text.length;
-  const ranges = marks(page.start + from, page.start + to);
-  const key = [page.start, from, to, markStamp, text.length].join(':');
+  const first = Math.max(0, top - 8), end = Math.min(rows.length, bottom + 12);
+  const from = rows[first] || 0, to = end < rows.length ? rows[end] : text.length;
+  const sourceFrom = sourceOffset(from), sourceTo = end < rows.length ? sourceOffset(to) : page.text.length;
+  const ranges = marks(page.start + sourceFrom, page.start + sourceTo);
+  const key = [page.start, from, to, markStamp, text.length, projection ? 'p' : ''].join(':');
   if (!ranges?.length) {
    // Nothing marked here, or not known yet: no marks of another part show.
    if (ranges || key !== markKey) markLayer.hidden = true;
@@ -795,7 +799,8 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    markKey = key;
    let html = '', at = from;
    for (const [a, b, kind] of ranges) {
-    const start = Math.max(a - page.start, at), stop = Math.min(b - page.start, to);
+    const start = Math.max(displayOffset(clamp(a - page.start, sourceFrom, sourceTo)), at);
+    const stop = Math.min(displayOffset(clamp(b - page.start, sourceFrom, sourceTo)), to);
     if (stop <= start) continue;
     html += escapeText(text.slice(at, start)) + (kind ? '<mark class="is-current">' : '<mark>') + escapeText(text.slice(start, stop)) + '</mark>';
     at = stop;

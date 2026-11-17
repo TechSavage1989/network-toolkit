@@ -678,6 +678,104 @@ const step=name=>console.log('FIND WINDOW '+name);
   step('document map done');
 
   // ---- 6. Transparency across a reload; a 640×400 window ----
+  step('comparison');
+  // Find, Replace and Mark work in a comparison, on the pane that has (or
+  // last had) the focus (owner request after v1.21.70).
+  {
+   const ids=()=>page.evaluate(()=>Object.fromEntries([...NetworkToolkitFileEditor.documents.values()].map(d=>[d.path.split(/[\\/]/).pop(),d.id])));
+   const content=name=>page.evaluate(name=>[...NetworkToolkitFileEditor.documents.values()].find(d=>d.path.split(/[\\/]/).pop()===name).content,name);
+   const compareOn=async(left,right)=>{
+    if(!await page.locator('#networkToolkitFileEditor.is-comparing').count())await page.locator('#networkToolkitFileEditor [data-ed="compare"]').click();
+    await until(()=>document.querySelector('#networkToolkitFileEditor.is-comparing'));
+    const known=await ids();
+    await page.selectOption('[data-compare-select="left"]',known[left]);
+    await page.selectOption('[data-compare-select="right"]',known[right]);
+   };
+   if(await win().isVisible())await win().locator('[data-ed-find-close]').click();
+   assert.ok(await page.evaluate(()=>NetworkToolkitFileEditor.closeAll()),'close everything before the comparison');
+   await open('left.txt');await open('right.txt');
+   await compareOn('left.txt','right.txt');
+   await until(()=>document.querySelectorAll('[data-compare-pane] .cm-content').length===2);
+   assert.equal(await page.locator('#networkToolkitFileEditor [data-ed="find"]').isVisible(),true,'Find is on the toolbar while comparing');
+   const pane=side=>page.locator('[data-compare-pane="'+side+'"] .cm-content');
+   // A click into a pane clear of the Find window, which floats over its top right.
+   const clickClear=async target=>{const box=await target.boundingBox();await page.mouse.click(box.x+24,box.y+box.height-24);};
+   await pane('right').click({position:{x:60,y:6}});await page.keyboard.press('Control+Home');
+   await page.keyboard.press('Control+f');await win().waitFor({state:'visible'});
+   await win().locator('[data-ed-find-tab="find"]').click();
+   await query('alpha');
+   await win().locator('[data-ed="next"]').click();
+   await messageIs(/^Match on line \d+\.$/);
+   assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.active.path.split(/[\\/]/).pop()),'right.txt','Find works on the pane that had the focus');
+   await until(()=>document.querySelector('[data-compare-pane="right"] .nt-find-mark.is-current')?.textContent==='alpha');
+   assert.equal(await page.locator('[data-compare-pane="left"] .nt-find-mark').count(),0,'the other pane shows no match');
+   // The window moves off the match it covered (as Notepad++'s Find dialog does).
+   await until(()=>{const m=document.querySelector('[data-compare-pane="right"] .nt-find-mark.is-current')?.getBoundingClientRect(),w=document.querySelector('[data-ed-find]').getBoundingClientRect();return m&&(m.right<=w.left||m.left>=w.right||m.bottom<=w.top||m.top>=w.bottom);},null,5000);
+   await shoot('editor-find-window-comparison-dark.png');
+   await win().locator('[data-ed-find-tab="mark"]').click();
+   await win().locator('[data-ed-find-action="mark"]').click();
+   await until(()=>[...document.querySelectorAll('[data-compare-pane="right"] .nt-find-mark')].map(el=>el.textContent).join('')==='alphaalpha');
+   // The marks belong to the document: Swap sides takes them along (a
+   // replaced text drops CodeMirror's decorations; review finding).
+   const swap=()=>page.locator('[data-compare="swap"]').first().click();
+   await swap();
+   await until(()=>[...document.querySelectorAll('[data-compare-pane="left"] .nt-find-mark')].map(el=>el.textContent).join('')==='alphaalpha');
+   await swap();
+   await until(()=>[...document.querySelectorAll('[data-compare-pane="right"] .nt-find-mark')].map(el=>el.textContent).join('')==='alphaalpha');
+   await win().locator('[data-ed-find-action="clear-marks"]').click();
+   await until(()=>!document.querySelector('[data-compare-pane="right"] .nt-find-mark:not(.is-current)'));
+   await win().locator('[data-ed-find-tab="replace"]').click();
+   await page.locator('[data-ed-replacement]').fill('omega');
+   await win().locator('[data-ed="replaceAll"]').click();
+   await until(()=>{const d=[...NetworkToolkitFileEditor.documents.values()].find(d=>d.path.endsWith('right.txt'));return d.content==='omega one\nbeta 2\ngamma\nomega four\nshared line\n';});
+   assert.equal(await content('left.txt'),'alpha one\nbeta two\nalpha three\nshared line\n','the other document is untouched');
+   await until(()=>document.querySelector('[data-compare-pane="right"] .cm-content')?.textContent.includes('omega four'));
+   await pane('right').click({position:{x:60,y:6}});await page.keyboard.press('Control+z');
+   await until(()=>{const d=[...NetworkToolkitFileEditor.documents.values()].find(d=>d.path.endsWith('right.txt'));return d.content.startsWith('alpha one')&&!d.dirty;});
+   await pane('left').click({position:{x:60,y:6}});
+   await win().locator('[data-ed-find-tab="find"]').click();
+   await win().locator('[data-ed-find-action="count"]').click();
+   await messageIs(/^Count: 2 matches\.$/);
+   assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.active.path.split(/[\\/]/).pop()),'left.txt','Count follows the pane that has the focus');
+   // With a disk-backed document open, the comparison is the disk one; its
+   // sides held in the page paint the marks too.
+   await open('large.txt');
+   await compareOn('left.txt','right.txt');
+   await until(()=>!document.querySelector('[data-compare-pane] .cm-content')&&document.querySelector('[data-compare-text="right"]')?.value.startsWith('alpha one'));
+   await clickClear(page.locator('[data-compare-text="right"]'));await page.keyboard.press('Control+Home');
+   await win().locator('[data-ed="next"]').click();
+   await messageIs(/^Match on line \d+\.$/);
+   await until(()=>document.querySelector('[data-compare-pane="right"] .nt-disk-compare-marks:not([hidden]) mark.is-current')?.textContent==='alpha');
+   // Two disk-backed documents: the marks follow the aligned rows.
+   await open('large2.txt');
+   await compareOn('large.txt','large2.txt');
+   await until(()=>document.querySelector('[data-compare-summary]')?.dataset.compareDone==='true',null,120000);
+   await clickClear(page.locator('[data-compare-text="right"]'));
+   await query('changed-000500');
+   await win().locator('[data-ed="next"]').click();
+   await messageIs(/^Match on line \d+\.$/);
+   await until(()=>document.querySelector('[data-compare-pane="right"] .nt-editor-marks:not([hidden]) mark.is-current')?.textContent==='changed-000500',null,30000);
+   const placed=await page.evaluate(()=>{const pane=document.querySelector('[data-compare-pane="right"]'),mark=pane.querySelector('.nt-editor-marks:not([hidden]) mark.is-current').getBoundingClientRect(),ta=pane.querySelector('[data-compare-text]'),r=ta.getBoundingClientRect();return {inside:mark.top>=r.top-1&&mark.bottom<=r.bottom+1,selected:ta.value.slice(ta.selectionStart,ta.selectionEnd)};});
+   assert.deepEqual(placed,{inside:true,selected:'changed-000500'},'the current match is painted on its own row');
+   // Replace All in All Opened Documents from the other pane: the pane of the
+   // changed document shows its new text, so typing there goes where it is
+   // seen (review finding: it kept the old page).
+   await page.locator('[data-compare-text="left"]').click({position:{x:60,y:12}});
+   await win().locator('[data-ed-find-tab="replace"]').click();
+   await query('changed-000500');await page.locator('[data-ed-replacement]').fill('edited-000500');
+   await win().locator('[data-ed-find-action="replace-open"]').click();
+   await until(()=>{const ta=document.querySelector('[data-compare-text="right"]');return ta.value.includes('edited-000500')&&!ta.value.includes('changed-000500');},null,60000);
+   await clickClear(page.locator('[data-compare-text="right"]'));await page.keyboard.press('Control+z');
+   await until(()=>{const d=[...NetworkToolkitFileEditor.documents.values()].find(d=>d.path.endsWith('large2.txt'));return d&&!d.dirty&&!d.diskEditing;},null,60000);
+   await until(()=>document.querySelector('[data-compare-text="right"]').value.includes('changed-000500'),null,60000);
+   await page.locator('#networkToolkitFileEditor [data-ed="compare"]').click();
+   await until(()=>!document.querySelector('#networkToolkitFileEditor.is-comparing'));
+   assert.ok(await page.evaluate(()=>NetworkToolkitFileEditor.closeAll()),'close the comparison documents');
+   await open('config.txt');
+   if(!await win().isVisible()){await text().focus();await page.keyboard.press('Control+f');await win().waitFor({state:'visible'});}
+  }
+  step('comparison done');
+
   step('transparency');
   await win().locator('[data-ed-find-transparency]').check();
   await win().locator('[data-ed-find-transparency-mode][value="always"]').check();

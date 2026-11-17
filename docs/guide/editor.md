@@ -186,6 +186,9 @@ For example, `bmFtZT1PZmZpY2UlMjAxJmFkZHJlc3M9MTkyLjAuMi4xMCY=&&` becomes `name=
 - **Replace** (shows the Replace tab; press **Replace All**, which one Undo takes back): **Each & on a new line** (`a=1&b=2` becomes two lines), **Each comma on a new line**, **Each semicolon on a new line**, **Each space on a new line**, **Join lines with &** and **Join lines with a comma** (empty lines between lines are left out and a final line break stays), **Tabs to commas**, **Remove spaces at line ends**, **Remove spaces at line starts**, **Several spaces to one** and **Backslashes to slashes**.
 - **Find** (press **Find Next**, **Count**, **Find All** or, on the Mark tab, **Mark All**): **IPv4 addresses**, **MAC addresses** (`00:1a:2b:3c:4d:5e`, `00-1A-…` and `001a.2b3c.4d5e`), **Email addresses**, **Web addresses**, **Spaces at line ends**, **Tabs**, **Characters outside ASCII** and **Empty lines**.
 
+### In a comparison
+Find, Replace and Mark also work while two documents are compared, as in Notepad++ with its Compare plugin: they act on the pane you clicked in last, also while you type in the Find window. **Find Next** shows the match in that pane, **Mark All** marks it there, and **Replace** and **Replace All** change only that document (Ctrl+Z in the pane takes Replace All back); the comparison is worked out again for the new text. Click in the other pane to search the other document. When the Find window covers the match it found, it moves out of the way. A line in **Search results** of a document that is not being compared says to close the comparison first.
+
 A quick search sets **Search Mode** to what it needs (Extended or Regular expression), turns off **Match whole word only** and sets **Match case** (on only for **Characters outside ASCII**, so that letters such as the Kelvin sign are not matched as their ASCII look-alikes); the pointer over an entry shows what it does. You can edit the fields before you press a button.
 
 ### Options

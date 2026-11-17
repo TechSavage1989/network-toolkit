@@ -875,7 +875,7 @@ function createPaneWorkspace(comparing){
  paneUsesDisk=factory===root.NTKEditorDiskCompare;
  const instance=factory.create({container:comparisonHost,comparing,ensureDiskSession,mountDiskView,compareRequest:(body,signal)=>root.NetworkToolkitEditorWindows.compareBuffers(body,signal),documents:()=>[...documents.values()],active:current,wordWrap:()=>wordWrap&&(paneUsesDisk||!workspaceLarge()),comparisonPreferences:()=>({compareMapZoom,compareHorizontalSync,compareUnderline,compareIntralineHighlight,compareWrapNavigation,compareMoveCaret,compareShowSummary}),setComparisonPreference:(key,value)=>{if(key==='compareMapZoom'&&mapZooms.includes(value))compareMapZoom=value;if(key==='compareHorizontalSync')compareHorizontalSync=value===true;if(key==='compareUnderline')compareUnderline=value!==false;if(key==='compareIntralineHighlight')compareIntralineHighlight=value!==false;if(key==='compareWrapNavigation')compareWrapNavigation=value!==false;if(key==='compareMoveCaret')compareMoveCaret=value!==false;if(key==='compareShowSummary')compareShowSummary=value!==false;keepPreferences();},syntax:()=>syntax,language:languageOf,selection:groups.selection,sideOf:groups.sideOf,activeSide:()=>groups.activeSide,
  choose:(side,id)=>{const d=documents.get(id);if(d){groups.choose(side,d.uid,{replace:comparing&&!splitEnabled});active=id;drawTabs();}},swap:()=>{groups.swap();drawTabs();},
- selectionChanged:status,activate:d=>{active=d.id;groups.activate(d.uid);displayedDocument=null;drawTabs();syncEditorControls(d);},edit:(d,text)=>setContent(d,text),
+ selectionChanged:status,marks:(d,from,to)=>findWindow?findWindow.marksIn(d,from,to):[],activate:d=>{active=d.id;groups.activate(d.uid);displayedDocument=null;drawTabs();syncEditorControls(d);},edit:(d,text)=>setContent(d,text),
  undo:(d,redo)=>{if(!d||d.frozen||d.loading)return;const from=redo?d.redo:d.undo,to=redo?d.undo:d.redo,previous=from.pop();if(previous===undefined)return;to.push(d.content);retainUndo(d,to);setContent(d,previous,false);},save:(d,as)=>save(as,d),painted:()=>documentMap?.schedule(),createInView:async side=>{try{const d=await newDocument();if(d){groups.move(d.uid,side);active=d.id;drawTabs();}return d;}catch(error){setMessage(error.message,true);return null;}},newDocument,openFiles:openDesktopFile});
  if(comparing)comparison=instance;else splitView=instance;drawTabs();if(current())syncEditorControls(current());
 }
@@ -985,7 +985,7 @@ function revealSelectedTabs(){
 }
 function drawTabs(){
  syncClosePreference();root.NetworkToolkitEditorWindows?.notifyChanged?.();
- groups.reconcile();for(const button of overlay?.querySelectorAll?.('[data-ed]')||[]){const action=button.dataset.ed;if(['find','replace','goto','comment','duplicate','trim','upper','lower','sortLines','format'].includes(action))button.disabled=!!comparison||!!current()?.frozen;}
+ groups.reconcile();for(const button of overlay?.querySelectorAll?.('[data-ed]')||[]){const action=button.dataset.ed;if(['find','replace','goto','comment','duplicate','trim','upper','lower','sortLines','format'].includes(action))button.disabled=(!!comparison&&!['find','replace'].includes(action))||!!current()?.frozen;}
  const focused=document.activeElement,focusID=focused?.dataset?.edOpen||focused?.dataset?.edCloseTab,closeFocus=!!focused?.dataset?.edCloseTab,workspace=paneWorkspace(),selection=groups.selection();
  for(const tabs of overlay?.querySelectorAll('[data-ed-tabs]')||[]){const side=tabs.dataset.edView||'single';tabs.hidden=side==='single'&&!!workspace;const list=side==='single'?(workspace?[]:[...documents.values()]):groups.list(side),chosen=side==='single'?active:selection[side];
  tabs.innerHTML=list.map((d,index)=>'<div class="nt-editor-tab" role="presentation" draggable="true" data-ed-uid="'+escaped(d.uid)+'"><button type="button" role="tab" id="nt-editor-tab-'+escaped(d.uid)+'" aria-posinset="'+(index+1)+'" aria-setsize="'+list.length+'" aria-keyshortcuts="Alt+Shift+ArrowLeft Alt+Shift+ArrowRight Shift+F10" tabindex="'+(chosen===d.id?'0':'-1')+'" data-ed-open="'+escaped(d.id)+'" aria-selected="'+(chosen===d.id)+'" title="'+escaped(d.source+' · '+d.path)+'" aria-label="'+escaped(nameOf(d.path)+(d.dirty?', unsaved changes':'')+(d.saving?', saving':''))+'">'+'<span class="nt-editor-tab-status" aria-hidden="true">'+(d.saving?'◌':d.dirty?'●':'')+'</span><span class="nt-editor-tab-name">'+escaped(nameOf(d.path))+'</span></button><button type="button" class="ux-editor-tab-actions" data-ed-tab-actions="'+escaped(d.uid)+'" title="More tab actions (Shift+F10)" aria-label="More actions for this document tab" aria-haspopup="menu">⋯</button><button type="button" class="tab-close" data-ed-close-tab="'+escaped(d.id)+'" aria-label="Close '+escaped(nameOf(d.path))+'" '+(d.saving?'disabled':'')+'>'+(typeof icon==='function'?icon('close'):'×')+'</button></div>').join('')+((side==='single'&&!workspace)||side==='left'?'<button type="button" class="nt-editor-new-tab" data-ed="new" aria-label="New document tab" title="New document in left view (Ctrl+N)">'+(typeof icon==='function'?icon('plus'):'+')+'</button>':'');
@@ -1130,7 +1130,7 @@ async function reload(){
  }catch(error){failure=error;}
  finally{
   d.reloading=false;
-  if(current()===d){diskView()?.setReadOnly(!!comparison);draw();if(failure)setMessage(failure.message,true);else if(d.disk)setMessage(notText(d)?openedNote(d):'Reloaded '+nameOf(d.path)+'.');}
+  if(current()===d){diskView()?.setReadOnly(notText(d));draw();if(failure)setMessage(failure.message,true);else if(d.disk)setMessage(notText(d)?openedNote(d):'Reloaded '+nameOf(d.path)+'.');}
  }
 }
 function applyEditorTheme(){if(!overlay)return;overlay.dataset.palette=editorPalette;overlay.style.setProperty('--nt-editor-font',editorFontSize+'px');for(const [key,hex] of Object.entries({...editorColorDefaults,...editorCustomColors})){if(editorPalette==='custom'&&goodEditorColor(hex))overlay.style.setProperty('--nt-code-'+key,hex);else overlay.style.removeProperty('--nt-code-'+key);} }
@@ -1397,7 +1397,8 @@ const textTools=root.NTKEditorTextTools?.create({
 // The Find window (editor-find.js): Find, Replace and Mark, the Search
 // results panel, marks and bookmarks. Every search runs in the engine; this
 // is what the window needs of the editor.
-const inComparison=d=>!!comparison&&Object.values(groups.selection()).includes(d?.id);
+const paneShows=d=>!!paneWorkspace()&&Object.values(groups.selection()).includes(d?.id);
+const diskViewFor=d=>current()===d?diskView():paneWorkspace()?.diskViewOf?.(d)||null;
 function currentRange(){const d=current(),ta=findEl('[data-ed-text]');if(!d)return {start:0,end:0};if(d.disk){const r=diskView()?.selection();return r?{start:r.start,end:r.end}:{start:0,end:0};}const a=ta?.selectionStart||0,b=ta?.selectionEnd||0;return {start:Math.min(a,b),end:Math.max(a,b)};}
 // Marks on page-held text: a layer behind the text with its wrapping,
 // scrolled with it. A large document marks the lines in view.
@@ -1432,6 +1433,8 @@ function noteEdit(d,before,after){
  findWindow.edited(d,{line:lines(before,0,p),removed:lines(before,p,before.length-q),inserted:lines(after,p,after.length-q),from:p,to:before.length-q,length:after.length-q-p});
 }
 function repaintFind(d){
+ // A comparison or split view paints the marks of every pane that shows d.
+ if(d&&paneWorkspace()?.repaintMarks){paneWorkspace().repaintMarks(d);return;}
  if(!d||current()!==d)return;
  if(d.disk){diskView()?.refreshMarks?.();return;}
  if(paneWorkspace())return;
@@ -1453,13 +1456,15 @@ const findAdapter={
   positionAt(from,focus);const view=captureView();restoreView(view,from,to,focus);status();
  },
  activate:d=>current()===d||activateDocument(d.id),
+ // In a comparison only its two documents can be shown without closing it.
+ shown:d=>!comparison||paneShows(d),
  diskCall:(d,action,body,signal)=>diskCall(d,action,body,signal),
  flush:d=>ensureDiskSession(d).flush(),
  request:(body,signal)=>api('/editor-views/find','POST',body,false,signal),
  engine:()=>typeof api==='function'&&!(typeof OFFLINE!=='undefined'&&OFFLINE),
  readBlocked:d=>d.loading||d.diskOpening?'The document is still opening.':d.frozen?'The document is being moved between windows.':d.reloading||d.promoting?'Wait for the current document operation to finish.':'',
- writeBlocked:d=>notText(d)?nameOf(d.path)+' is not a text file. Nothing in it can be replaced.':d.loading||d.diskOpening?'The document is still opening.':d.frozen?'The document is being moved between windows.':d.saving?'Wait for the save to finish.':d.reloading||d.promoting||d.diskEditing||d.formatting?'Wait for the current document operation to finish.':inComparison(d)?'Close the document comparison first.':pendingEditorDialog?'Close the open dialog first.':editorComposing()?'Finish text composition first.':'',
- skipReason:d=>notText(d)?'not a text file':d.frozen?'being moved to another window':d.saving?'being saved':d.loading||d.diskOpening?'still opening':inComparison(d)?'in a comparison':'busy',
+ writeBlocked:d=>notText(d)?nameOf(d.path)+' is not a text file. Nothing in it can be replaced.':d.loading||d.diskOpening?'The document is still opening.':d.frozen?'The document is being moved between windows.':d.saving?'Wait for the save to finish.':d.reloading||d.promoting||d.diskEditing||d.formatting?'Wait for the current document operation to finish.':pendingEditorDialog?'Close the open dialog first.':editorComposing()?'Finish text composition first.':'',
+ skipReason:d=>notText(d)?'not a text file':d.frozen?'being moved to another window':d.saving?'being saved':d.loading||d.diskOpening?'still opening':'busy',
  async replaceSelection(d,text){if(current()!==d)throw Error('Switch back to '+nameOf(d.path)+' first.');await Promise.resolve(replaceSelection(text));status();},
  // One edit, the whole result. A result too large for a page-held document
  // moves it to a disk-backed one in the background: the outcome is that
@@ -1473,11 +1478,22 @@ const findAdapter={
  async diskReplaced(d,metadata){
   const session=ensureDiskSession(d);session.initialize(metadata);
   findWindow.edited(d,{bulk:true,lines:metadata.lines});
-  const view=current()===d?diskView():null;
-  if(view){const at=Math.min(view.selection().start,metadata.units);await view.position(at,at,false);await view.load({start:session.state().page.start});}
+  // The view that shows d: the active one, or the other pane of a comparison
+  // or split view (Replace All in All Opened Documents), so its page is the
+  // new text before anyone types there.
+  const view=diskViewFor(d);
+  // The replacement is committed whatever happens here: a reload another
+  // part of the editor cancels (a comparison realigning on the new revision)
+  // is tried again, and never reported as a failed Replace All.
+  if(view){
+   const reload=async()=>{const at=Math.min(view.selection().start,metadata.units);await view.position(at,at,false);await view.load({start:session.state().page.start});};
+   for(let attempt=0;;attempt++){try{await reload();break;}catch(error){if(error?.name!=='AbortError'||attempt>=2)break;}}
+  }
+  // A compared document's comparison is worked out again for its new text.
+  if(paneShows(d))paneWorkspace().refresh(true);
   drawTabs();status();
  },
- diskBusy(d,on){d.diskEditing=!!on;const view=current()===d?diskView():null;if(view)view.setReadOnly(on?true:!!comparison);},
+ diskBusy(d,on){d.diskEditing=!!on;const view=diskViewFor(d);if(view)view.setReadOnly(on?true:notText(d));},
  refresh:()=>{paneWorkspace()?.refresh(true);drawTabs();},
  setMessage,focusText:()=>findEl('[data-ed-text]')?.focus({preventScroll:true}),
  copyText:text=>typeof root.copyText==='function'?root.copyText(text):root.navigator.clipboard.writeText(text),

@@ -1,0 +1,13 @@
+Network Toolkit 1.21.71
+
+## What's New
+
+- Find, Replace and Mark now work while you compare two documents. They act on the side you clicked in last, so you can search, mark or replace in either document without leaving the comparison.
+- When the Find window covers the text it just found, it moves out of the way.
+
+## Additional Details
+
+- Replace All changes only the document on that side, and Ctrl+Z in that side takes it back. The comparison updates for the new text.
+- Marks and the current match show in both kinds of comparison, for small and very large files.
+- A Search results line of a document that is not being compared asks you to close the comparison first instead of replacing one of its sides.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

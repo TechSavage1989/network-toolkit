@@ -56,7 +56,20 @@ func TestEditorSessionBrowserFindWindow(t *testing.T) {
 	for i := 0; large.Len() < 5<<20; i++ {
 		fmt.Fprintf(&large, "host-%06d.example.com 192.0.2.%d port %d\n", i, i%250, 1000+i%9000)
 	}
+	// A second large file that differs from the first every 1,000 lines, for
+	// Find in a comparison of two disk-backed documents.
+	var large2 strings.Builder
+	for i := 0; large2.Len() < 5<<20; i++ {
+		if i%1000 == 500 {
+			fmt.Fprintf(&large2, "changed-%06d.example.com 198.51.100.%d port %d\n", i, i%250, 1000+i%9000)
+			continue
+		}
+		fmt.Fprintf(&large2, "host-%06d.example.com 192.0.2.%d port %d\n", i, i%250, 1000+i%9000)
+	}
 	contents := map[string]string{
+		"left.txt":   "alpha one\nbeta two\nalpha three\nshared line\n",
+		"right.txt":  "alpha one\nbeta 2\ngamma\nalpha four\nshared line\n",
+		"large2.txt": large2.String(),
 		"config.txt": config.String(),
 		"second.txt": "vlan 99\n name lab\nvlan 100\n name voice\n",
 		"hits.txt":   hits.String(),
