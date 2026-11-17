@@ -183,10 +183,10 @@ For example, `bmFtZT1PZmZpY2UlMjAxJmFkZHJlc3M9MTkyLjAuMi4xMCY=&&` becomes `name=
 
 **Quick ▾** beside **Find what** fills in a common search, so you do not have to remember its pattern. Choose one, then press the button you want (nothing changes until you do):
 
-- **Replace** (shows the Replace tab; press **Replace All**, which one Undo takes back): **Each & on a new line** (`a=1&b=2` becomes two lines), **Each comma on a new line**, **Each semicolon on a new line**, **Each space on a new line**, **Join lines with &**, **Join lines with a comma**, **Tabs to commas**, **Remove spaces at line ends**, **Remove spaces at line starts**, **Several spaces to one** and **Backslashes to slashes**.
+- **Replace** (shows the Replace tab; press **Replace All**, which one Undo takes back): **Each & on a new line** (`a=1&b=2` becomes two lines), **Each comma on a new line**, **Each semicolon on a new line**, **Each space on a new line**, **Join lines with &** and **Join lines with a comma** (empty lines are left out and a final line break stays), **Tabs to commas**, **Remove spaces at line ends**, **Remove spaces at line starts**, **Several spaces to one** and **Backslashes to slashes**.
 - **Find** (press **Find Next**, **Count**, **Find All** or, on the Mark tab, **Mark All**): **IPv4 addresses**, **MAC addresses** (`00:1a:2b:3c:4d:5e`, `00-1A-…` and `001a.2b3c.4d5e`), **Email addresses**, **Web addresses**, **Spaces at line ends**, **Tabs**, **Characters outside ASCII** and **Empty lines**.
 
-A quick search sets **Search Mode** to what it needs (Extended or Regular expression) and turns off **Match whole word only**; the pointer over an entry shows what it does. You can edit the fields before you press a button.
+A quick search sets **Search Mode** to what it needs (Extended or Regular expression), turns off **Match whole word only** and sets **Match case** (on only for **Characters outside ASCII**, so that letters such as the Kelvin sign are not matched as their ASCII look-alikes); the pointer over an entry shows what it does. You can edit the fields before you press a button.
 
 ### Options
 - **Backward direction**: **Find Next** goes up instead of down (Find and Replace tabs).

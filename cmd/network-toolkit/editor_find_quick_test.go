@@ -13,13 +13,15 @@ import (
 )
 
 type findQuickEntry struct {
-	Group   string    `json:"group"`
-	Label   string    `json:"label"`
-	Title   string    `json:"title"`
-	Find    string    `json:"find"`
-	Replace *string   `json:"replace"`
-	Mode    string    `json:"mode"`
-	Example [2]string `json:"example"`
+	Group   string  `json:"group"`
+	Label   string  `json:"label"`
+	Title   string  `json:"title"`
+	Find    string  `json:"find"`
+	Replace *string `json:"replace"`
+	Mode    string  `json:"mode"`
+	// MatchCase: the page sets Match case to this (off when absent).
+	MatchCase bool      `json:"matchCase"`
+	Example   [2]string `json:"example"`
 }
 
 // The Find window's Quick searches (QUICK in web/assets/editor-find.js) run
@@ -68,7 +70,8 @@ func TestFindQuickSearches(t *testing.T) {
 			default:
 				t.Fatalf("mode %q", entry.Mode)
 			}
-			search := editorbuffer.Search{Query: query, Regex: entry.Mode == "regex", MatchCase: true}
+			// As the page sends it: Match case as the entry sets it, whole word off.
+			search := editorbuffer.Search{Query: query, Regex: entry.Mode == "regex", MatchCase: entry.MatchCase}
 			ctx := context.Background()
 			if entry.Replace != nil {
 				got, count, err := editorbuffer.ReplaceInText(ctx, entry.Example[0], search, replacement, 0, -1, 1<<20)

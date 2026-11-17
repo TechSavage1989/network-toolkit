@@ -9,7 +9,9 @@ What changed (rules in AGENTS.md: Network configuration languages, the Find wind
 - Find window **Quick ▾**: 11 replacements and 8 searches that fill the fields and Search Mode only.
 - Document Map: contiguous sample rows are coloured as one text (with the previous chunk's tail as context), not rows joined by line breaks. The screenshot's file was a disk-backed one-line JSON of long Base64 strings: the map broke every string at each of its rows.
 
-Known limits: the editor and the map colour a disk-backed page from its own start, so a page (or map chunk without its predecessor held) that starts inside a string longer than a page can still show that string's inside as plain text until its closing quote; both now read the same text, so they agree. SonicOS export key families are inferred from exports (no published schema).
+Review before release: nine findings, all confirmed and fixed (see CHANGELOG). The map's colouring went through three rounds against the new check: rows joined by offset, plain-text starting points (`neutralFrom`), text after each request (lookahead), and colouring in order.
+
+Known limits: the editor colours a disk-backed page from the page's own start, so a page that starts inside a string longer than a page can show that string's inside as plain text until its closing quote. In the map, a single string or comment longer than 40,000 characters, and the last few characters of a document that the samples never read, can still be coloured by guess. SonicOS export key families are inferred from exports (no published schema).
 
 Not checked on real Windows.
 

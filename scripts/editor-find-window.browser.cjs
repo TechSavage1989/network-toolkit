@@ -190,6 +190,10 @@ const step=name=>console.log('FIND WINDOW '+name);
   assert.deepEqual(await quickList.locator('.nt-find-quick-heading').allTextContents(),['Replace','Find']);
   await page.keyboard.press('Escape');await quickList.waitFor({state:'hidden'});
   assert.equal(await win().isVisible(),true,'Escape closes only the menu');
+  await quickMenu.click();await quickList.waitFor({state:'visible'});
+  await text().click({position:{x:30,y:12}});await quickList.waitFor({state:'hidden'});
+  assert.equal(await quickMenu.getAttribute('aria-expanded'),'false','a click in the text closes the menu');
+  await showTab('find');
   await quickMenu.click();await quickList.waitFor({state:'visible'});await shoot('editor-find-window-quick-dark.png');
   {const [list,frame]=await Promise.all([quickList.boundingBox(),win().locator('.nt-find-panel').boundingBox()]);assert(list.y+list.height<=frame.y+frame.height,'the Quick list stays inside the Find window (it scrolls)');}
   assert.equal(await quickList.locator('[role="menuitem"]').count(),await page.evaluate(()=>NTKEditorFind.QUICK.length));

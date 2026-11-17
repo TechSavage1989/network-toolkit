@@ -29,8 +29,19 @@ const exportMarkers=[['checksumVersion',/^checksumVersion=\d/],['shortProdName',
  ['schedObj',/^schedObj[A-Za-z]*_\d+=/],['userObj',/^userObj[A-Za-z]*_\d+=/],['adminObj',/^adminObj[A-Za-z]*=/],['policy',/^policy(?:Src|Dst|Action|Svc)[A-Za-z]*_\d+=/],['iface',/^iface_[a-z]+_\d+=/],['logEvt',/^logEvt[A-Za-z]*_\d+=/],['pnac',/^pnac[A-Za-z]+_\d+=/]];
 // Lines, or the '&'-joined pairs of a file of only a few lines.
 function exportRows(head){let rows=[];lines(head,(line)=>{if(line.trim())rows.push(line);});if(rows.length<8)rows=rows.flatMap(row=>row.split(exportJoin));return rows;}
+// Asked first for every file (whatever its extension) and on every redraw
+// that needs the language, so it rejects at once what does not start with a
+// pair and remembers its last answer.
+let exportMemo={text:null,id:''};
 function settingsExport(text){
- if(typeof text!=='string'||!text)return '';const head=text.slice(0,MAX_DETECT).replace(/^\uFEFF/,'');
+ if(typeof text!=='string'||!text)return '';
+ if(exportMemo.text===text)return exportMemo.id;
+ const id=exportCheck(text);exportMemo={text,id};return id;
+}
+function exportCheck(text){
+ const start=text.charCodeAt(0)===0xFEFF?1:0;let at=start;while(at<text.length&&(text[at]==='\r'||text[at]==='\n'))at++;
+ if(!/^[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)*=/.test(text.slice(at,at+256)))return '';
+ const head=text.slice(start,MAX_DETECT);
  if(/[\x00-\x08\x0e-\x1f]/.test(head))return '';
  const rows=exportRows(head);if(text.length>MAX_DETECT&&rows.length>1)rows.pop(); // The cut may split the last pair.
  if(rows.length<8)return '';let pairs=0;const found=new Set(),keys=new Set();
@@ -45,8 +56,8 @@ const exportNumber=/^(?:-?\d+(?:\.\d+)*(?:\/\d+)?|0x[0-9a-f]+|#[0-9a-f]{3,8}|(?=
 function exportValue(value,secret){if(!value)return '';if(secret)return span('string',value);if(exportNumber.test(value))return span('number',value);if(/^(?:on|off|true|false|yes|no|enabled?|disabled?)$/i.test(value))return span('keyword',value);
  let out='',at=0;const re=/(?:%[0-9a-f]{2})+/gi;let m;while((m=re.exec(value))){out+=span('string',value.slice(at,m.index))+span('punctuation',m[0]);at=re.lastIndex;}return out+span('string',value.slice(at));}
 function exportPairHTML(part){const m=/^([A-Za-z][A-Za-z0-9]*(?:_[A-Za-z][A-Za-z0-9]*)*)((?:_\d+)*)(=)([\s\S]*)$/.exec(part);if(!m)return escape(part);
- const index=m[2]?m[2].replace(/(_)(\d+)/g,(all,u,n)=>escape(u)+span('number',n)):'';return span('property',m[1])+index+span('operator',m[3])+exportValue(m[4],exportSecret.test(m[1]));}
-function exportHighlight(text){let out='';lines(text,(line,eol)=>{charge(eol.length);const parts=line.split(exportJoin);parts.forEach((part,i)=>{if(i)out+=span('punctuation','&');out+=exportPairHTML(part);});out+=eol;});return out;}
+ const index=m[2]?m[2].replace(/(_)(\d+)/g,(all,u,n)=>escape(u)+span('number',n)):'';charge(1);return span('property',m[1])+index+m[3]+exportValue(m[4],exportSecret.test(m[1]));}
+function exportHighlight(text){let out='';lines(text,(line,eol)=>{charge(eol.length);const parts=line.split(exportJoin);parts.forEach((part,i)=>{if(i){charge(5);out+='&amp;';}out+=exportPairHTML(part);});out+=eol;});return out;}
 function detect(text){
  if(typeof text!=='string'||!text)return '';const head=text.slice(0,MAX_DETECT).replace(/^\uFEFF/,'');
  if(/[\x00-\x08\x0e-\x1f]/.test(head))return ''; // Binary/terminal-control export: do not reinterpret it.

@@ -123,8 +123,8 @@ const QUICK=
  {"group":"Replace","label":"Each comma on a new line","title":"a,b,c → one item per line","find":",","replace":"\\n","mode":"extended","example":["a,b,c","a\nb\nc"]},
  {"group":"Replace","label":"Each semicolon on a new line","title":"a;b;c → one item per line","find":";","replace":"\\n","mode":"extended","example":["a;b;c","a\nb\nc"]},
  {"group":"Replace","label":"Each space on a new line","title":"One word per line: a b  c → a, b and c on three lines","find":"[ \\t]+","replace":"\\n","mode":"regex","example":["a b  c","a\nb\nc"]},
- {"group":"Replace","label":"Join lines with &","title":"Lines a=1 and b=2 → a=1&b=2","find":"\\n","replace":"&","mode":"extended","example":["a=1\nb=2","a=1&b=2"]},
- {"group":"Replace","label":"Join lines with a comma","title":"Lines a, b and c → a,b,c","find":"\\n","replace":",","mode":"extended","example":["a\nb\nc","a,b,c"]},
+ {"group":"Replace","label":"Join lines with &","title":"Lines a=1 and b=2 → a=1&b=2 (empty lines are left out; a final line break stays)","find":"\\n+([^\\n])","replace":"&$1","mode":"regex","example":["a=1\nb=2\n\nc=3\n","a=1&b=2&c=3\n"]},
+ {"group":"Replace","label":"Join lines with a comma","title":"Lines a, b and c → a,b,c (empty lines are left out; a final line break stays)","find":"\\n+([^\\n])","replace":",$1","mode":"regex","example":["a\nb\nc\n","a,b,c\n"]},
  {"group":"Replace","label":"Tabs to commas","title":"Tab-separated a⇥b → a,b","find":"\\t","replace":",","mode":"extended","example":["a\tb","a,b"]},
  {"group":"Replace","label":"Remove spaces at line ends","title":"Deletes spaces and tabs before each line break","find":"[ \\t]+$","replace":"","mode":"regex","example":["a  \nb\t","a\nb"]},
  {"group":"Replace","label":"Remove spaces at line starts","title":"Deletes the indentation of each line","find":"^[ \\t]+","replace":"","mode":"regex","example":["  a\n\tb","a\nb"]},
@@ -136,7 +136,7 @@ const QUICK=
  {"group":"Find","label":"Web addresses","title":"Finds http:// and https:// links up to the next space","find":"https?://[^\\s\"'<>]+","mode":"regex","example":["see https://example.com/a now","https://example.com/a"]},
  {"group":"Find","label":"Spaces at line ends","title":"Finds the spaces and tabs before a line break","find":"[ \\t]+$","mode":"regex","example":["a  \nb","  "]},
  {"group":"Find","label":"Tabs","title":"Finds every tab character","find":"\\t","mode":"extended","example":["a\tb","\t"]},
- {"group":"Find","label":"Characters outside ASCII","title":"Finds letters such as é, symbols and invisible characters such as a no-break space","find":"[^\\x00-\\x7F]","mode":"regex","example":["café","é"]},
+ {"group":"Find","label":"Characters outside ASCII","title":"Finds letters such as é, symbols and invisible characters such as a no-break space","find":"[^\\x00-\\x7F]","mode":"regex","matchCase":true,"example":["Kelvin \u212a café","\u212a"]},
  {"group":"Find","label":"Empty lines","title":"Finds lines that hold nothing","find":"^$","mode":"regex","example":["a\n\nb",""]}
 ]
 // QUICK-END
@@ -1064,7 +1064,7 @@ function create(a){
   const entry=QUICK[index];if(!entry)return;
   const find=el.querySelector('[data-ed-query]'),replace=el.querySelector('[data-ed-replacement]');
   find.value=entry.find;if('replace' in entry)replace.value=entry.replace;
-  opts.mode=entry.mode;opts.dotAll=false;opts.word=false;
+  opts.mode=entry.mode;opts.dotAll=false;opts.word=false;opts.matchCase=!!entry.matchCase;
   closeQuickMenu();
   if('replace' in entry&&tab!=='replace')setTab('replace',false);
   else if(!('replace' in entry)&&tab==='replace')setTab('find',false);
@@ -1130,7 +1130,13 @@ function create(a){
   });
   el.addEventListener('input',event=>{if(event.target.matches('[data-ed-find-opacity]')){transparency.level=Math.max(20,Math.min(95,Number(event.target.value)||70));applyTransparency();}});
   el.addEventListener('focusin',applyTransparency);
-  el.addEventListener('focusout',()=>root.setTimeout(applyTransparency,0));
+  el.addEventListener('focusout',()=>root.setTimeout(()=>{
+   applyTransparency();
+   // A menu closes when the focus leaves it (a click in the text, Tab away).
+   const active=document.activeElement;
+   if(!el.querySelector('.nt-find-quick')?.contains(active))closeQuickMenu();
+   if(!el.querySelector('.nt-find-swap')?.contains(active)){const list=el.querySelector('.nt-find-swap-list');if(list&&!list.hidden){list.hidden=true;el.querySelector('[data-ed-find-swap-menu]').setAttribute('aria-expanded','false');}}
+  },0));
   el.addEventListener('pointerdown',event=>{
    if(!event.target.closest('.nt-find-swap,.nt-find-quick'))closeSwapMenu();
    else if(!event.target.closest('.nt-find-quick'))closeQuickMenu();

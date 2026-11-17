@@ -257,7 +257,7 @@ async function verifySonicExport(page) {
   assert.equal(await page.evaluate(() => NetworkToolkitFileEditor.active.diskSyntaxLanguage), 'network-sonicos-exp');
   assert.equal(await page.locator('[data-ed-auto-language]').first().textContent(), 'Auto (SonicWall SonicOS settings export)');
   const kinds = await page.evaluate(() => [...document.querySelectorAll('.nt-editor-disk-highlight:not([hidden]) span')].reduce((all, el) => (all[el.className] = (all[el.className] || 0) + 1, all), {}));
-  for (const kind of ['nt-ed-property', 'nt-ed-operator', 'nt-ed-number', 'nt-ed-string', 'nt-ed-punctuation']) assert(kinds[kind] > 0, kind + ' ' + JSON.stringify(kinds));
+  for (const kind of ['nt-ed-property', 'nt-ed-number', 'nt-ed-string', 'nt-ed-punctuation']) assert(kinds[kind] > 0, kind + ' ' + JSON.stringify(kinds));
 }
 
 
@@ -280,16 +280,29 @@ async function verifyLongLineMapColours(page) {
     !document.querySelector('.nt-editor-code textarea[data-ed-text]').disabled);
   await page.locator('[data-ed-wrap]').check();
   await page.locator('.nt-editor-disk-highlight:visible .nt-ed-string').first().waitFor({timeout:10000});
-  let kinds = null;
-  await page.waitForFunction(() => {
-    const map = NetworkToolkitFileEditor.documentMap, state = map?.sampleState;
-    return map?.layout?.kind === 'offsets' && state?.chunks.length && state.colored === state.chunks.length && (map.sampleKinds?.string || 0) > 0;
-  }, null, {timeout:15000}).catch(() => {});
-  kinds = await page.evaluate(() => ({map:NetworkToolkitFileEditor.documentMap.sampleKinds, state:NetworkToolkitFileEditor.documentMap.sampleState,
-    layout:NetworkToolkitFileEditor.documentMap.layout?.kind}));
-  const all = Object.values(kinds.map || {}).reduce((a, b) => a + b, 0);
-  assert(all > 0 && kinds.map.string / all > 0.9, 'the map shows the long strings as strings: ' + JSON.stringify(kinds));
-  assert(!kinds.map.number || kinds.map.number / all < 0.01, 'no digits inside strings drawn as numbers: ' + JSON.stringify(kinds));
+  const font = page.locator('[data-ed-font]').first(), size = await font.inputValue();
+  // At the default size the wrapped rows are under 190 characters; at 8 px
+  // they are wider (review finding: wide rows were cut before colouring).
+  for (const px of [size, '8']) {
+    await font.fill(px);await font.press('Enter');
+    let kinds = null;
+    try {
+      // Every chunk of the document read and coloured, none waiting for the one before.
+      await page.waitForFunction(() => {
+        const map = NetworkToolkitFileEditor.documentMap, state = map?.sampleState;
+        return map?.layout?.kind === 'offsets' && state?.count > 0 && state.chunks.length === state.count &&
+          state.colored === state.count && state.waiting === 0 && state.fresh;
+      }, null, {timeout:20000});
+    } finally {
+      kinds = await page.evaluate(() => ({map:NetworkToolkitFileEditor.documentMap.sampleKinds, state:NetworkToolkitFileEditor.documentMap.sampleState}));
+      report.mapColours = report.mapColours || {};report.mapColours[px] = kinds;
+    }
+    const all = Object.values(kinds.map || {}).reduce((a, b) => a + b, 0);
+    assert(kinds.state.columns > (px === '8' ? 190 : 0), 'row width at ' + px + ' px: ' + kinds.state.columns);
+    assert(all > 0 && kinds.map.string / all > 0.9, 'the map shows the long strings as strings at ' + px + ' px: ' + JSON.stringify(kinds));
+    assert(!kinds.map.number || kinds.map.number / all < 0.01, 'no digits inside strings drawn as numbers at ' + px + ' px: ' + JSON.stringify(kinds));
+  }
+  await font.fill(size);await font.press('Enter');
   await page.evaluate(() => NetworkToolkitFileEditor.setDocumentMap(false));
 }
 
