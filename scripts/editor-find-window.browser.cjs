@@ -180,6 +180,41 @@ const step=name=>console.log('FIND WINDOW '+name);
   await win().locator('[data-ed-search-mode] input[value="normal"]').check();
   assert.equal(await explainLine.isVisible(),false,'no line in Normal mode');
   await win().locator('[data-ed-search-mode] input[value="normal"]').check();
+  // Quick searches fill the fields and the Search Mode; Replace All does the
+  // rest (owner request after v1.21.69: "replace & with \n").
+  await open('pairs.txt');
+  await showTab('find');
+  const quickMenu=win().locator('[data-ed-find-quick-menu]'),quickList=win().locator('.nt-find-quick-list');
+  await quickMenu.click();await quickList.waitFor({state:'visible'});
+  assert.equal(await quickMenu.getAttribute('aria-expanded'),'true');
+  assert.deepEqual(await quickList.locator('.nt-find-quick-heading').allTextContents(),['Replace','Find']);
+  await page.keyboard.press('Escape');await quickList.waitFor({state:'hidden'});
+  assert.equal(await win().isVisible(),true,'Escape closes only the menu');
+  await quickMenu.click();await quickList.waitFor({state:'visible'});
+  await text().click({position:{x:30,y:12}});await quickList.waitFor({state:'hidden'});
+  assert.equal(await quickMenu.getAttribute('aria-expanded'),'false','a click in the text closes the menu');
+  await showTab('find');
+  await quickMenu.click();await quickList.waitFor({state:'visible'});await shoot('editor-find-window-quick-dark.png');
+  {const [list,frame]=await Promise.all([quickList.boundingBox(),win().locator('.nt-find-panel').boundingBox()]);assert(list.y+list.height<=frame.y+frame.height,'the Quick list stays inside the Find window (it scrolls)');}
+  assert.equal(await quickList.locator('[role="menuitem"]').count(),await page.evaluate(()=>NTKEditorFind.QUICK.length));
+  await quickList.locator('[role="menuitem"]',{hasText:'Each & on a new line'}).click();
+  await quickList.waitFor({state:'hidden'});
+  assert.equal(await win().getAttribute('data-tab'),'replace','a replacement shows the Replace tab');
+  assert.equal(await page.locator('[data-ed-query]').inputValue(),'&');
+  assert.equal(await page.locator('[data-ed-replacement]').inputValue(),'\\n');
+  assert.equal(await win().locator('[data-ed-search-mode] input[value="extended"]').isChecked(),true);
+  assert.equal(await active().then(d=>d.content),'name=Lab%20A&address=192.0.2.10&zone=LAN\n','nothing changes until Replace All');
+  await win().locator('[data-ed="replaceAll"]').click();
+  await until(()=>NetworkToolkitFileEditor.active.content==='name=Lab%20A\naddress=192.0.2.10\nzone=LAN\n');
+  await quickMenu.click();await quickList.locator('[role="menuitem"]',{hasText:'IPv4 addresses'}).click();
+  assert.equal(await win().getAttribute('data-tab'),'find','a search shows the Find tab');
+  assert.equal(await win().locator('[data-ed-search-mode] input[value="regex"]').isChecked(),true);
+  await win().locator('[data-ed-find-action="count"]').click();await messageIs(/^Count: 1 match/);
+  await text().focus();await page.keyboard.press('Control+z');
+  await until(()=>NetworkToolkitFileEditor.active.content==='name=Lab%20A&address=192.0.2.10&zone=LAN\n'&&!NetworkToolkitFileEditor.active.dirty);
+  await page.locator('[data-ed-close-tab][aria-label="Close pairs.txt"]').click();
+  await until(()=>![...document.querySelectorAll('[data-ed-open]')].some(t=>t.textContent.includes('pairs.txt')));
+  await win().locator('[data-ed-search-mode] input[value="normal"]').check();
   // Find Next moves on from a match of empty text (^$ on an empty line),
   // and Replace replaces it and goes on.
   await open('blank.txt');
@@ -227,7 +262,7 @@ const step=name=>console.log('FIND WINDOW '+name);
   await win().locator('[data-ed-query] ~ .combobox-toggle').click();
   await page.locator('#comboboxPopup').waitFor({state:'visible'});
   const history=await page.locator('#comboboxPopup [role="option"]').evaluateAll(list=>list.map(o=>o.textContent));
-  assert.deepEqual(history.slice(0,4),['^$','foo(?=bar)','ge-0/0/12. description','^interface ge-0/0/\\d+$']);
+  assert.deepEqual(history.slice(0,6),['^$','\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b','&','foo(?=bar)','ge-0/0/12. description','^interface ge-0/0/\\d+$']);
   await page.keyboard.press('Escape');
   await theme('dark');await shoot('editor-find-window-find-dark.png');
   await theme('light');await shoot('editor-find-window-find-light.png');await theme('dark');

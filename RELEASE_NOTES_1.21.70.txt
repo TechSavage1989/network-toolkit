@@ -1,0 +1,13 @@
+Network Toolkit 1.21.70
+
+## What's New
+
+- The Text Editor recognizes a decoded SonicWall settings export (the .exp file after Base64 decode) by its contents, whatever the file is called, and colours it: names, numbers and addresses, on/off and %20-style codes each in their own colour.
+- The Find window has a Quick menu beside Find what with common searches, such as putting each & on a new line, joining lines, trimming spaces, or finding IP and MAC addresses. Pick one, then press Replace All or Find.
+- The Document Map's colours now match the document for files with very long lines, such as JSON with long encoded values.
+
+## Additional Details
+
+- A SonicWall export is recognized as one name=value pair per line or still joined by &, and also when the values were URL-decoded or the lines sorted. Values of passwords, keys and community strings are shown as one plain run. Nothing is decoded or changed by recognizing it.
+- Quick searches only fill in Find what, Replace with and the Search Mode; nothing changes until you press a button, and Replace All is one step that Undo takes back.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

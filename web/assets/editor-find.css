@@ -27,9 +27,13 @@
 .nt-find-swap{position:relative;display:inline-flex}
 .nt-find-swap .btn{min-height:26px;padding:2px 6px}
 .nt-find-swap-more{margin-left:-1px;padding:2px 4px!important}
-.nt-find-swap-list{position:absolute;right:0;top:calc(100% + 3px);z-index:2;display:flex;flex-direction:column;gap:2px;min-width:190px;padding:5px;border:1px solid var(--border);border-radius:7px;background:var(--panel);box-shadow:var(--shadow);font-size:11px}
-.nt-find-swap-list button{text-align:left;border:0;border-radius:5px;background:transparent;color:var(--text);padding:6px 8px;font:inherit;cursor:pointer}
-.nt-find-swap-list button:hover,.nt-find-swap-list button:focus{background:var(--hover);outline:0}
+.nt-find-swap-list,.nt-find-quick-list{position:absolute;right:0;top:calc(100% + 3px);z-index:2;display:flex;flex-direction:column;gap:2px;min-width:190px;padding:5px;border:1px solid var(--border);border-radius:7px;background:var(--panel);box-shadow:var(--shadow);font-size:11px}
+.nt-find-swap-list button,.nt-find-quick-list button{text-align:left;border:0;border-radius:5px;background:transparent;color:var(--text);padding:6px 8px;font:inherit;cursor:pointer}
+.nt-find-swap-list button:hover,.nt-find-swap-list button:focus,.nt-find-quick-list button:hover,.nt-find-quick-list button:focus{background:var(--hover);outline:0}
+.nt-find-quick{position:relative;display:inline-flex}
+.nt-find-quick .btn{min-height:26px;padding:2px 6px;white-space:nowrap}
+.nt-find-quick-list{min-width:220px;overflow:auto;overscroll-behavior:contain}
+.nt-find-quick-heading{padding:4px 8px 2px;color:var(--muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.04em}
 .nt-find-options{display:grid;grid-template-columns:repeat(2,max-content);gap:3px 16px;min-width:0}
 .nt-find-check{display:flex;align-items:center;gap:6px;white-space:nowrap;min-width:0;cursor:pointer}
 .nt-find-check input{width:14px;height:14px;margin:0;flex:0 0 auto}

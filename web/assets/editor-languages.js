@@ -31,6 +31,8 @@ const nameOf=path=>String(path||'').split(/[\\/]/).pop()||'';
 function valid(id){return all.has(id)?id:'text';}
 function detect(path,content=''){
  const name=nameOf(path).toLowerCase(),head=String(content).replace(/^\uFEFF/,'').slice(0,4096);
+ // A SonicOS settings export is recognized by its own key names, whatever the file is called.
+ {const exported=root.NTKNetworkConfig?.settingsExport?.(String(content));if(exported)return exported;}
  if(Object.hasOwn(filenames,name))return valid(filenames[name]);
  if(/^(?:dockerfile|containerfile)\./.test(name))return 'docker';
  if(/^\.env(?:\.|$)/.test(name))return 'bash';

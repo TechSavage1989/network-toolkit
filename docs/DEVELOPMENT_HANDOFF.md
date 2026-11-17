@@ -1,3 +1,22 @@
+# v1.21.70 Beta 1 - SonicWall settings exports recognized by content; Find window Quick searches; Document Map colours on long lines
+
+v1.21.69 was published and verified: tag at merge commit d6e9832 (PR #200), release run 44006081576 green, both Checks runs green (one re-run of an unrelated native job), all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` passing, stable channel still v1.21.34.
+
+Owner requests after v1.21.69, with one of their own SonicWall exports (decoded and split into lines; used only locally to measure, never committed or used in tests): "text editor must be able to automatically detect this base64 decoded and reorganized format as sonicwall config regardless of it's file extension", "it must highlight correctly", "also add some quick options for find and replace, like replace & with \n, and other relevant ones", and, with a screenshot of a one-line JSON file, "Colors in the document map don't match the document".
+
+What changed (rules in AGENTS.md: Network configuration languages, the Find window's Quick searches, the map bullet's sample colouring):
+- `network-sonicos-exp` (SonicWall SonicOS settings export) with its own detector and display; it wins over every extension. On the owner's 1.7 MB export: recognized under every extension tried, from its first disk page, sorted, `&`-joined and URL-decoded; 400,000 characters painted exactly in about 80 ms.
+- Find window **Quick ▾**: 11 replacements and 8 searches that fill the fields and Search Mode only.
+- Document Map: contiguous sample rows are coloured as one text (with the previous chunk's tail as context), not rows joined by line breaks. The screenshot's file was a disk-backed one-line JSON of long Base64 strings: the map broke every string at each of its rows.
+
+Review before release: nine findings, all confirmed and fixed (see CHANGELOG). The map's colouring went through three rounds against the new check: rows joined by offset, plain-text starting points (`neutralFrom`), text after each request (lookahead), and colouring in order.
+
+Known limits: the editor colours a disk-backed page from the page's own start, so a page that starts inside a string longer than a page can show that string's inside as plain text until its closing quote. In the map, a single string or comment longer than 75,000 characters, and the last few characters of a document that the samples never read, can still be coloured by guess, and that guess can carry on along the line. **Join lines** turns empty lines at the very start of the text into one leading separator.
+
+Second review (six findings, all confirmed and fixed; see CHANGELOG): failed colourings no longer block later chunks, no recolour cascade, wider windows, the export's own span cap, blank first lines. SonicOS export key families are inferred from exports (no published schema).
+
+Not checked on real Windows.
+
 # v1.21.69 Beta 1 - Comparison change map: map-only wheel and edge scrolling like the Document Map
 
 v1.21.68 was published and verified: tag at merge commit 8005751 (PR #199), release run 43993620406 green, both Checks runs green without a re-run, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` reporting "Verified 1.21.68", stable channel still at v1.21.34. Before merging, a review (four reviewers, each finding checked by two skeptics) found two defects in the small-file map, fixed in the same PR.

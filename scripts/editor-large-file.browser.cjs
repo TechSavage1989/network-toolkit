@@ -238,6 +238,75 @@ async function verifyLongLineStatus(page) {
   await page.waitForFunction(() => document.querySelector('[data-ed-position]').textContent === 'Ln 2, Col 1 · 11 selected');
 }
 
+// A decoded SonicOS settings export large enough to be disk-backed, named .txt:
+// recognized by its keys whatever its name, and coloured page by page (made-up data).
+async function verifySonicExport(page) {
+  await page.evaluate(async () => {
+    const rows = ['checksumVersion=1', 'buildNum=7.1.0-0000-R0000', 'shortProdName=TZ%20Lab', 'passwordUniqueNum=0'];
+    for (let i = 0; rows.length < 40000; i++) rows.push('addrObjId_' + i + '=Lab%20Host%20' + i, 'addrObjType_' + i + '=1',
+      'addrObjZone_' + i + '=LAN', 'addrObjIp1_' + i + '=192.0.2.' + (i % 250));
+    const content = rows.join('\n') + '\n', file = new File([content], 'synthetic-sonicos-export.txt');
+    await NetworkToolkitFileEditor.open({
+      id:'sonic-export', path:file.name, source:'Synthetic export', binding:{kind:'localDraft'},
+      create:true, diskMode:'upload', diskFile:file, read:async()=>({content}), write:async()=>({}),
+    });
+  });
+  await page.waitForFunction(() => NetworkToolkitFileEditor.active?.path === 'synthetic-sonicos-export.txt' &&
+    NetworkToolkitFileEditor.active.disk && !document.querySelector('.nt-editor-code textarea[data-ed-text]').disabled);
+  await page.locator('.nt-editor-disk-highlight:visible .nt-ed-property').first().waitFor({timeout:10000});
+  assert.equal(await page.evaluate(() => NetworkToolkitFileEditor.active.diskSyntaxLanguage), 'network-sonicos-exp');
+  assert.equal(await page.locator('[data-ed-auto-language]').first().textContent(), 'Auto (SonicWall SonicOS settings export)');
+  const kinds = await page.evaluate(() => [...document.querySelectorAll('.nt-editor-disk-highlight:not([hidden]) span')].reduce((all, el) => (all[el.className] = (all[el.className] || 0) + 1, all), {}));
+  for (const kind of ['nt-ed-property', 'nt-ed-number', 'nt-ed-string', 'nt-ed-punctuation']) assert(kinds[kind] > 0, kind + ' ' + JSON.stringify(kinds));
+}
+
+
+// One long line of JSON whose strings run over many of the map's rows: the
+// map colours them as strings, as the editor does (owner report on v1.21.69:
+// the map's colours did not match the document). Made-up data.
+async function verifyLongLineMapColours(page) {
+  await page.evaluate(async () => {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    let seed = 7;
+    const random = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x80000000; };
+    const value = () => { let text = ''; for (let i = 0; i < 2000; i++) text += letters[(random() * 64) | 0]; return text; };
+    const items = []; for (let i = 0; i < 320; i++) items.push('{"id":"art-' + i + '","dataUrl":"data:image/png;base64,' + value() + '","width":' + (i + 100) + '}');
+    const content = '{"art":[' + items.join(',') + ']}', file = new File([content], 'synthetic-art.json');
+    await NetworkToolkitFileEditor.open({id:'json-art', path:file.name, source:'Synthetic', binding:{kind:'localDraft'}, create:true,
+      diskMode:'upload', diskFile:file, read:async()=>({content}), write:async()=>({})});
+    NetworkToolkitFileEditor.setDocumentMap(true);
+  });
+  await page.waitForFunction(() => NetworkToolkitFileEditor.active?.path === 'synthetic-art.json' && NetworkToolkitFileEditor.active.disk &&
+    !document.querySelector('.nt-editor-code textarea[data-ed-text]').disabled);
+  await page.locator('[data-ed-wrap]').check();
+  await page.locator('.nt-editor-disk-highlight:visible .nt-ed-string').first().waitFor({timeout:10000});
+  const font = page.locator('[data-ed-font]').first(), size = await font.inputValue();
+  // At the default size the wrapped rows are under 190 characters; at 8 px
+  // they are wider (review finding: wide rows were cut before colouring).
+  for (const px of [size, '8']) {
+    await font.fill(px);await font.press('Enter');
+    let kinds = null;
+    try {
+      // Every chunk of the document read and coloured, none waiting for the one before.
+      await page.waitForFunction(() => {
+        const map = NetworkToolkitFileEditor.documentMap, state = map?.sampleState;
+        return map?.layout?.kind === 'offsets' && state?.count > 0 && state.chunks.length === state.count &&
+          state.colored === state.count && state.waiting === 0 && state.fresh;
+      }, null, {timeout:20000});
+    } finally {
+      kinds = await page.evaluate(() => ({map:NetworkToolkitFileEditor.documentMap.sampleKinds, state:NetworkToolkitFileEditor.documentMap.sampleState}));
+      report.mapColours = report.mapColours || {};report.mapColours[px] = kinds;
+    }
+    const all = Object.values(kinds.map || {}).reduce((a, b) => a + b, 0);
+    assert(kinds.state.columns > (px === '8' ? 190 : 0), 'row width at ' + px + ' px: ' + kinds.state.columns);
+    assert(kinds.state.colourings <= 3 * kinds.state.count, 'each chunk is coloured a few times at most, not once per chunk read before it: ' + JSON.stringify(kinds.state));
+    assert(all > 0 && kinds.map.string / all > 0.9, 'the map shows the long strings as strings at ' + px + ' px: ' + JSON.stringify(kinds));
+    assert(!kinds.map.number || kinds.map.number / all < 0.01, 'no digits inside strings drawn as numbers at ' + px + ' px: ' + JSON.stringify(kinds));
+  }
+  await font.fill(size);await font.press('Enter');
+  await page.evaluate(() => NetworkToolkitFileEditor.setDocumentMap(false));
+}
+
 async function main() {
   const browser = await chromium.launch({ headless: true, ignoreDefaultArgs:['--hide-scrollbars'],
     ...(process.env.TOOLKIT_BROWSER_EXECUTABLE ? { executablePath: process.env.TOOLKIT_BROWSER_EXECUTABLE } : {}) });
@@ -761,6 +830,10 @@ async function main() {
     await waitForEngine(page, state => state.grants === 0 && state.comparisons === 0);
     report.phase = 'long-line-status';
     await verifyLongLineStatus(page);
+    report.phase = 'sonicos-export';
+    await verifySonicExport(page);
+    report.phase = 'long-line-map-colours';
+    await verifyLongLineMapColours(page);
     assert.ok(await page.evaluate(() => NetworkToolkitFileEditor.closeAll()));
     await waitForEngine(page, state => state.grants === 0 && state.comparisons === 0);
     assert.deepEqual(report.browserErrors, []);
