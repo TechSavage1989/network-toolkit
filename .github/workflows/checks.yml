@@ -119,6 +119,24 @@ jobs:
           path: ${{ runner.temp }}/ntk-types130-results
           if-no-files-found: error
           retention-days: 14
+  windows-browser-window:
+    # Windows without the WebView2 Runtime (Windows Server) opens the interface
+    # in an Edge or Chrome app window; a stand-in browser checks the launch.
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Open the interface in a browser window without WebView2
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_BROWSER_WINDOW_TEST: '1'
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestWindowsBrowserWindow$' -count=1 -timeout=8m -v
   native-editor128-diagnostic:
     runs-on: windows-latest
     timeout-minutes: 10

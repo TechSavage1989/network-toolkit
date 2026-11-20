@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	"strings"
 	"syscall"
 	"unsafe"
 )
@@ -83,11 +82,7 @@ func loadInstalledWebViewRuntime() (*installedWebViewRuntime, error) {
 		}
 		return &installedWebViewRuntime{DLL: dll, Create: create, Path: filename, Version: version}, nil
 	}
-	message := "A usable installed Microsoft Edge WebView2 Runtime was not found. This application requires the x64 WebView2 Runtime already installed on Windows."
-	if len(problems) != 0 {
-		message += "\n\n" + strings.Join(problems, "\n")
-	}
-	return nil, errors.New(message)
+	return nil, runtimeMissingError{problems: problems}
 }
 
 func readInstalledRuntimeDirectory(root syscall.Handle) (string, error) {
@@ -129,4 +124,23 @@ func readInstalledRuntimeDirectory(root syscall.Handle) (string, error) {
 		return syscall.UTF16ToString(buffer[:size/2]), nil
 	}
 	return "", errors.New("the WebView2 installation is changing; reopen the application after the runtime update completes")
+}
+
+// WebViewRuntimeAvailable reports whether a registered Evergreen WebView2
+// Runtime looks usable, reading only the registry and the runtime's files
+// (nothing is loaded). The app opens a browser window when it is not.
+func WebViewRuntimeAvailable() bool {
+	if runtime.GOARCH != "amd64" {
+		return false
+	}
+	for _, root := range []syscall.Handle{syscall.HKEY_LOCAL_MACHINE, syscall.HKEY_CURRENT_USER} {
+		directory, err := readInstalledRuntimeDirectory(root)
+		if err != nil || directory == "" {
+			continue
+		}
+		if filename, _, err := installedRuntimePath(directory); err == nil && validateRuntimeDLL(filename) == nil {
+			return true
+		}
+	}
+	return false
 }

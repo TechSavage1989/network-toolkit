@@ -129,7 +129,7 @@ func PromptSaveFile(ctx context.Context, request SaveFileRequest) (SaveFileRespo
 		return SaveFileResponse{}, nativeError("get the Save As dialog module", callErr)
 	}
 	class, title := utf16String("STATIC"), utf16String("Network Toolkit Save As owner")
-	owner, _, callErr := wndCreateWindow.Call(0x00000080, uintptr(unsafe.Pointer(class)), uintptr(unsafe.Pointer(title)), 0x80000000,
+	owner, _, callErr := wndCreateWindow.Call(dialogOwnerStyle(), uintptr(unsafe.Pointer(class)), uintptr(unsafe.Pointer(title)), 0x80000000,
 		0, 0, 0, 0, 0, 0, instance, 0)
 	runtime.KeepAlive(class)
 	runtime.KeepAlive(title)

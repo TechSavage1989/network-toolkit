@@ -99,6 +99,7 @@ const (
 	windowCloseButton  = 1001
 	windowCloseTimer   = 1002
 	windowStartupTimer = 1003
+	windowRuntimeButton = 1004
 )
 
 type windowClass struct {
@@ -182,6 +183,8 @@ type hostWindow struct {
 	postedHandle     atomic.Uintptr
 	activationQueued atomic.Bool
 	closeButton      uintptr
+	runtimeButton    uintptr // Opens Microsoft's WebView2 page; shown only when the runtime is missing.
+	runtimeShown     bool
 	font             uintptr
 	headingFont      uintptr
 	view             *WebView
@@ -309,6 +312,14 @@ func Run(ctx context.Context, cfg Config) error {
 		hwnd, windowCloseButton, instance, 0)
 	if w.closeButton != 0 && w.font != 0 {
 		wndSendMessage.Call(w.closeButton, 0x0030, w.font, 1) // WM_SETFONT
+	}
+	runtimeText := utf16String(webViewRuntimeButton)
+	w.runtimeButton, _, _ = wndCreateWindow.Call(0,
+		uintptr(unsafe.Pointer(buttonClass)), uintptr(unsafe.Pointer(runtimeText)),
+		0x40000000|0x00010000, 0, 0, 96, 34,
+		hwnd, windowRuntimeButton, instance, 0)
+	if w.runtimeButton != 0 && w.font != 0 {
+		wndSendMessage.Call(w.runtimeButton, 0x0030, w.font, 1)
 	}
 	w.layout()
 	w.splash, err = newSplashWindow(w, instance, work)
@@ -659,8 +670,17 @@ func (w *hostWindow) layout() {
 	}
 	if w.closeButton != 0 {
 		width, height := w.scale(100), w.scale(36)
-		x, y := (client.Right-width)/2, client.Bottom-height-w.scale(32)
-		wndSetWindowPos.Call(w.closeButton, 0, uintptr(x), uintptr(max(y, 0)), uintptr(width), uintptr(height), 0x0004|0x0010)
+		y := max(client.Bottom-height-w.scale(32), 0)
+		if w.runtimeShown && w.runtimeButton != 0 {
+			// The page button first, Close beside it, both centered.
+			wide, gap := w.scale(240), w.scale(12)
+			x := (client.Right - wide - gap - width) / 2
+			wndSetWindowPos.Call(w.runtimeButton, 0, uintptr(max(x, 0)), uintptr(y), uintptr(wide), uintptr(height), 0x0004|0x0010)
+			wndSetWindowPos.Call(w.closeButton, 0, uintptr(max(x+wide+gap, 0)), uintptr(y), uintptr(width), uintptr(height), 0x0004|0x0010)
+		} else {
+			x := (client.Right - width) / 2
+			wndSetWindowPos.Call(w.closeButton, 0, uintptr(x), uintptr(y), uintptr(width), uintptr(height), 0x0004|0x0010)
+		}
 	}
 }
 
@@ -686,6 +706,9 @@ func (w *hostWindow) setFonts() {
 	if w.closeButton != 0 && w.font != 0 {
 		wndSendMessage.Call(w.closeButton, 0x0030, w.font, 1)
 	}
+	if w.runtimeButton != 0 && w.font != 0 {
+		wndSendMessage.Call(w.runtimeButton, 0x0030, w.font, 1)
+	}
 	if old != 0 {
 		wndDeleteObject.Call(old)
 	}
@@ -701,6 +724,10 @@ func (w *hostWindow) showStartupError(err error) {
 	w.ready = false
 	w.statusTitle = "The application window is unavailable"
 	w.statusText = err.Error() + "\n\nClose this window after reviewing the error."
+	w.runtimeShown = errors.Is(err, ErrWebViewRuntimeMissing)
+	if w.runtimeShown {
+		w.statusTitle, w.statusText = webViewRuntimeMissingTitle, err.Error()
+	}
 	if w.view != nil {
 		observeNativeFileDrag(w.hwnd, "webview-close-enter")
 		w.view.Close()
@@ -711,6 +738,10 @@ func (w *hostWindow) showStartupError(err error) {
 	if w.closeButton != 0 {
 		wndShowWindow.Call(w.closeButton, 1)
 	}
+	if w.runtimeShown && w.runtimeButton != 0 {
+		wndShowWindow.Call(w.runtimeButton, 1)
+	}
+	w.layout()
 	wndInvalidateRect.Call(w.hwnd, 0, 1)
 }
 
@@ -856,6 +887,12 @@ func windowProcedure(hwnd uintptr, message uint32, wparam, lparam uintptr) uintp
 	case wmCommand:
 		if uint16(wparam) == windowCloseButton {
 			wndPostMessage.Call(hwnd, wmClose, 0, 0)
+			return 0
+		}
+		if uint16(wparam) == windowRuntimeButton && w.runtimeShown {
+			if err := openRuntimeDownloadPage(); err != nil {
+				w.showMessage("Network Toolkit", "The browser could not be opened. Open "+WebViewRuntimeDownloadPage+" in a web browser to get the WebView2 Runtime.")
+			}
 			return 0
 		}
 	case wmEraseBackground:

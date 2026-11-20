@@ -95,6 +95,9 @@ func StartWebView(parent uintptr, cfg WebViewConfig, ready func(*WebView, error)
 	}
 	webRuntime, err := loadInstalledWebViewRuntime()
 	if err != nil {
+		if errors.Is(err, ErrWebViewRuntimeMissing) {
+			return nil, err // Its own plain explanation; the window offers Microsoft's page.
+		}
 		return nil, fmt.Errorf("The installed Microsoft Edge WebView2 Runtime could not be loaded: %w", err)
 	}
 	w := &WebView{parent: parent, cfg: cfg, ready: ready, webRuntime: webRuntime, downloads: make(map[uintptr]eventRegistration), pendingDownloads: make(map[*pendingDownload]bool)}
