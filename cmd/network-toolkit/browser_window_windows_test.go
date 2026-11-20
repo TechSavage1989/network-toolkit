@@ -34,20 +34,37 @@ func TestWindowsBrowserWindow(t *testing.T) {
 	}
 	cmd := exec.Command(app, "--data-dir", filepath.Join(work, "data"))
 	cmd.Env = append(os.Environ(), "NETWORK_TOOLKIT_WINDOW=browser", "NETWORK_TOOLKIT_BROWSER="+standin)
-	var log strings.Builder
-	cmd.Stdout, cmd.Stderr = &log, &log
+	// The app's output goes to a file, never a pipe: a pipe kept open by a
+	// process the app started would hold cmd.Wait, and with it the cleanup,
+	// until the test binary's own deadline hid the real failure (CI on v1.21.73).
+	logFile, err := os.Create(filepath.Join(work, "app.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer logFile.Close()
+	cmd.Stdout, cmd.Stderr = logFile, logFile
+	cmd.WaitDelay = 5 * time.Second
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
 	exited := make(chan error, 1)
 	go func() { exited <- cmd.Wait() }()
+	appLog := func() string {
+		data, _ := os.ReadFile(filepath.Join(work, "app.log"))
+		report, _ := os.ReadFile(filepath.Join(work, "browser", "report.json"))
+		return "app output:\n" + string(data) + "\nstand-in report:\n" + string(report)
+	}
 	t.Cleanup(func() {
 		_ = os.WriteFile(filepath.Join(work, "browser", "close"), nil, 0o600)
 		select {
 		case <-exited:
 		case <-time.After(5 * time.Second):
 			_ = cmd.Process.Kill()
-			<-exited
+			select {
+			case <-exited:
+			case <-time.After(10 * time.Second):
+				t.Errorf("the app did not end after it was killed")
+			}
 		}
 	})
 	var r struct {
@@ -65,7 +82,7 @@ func TestWindowsBrowserWindow(t *testing.T) {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("the app never opened its browser window\n%s", log.String())
+			t.Fatalf("the app never opened its browser window\n%s", appLog())
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
@@ -79,10 +96,10 @@ func TestWindowsBrowserWindow(t *testing.T) {
 		t.Errorf("browser protections must stay on: %v", r.Args)
 	}
 	if len(r.Problems) != 0 || r.Status != http.StatusOK || r.Path != "/" || !r.Token {
-		t.Fatalf("the launched window must reach the page and its token: %+v", r)
+		t.Fatalf("the launched window must reach the page and its token: %+v\n%s", r, appLog())
 	}
 	if r.Engine["os"] != "windows" || r.Engine["uiHost"] != "browser-window" || r.Engine["terminalDetachAvailable"] != false || r.Engine["editorWindowAvailable"] != false {
-		t.Errorf("status in a browser window: %v", r.Engine)
+		t.Errorf("status in a browser window: %v\n%s", r.Engine, appLog())
 	}
 	base := r.Launch[:strings.Index(r.Launch, "/launch")]
 	for _, address := range []string{base + "/", r.Launch} {
@@ -103,7 +120,7 @@ func TestWindowsBrowserWindow(t *testing.T) {
 	select {
 	case <-exited:
 	case <-time.After(45 * time.Second):
-		t.Fatalf("the app kept running after its window closed\n%s", log.String())
+		t.Fatalf("the app kept running after its window closed\n%s", appLog())
 	}
 }
 
