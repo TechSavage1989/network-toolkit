@@ -1,0 +1,133 @@
+name: Defender scan of published v1.21.73
+on:
+  push:
+    branches: [chore/defender-12173]
+    paths: ['.github/workflows/defender-12173.yml']
+permissions: {}
+jobs:
+  scan:
+    name: Scan ${{ matrix.file }}
+    runs-on: windows-2025
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - file: Network_Toolkit.exe
+            sha256: 9c45e0f1668f5766c06eafabdc8b0e31e60b48804c496fe91137c67f90fcc197
+          - file: Network_Toolkit_1.21.73_Windows_x64_Setup.exe
+            sha256: d47304894a734cacbf05283fb85684e0afe897a470897d883731c1a25c228644
+    steps:
+      - name: Enable Defender, update definitions, verify and scan the published file
+        shell: powershell
+        env:
+          SAMPLE: ${{ matrix.file }}
+          EXPECTED: ${{ matrix.sha256 }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
+              throw 'This scan requires a disposable GitHub-hosted Windows VM.'
+          }
+          $dir = Join-Path $env:SystemDrive "ReleaseDefenderScan-$env:GITHUB_RUN_ID"
+          New-Item -ItemType Directory -Path $dir -Force | Out-Null
+          $target = Join-Path $dir $env:SAMPLE
+          $logName = 'Microsoft-Windows-Windows Defender/Operational'
+
+          # Hosted build images ship with Defender settings for compiler performance.
+          # Enable normal antivirus protection before introducing either release file.
+          $policy = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows Advanced Threat Protection'
+          if ((Get-ItemProperty -Path $policy -Name ForceDefenderPassiveMode -ErrorAction SilentlyContinue).ForceDefenderPassiveMode -eq 1) {
+              Set-ItemProperty -Path $policy -Name ForceDefenderPassiveMode -Value 0
+          }
+          if (-not (Get-Service WinDefend -ErrorAction SilentlyContinue)) {
+              $feature = Install-WindowsFeature Windows-Defender
+              if (-not $feature.Success -or $feature.RestartNeeded -eq 'Yes') { throw 'Defender is unavailable until reboot.' }
+          }
+          if ((Get-Service WinDefend).Status -ne 'Running') { Start-Service WinDefend }
+          $rootExclusions = @((Get-MpPreference).ExclusionPath | Where-Object { $_ -and $_.TrimEnd('\') -eq $env:SystemDrive })
+          if ($rootExclusions.Count) { Remove-MpPreference -ExclusionPath $rootExclusions }
+          Set-MpPreference -DisableRealtimeMonitoring $false -DisableArchiveScanning $false -DisableIOAVProtection $false -DisableBehaviorMonitoring $false -DisableScriptScanning $false -MAPSReporting Advanced -DisableBlockAtFirstSeen $false -SubmitSamplesConsent SendSafeSamples
+          Update-MpSignature -UpdateSource MMPC
+          for ($i = 0; $i -lt 20; $i++) {
+              $status = Get-MpComputerStatus
+              if ($status.AntivirusEnabled -and $status.RealTimeProtectionEnabled -and $status.AMRunningMode -eq 'Normal') { break }
+              Start-Sleep -Seconds 3
+          }
+          $status | Select-Object AMRunningMode, AntivirusEnabled, RealTimeProtectionEnabled, AMProductVersion, AMEngineVersion, AntivirusSignatureVersion, AntivirusSignatureLastUpdated, DefenderSignaturesOutOfDate | Format-List
+          $prefs = Get-MpPreference
+          if (-not $status.AntivirusEnabled -or -not $status.RealTimeProtectionEnabled -or $status.AMRunningMode -ne 'Normal' -or $status.DefenderSignaturesOutOfDate -or $prefs.DisableArchiveScanning) {
+              throw 'Required active protection and current definitions could not be verified.'
+          }
+          $mp = Join-Path "$env:ProgramData\Microsoft\Windows Defender\Platform\$($status.AMProductVersion)" 'MpCmdRun.exe'
+          if (-not (Test-Path $mp)) {
+              $mp = (Get-ChildItem "$env:ProgramData\Microsoft\Windows Defender\Platform\*\MpCmdRun.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
+          }
+          if (-not $mp) { $mp = Join-Path $env:ProgramFiles 'Windows Defender\MpCmdRun.exe' }
+          # A benign empty placeholder allows Defender to resolve inherited exclusions.
+          [IO.File]::WriteAllBytes($target, [byte[]]@())
+          & $mp -CheckExclusion -Path $target
+          if ($LASTEXITCODE -ne 1) { throw 'The sample path is excluded or could not be validated.' }
+          & $mp -ValidateMapsConnection
+          $cloudCode = $LASTEXITCODE
+          Write-Host "Defender cloud connectivity exit code: $cloudCode"
+          if (-not (Get-WinEvent -ListLog $logName).IsEnabled) { throw 'Defender detection logging is unavailable.' }
+
+          $start = Get-Date
+          Add-Type -AssemblyName System.Net.Http
+          $client = New-Object Net.Http.HttpClient
+          $url = "https://github.com/TechSavage1989/network-toolkit/releases/download/v1.21.73/$env:SAMPLE"
+          try { $bytes = $client.GetByteArrayAsync($url).GetAwaiter().GetResult() } finally { $client.Dispose() }
+          $sha = [Security.Cryptography.SHA256]::Create()
+          try { $hash = ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-','').ToLowerInvariant() } finally { $sha.Dispose() }
+          if ($hash -cne $env:EXPECTED) { throw "Published file hash mismatch: $hash" }
+          Write-Host "$env:SAMPLE SHA-256 $hash ($($bytes.Length) bytes)"
+          $writeOk = $false
+          $scanExit = $null
+          try {
+              [IO.File]::WriteAllBytes($target, $bytes)
+              $writeOk = $true
+          } catch { Write-Warning "Write interrupted: $($_.Exception.Message)" }
+          $bytes = $null
+          if ($writeOk -and (Test-Path -LiteralPath $target)) {
+              & $mp -Scan -ScanType 3 -File $target
+              $scanExit = $LASTEXITCODE
+              Write-Host "On-demand scan exit code: $scanExit"
+          }
+          $events = @()
+          $hits = @()
+          $escaped = [regex]::Escape($target)
+          for ($i = 0; $i -lt 5; $i++) {
+              Start-Sleep -Seconds 3
+              $hits = @(Get-MpThreatDetection | Where-Object { ($_.Resources -join ' ') -match $escaped })
+              $events = @(Get-WinEvent -FilterHashtable @{LogName=$logName;Id=1116,1117,1118,1119;StartTime=$start.AddSeconds(-1)} -ErrorAction SilentlyContinue | ForEach-Object {
+                  [xml]$xml = $_.ToXml()
+                  $fields = @{}
+                  foreach ($item in $xml.Event.EventData.Data) { $fields[[string]$item.Name] = $item.InnerText }
+                  if ($fields['Path'] -match $escaped) {
+                      [pscustomobject]@{EventId=$_.Id; UTC=$_.TimeCreated.ToUniversalTime().ToString('o'); Threat=$fields['Threat Name']; Action=$fields['Action Name']; Path=$fields['Path']}
+                  }
+              })
+              if ($events.Count -or $hits.Count) { break }
+          }
+          $events | Format-List
+          $hits | Select-Object ThreatID, DetectionID, ActionSuccess, Resources | Format-List
+          $finalHash = $null
+          try {
+              if (Test-Path -LiteralPath $target) { $finalHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() }
+          } catch { Write-Warning "File is no longer readable: $($_.Exception.Message)" }
+          $verdict = 'Inconclusive'
+          if ($hits.Count -or $events.Count) { $verdict = 'Detected' }
+          elseif ($writeOk -and $null -ne $scanExit -and $scanExit -eq 0 -and $finalHash -ceq $hash) { $verdict = 'No detection observed' }
+          $names = @($events | ForEach-Object { $_.Threat } | Where-Object { $_ } | Sort-Object -Unique)
+          if (-not $names.Count -and $hits.Count) {
+              $names = @(Get-MpThreat | Where-Object { $_.ThreatID -in $hits.ThreatID } | Select-Object -ExpandProperty ThreatName -Unique)
+          }
+          $report = [ordered]@{file=$env:SAMPLE;sha256=$hash;verdict=$verdict;threats=$names;scanExit=$scanExit;cloudExit=$cloudCode;engine=$status.AMEngineVersion;signatures=$status.AntivirusSignatureVersion;utc=(Get-Date).ToUniversalTime().ToString('o')}
+          $json = $report | ConvertTo-Json -Compress
+          Write-Host "DEFENDER_RESULT $json"
+          @("### $env:SAMPLE", '', $verdict, '', '~~~json', $json, '~~~') | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+          if ($verdict -eq 'Detected') { throw "Defender detected the published file: $($names -join ', ')." }
+          if ($verdict -eq 'Inconclusive') { throw 'The scan did not produce a verifiable result.' }
+          exit 0
+
