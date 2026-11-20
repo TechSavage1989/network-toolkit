@@ -29,7 +29,22 @@ jobs:
           if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
               throw 'This scan requires a disposable GitHub-hosted Windows VM.'
           }
-          $dir = Join-Path $env:SystemDrive "ReleaseDefenderScan-$env:GITHUB_RUN_ID"
+          # The hosted image excludes its system and build volumes. Scan on a new NTFS volume.
+          if (Get-PSDrive R -ErrorAction SilentlyContinue) { throw 'The isolated volume letter is occupied.' }
+          $vhd = Join-Path $env:RUNNER_TEMP 'release-scan.vhdx'
+          $diskScript = Join-Path $env:RUNNER_TEMP 'prepare-scan-volume.txt'
+          @(
+              ('create vdisk file="{0}" maximum=256 type=expandable' -f $vhd),
+              ('select vdisk file="{0}"' -f $vhd),
+              'attach vdisk',
+              'create partition primary',
+              'format fs=ntfs quick label="ReleaseScan"',
+              'assign letter=R',
+              'exit'
+          ) | Set-Content -LiteralPath $diskScript -Encoding ASCII
+          & diskpart.exe /s $diskScript
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path 'R:\')) { throw 'Could not create a dedicated scan volume.' }
+          $dir = 'R:\Published'
           New-Item -ItemType Directory -Path $dir -Force | Out-Null
           $target = Join-Path $dir $env:SAMPLE
           $logName = 'Microsoft-Windows-Windows Defender/Operational'
@@ -45,8 +60,6 @@ jobs:
               if (-not $feature.Success -or $feature.RestartNeeded -eq 'Yes') { throw 'Defender is unavailable until reboot.' }
           }
           if ((Get-Service WinDefend).Status -ne 'Running') { Start-Service WinDefend }
-          $rootExclusions = @((Get-MpPreference).ExclusionPath | Where-Object { $_ -and $_.TrimEnd('\') -eq $env:SystemDrive })
-          if ($rootExclusions.Count) { Remove-MpPreference -ExclusionPath $rootExclusions }
           Set-MpPreference -DisableRealtimeMonitoring $false -DisableArchiveScanning $false -DisableIOAVProtection $false -DisableBehaviorMonitoring $false -DisableScriptScanning $false -MAPSReporting Advanced -DisableBlockAtFirstSeen $false -SubmitSamplesConsent SendSafeSamples
           Update-MpSignature -UpdateSource MMPC
           for ($i = 0; $i -lt 20; $i++) {
@@ -56,6 +69,7 @@ jobs:
           }
           $status | Select-Object AMRunningMode, AntivirusEnabled, RealTimeProtectionEnabled, AMProductVersion, AMEngineVersion, AntivirusSignatureVersion, AntivirusSignatureLastUpdated, DefenderSignaturesOutOfDate | Format-List
           $prefs = Get-MpPreference
+          $prefs | Select-Object ExclusionPath, ExclusionExtension, DisableArchiveScanning, DisableIOAVProtection, DisableRealtimeMonitoring, MAPSReporting | Format-List
           if (-not $status.AntivirusEnabled -or -not $status.RealTimeProtectionEnabled -or $status.AMRunningMode -ne 'Normal' -or $status.DefenderSignaturesOutOfDate -or $prefs.DisableArchiveScanning) {
               throw 'Required active protection and current definitions could not be verified.'
           }
