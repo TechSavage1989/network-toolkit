@@ -47,8 +47,11 @@ func TestWindowsBrowserWindow(t *testing.T) {
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
-	exited := make(chan error, 1)
-	go func() { exited <- cmd.Wait() }()
+	// Closed when the app has ended, so the body and the cleanup can both
+	// wait for it (a value sent once was taken by the body, and the cleanup
+	// then waited for a second one that never came: CI on v1.21.73).
+	exited := make(chan struct{})
+	go func() { _ = cmd.Wait(); close(exited) }()
 	appLog := func() string {
 		data, _ := os.ReadFile(filepath.Join(work, "app.log"))
 		report, _ := os.ReadFile(filepath.Join(work, "browser", "report.json"))
