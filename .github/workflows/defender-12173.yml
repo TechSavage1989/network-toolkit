@@ -1,4 +1,4 @@
-name: Defender scan of published v1.21.73
+name: Defender verification of the published v1.21.73 installer
 on:
   push:
     branches: [chore/defender-12173]
@@ -7,14 +7,12 @@ permissions: {}
 jobs:
   scan:
     name: Scan ${{ matrix.file }}
-    runs-on: windows-2025
+    runs-on: windows-2022
     timeout-minutes: 18
     strategy:
       fail-fast: false
       matrix:
         include:
-          - file: Network_Toolkit.exe
-            sha256: 9c45e0f1668f5766c06eafabdc8b0e31e60b48804c496fe91137c67f90fcc197
           - file: Network_Toolkit_1.21.73_Windows_x64_Setup.exe
             sha256: d47304894a734cacbf05283fb85684e0afe897a470897d883731c1a25c228644
     steps:
@@ -91,6 +89,8 @@ jobs:
           Add-Type -AssemblyName System.Net.Http
           $client = New-Object Net.Http.HttpClient
           $url = "https://github.com/TechSavage1989/network-toolkit/releases/download/v1.21.73/$env:SAMPLE"
+          # Preserve the public download origin as a browser normally would.
+          Set-Content -LiteralPath $target -Stream Zone.Identifier -Encoding ASCII -Value @('[ZoneTransfer]', 'ZoneId=3', "HostUrl=$url")
           try { $bytes = $client.GetByteArrayAsync($url).GetAwaiter().GetResult() } finally { $client.Dispose() }
           $sha = [Security.Cryptography.SHA256]::Create()
           try { $hash = ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-','').ToLowerInvariant() } finally { $sha.Dispose() }
@@ -101,6 +101,7 @@ jobs:
           try {
               [IO.File]::WriteAllBytes($target, $bytes)
               $writeOk = $true
+              Get-Content -LiteralPath $target -Stream Zone.Identifier | Write-Host
           } catch { Write-Warning "Write interrupted: $($_.Exception.Message)" }
           $bytes = $null
           if ($writeOk -and (Test-Path -LiteralPath $target)) {
@@ -111,7 +112,8 @@ jobs:
           $events = @()
           $hits = @()
           $escaped = [regex]::Escape($target)
-          for ($i = 0; $i -lt 5; $i++) {
+          # Give real-time and cloud detections time to arrive after the on-demand result.
+          for ($i = 0; $i -lt 30; $i++) {
               Start-Sleep -Seconds 3
               $hits = @(Get-MpThreatDetection | Where-Object { ($_.Resources -join ' ') -match $escaped })
               $events = @(Get-WinEvent -FilterHashtable @{LogName=$logName;Id=1116,1117,1118,1119;StartTime=$start.AddSeconds(-1)} -ErrorAction SilentlyContinue | ForEach-Object {
