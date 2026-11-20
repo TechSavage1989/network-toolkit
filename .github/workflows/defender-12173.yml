@@ -89,8 +89,6 @@ jobs:
           Add-Type -AssemblyName System.Net.Http
           $client = New-Object Net.Http.HttpClient
           $url = "https://github.com/TechSavage1989/network-toolkit/releases/download/v1.21.73/$env:SAMPLE"
-          # Preserve the public download origin as a browser normally would.
-          Set-Content -LiteralPath $target -Stream Zone.Identifier -Encoding ASCII -Value @('[ZoneTransfer]', 'ZoneId=3', "HostUrl=$url")
           try { $bytes = $client.GetByteArrayAsync($url).GetAwaiter().GetResult() } finally { $client.Dispose() }
           $sha = [Security.Cryptography.SHA256]::Create()
           try { $hash = ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-','').ToLowerInvariant() } finally { $sha.Dispose() }
@@ -100,8 +98,12 @@ jobs:
           $scanExit = $null
           try {
               [IO.File]::WriteAllBytes($target, $bytes)
+              # Mark the finished file. Replacing the empty placeholder also replaces its streams.
+              Set-Content -LiteralPath $target -Stream Zone.Identifier -Encoding ASCII -Value @('[ZoneTransfer]', 'ZoneId=3', "HostUrl=$url")
+              $zone = @(Get-Content -LiteralPath $target -Stream Zone.Identifier)
+              if ($zone -notcontains 'ZoneId=3') { throw 'Internet origin marker is missing.' }
+              $zone | Write-Host
               $writeOk = $true
-              Get-Content -LiteralPath $target -Stream Zone.Identifier | Write-Host
           } catch { Write-Warning "Write interrupted: $($_.Exception.Message)" }
           $bytes = $null
           if ($writeOk -and (Test-Path -LiteralPath $target)) {
