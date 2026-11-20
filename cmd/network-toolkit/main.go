@@ -407,7 +407,10 @@ func main() {
 	if editorLaunch != nil {
 		a.editorLaunchInbox.add(*editorLaunch)
 	}
-	if runtime.GOOS == "windows" || *noBrowser {
+	// Windows without the WebView2 Runtime (Windows Server) shows the interface
+	// in an Edge or Chrome window, as the Linux edition does (browser_window.go).
+	browserWindow := runtime.GOOS == "windows" && !*noBrowser && decideBrowserWindow()
+	if runtime.GOOS == "windows" && !browserWindow || *noBrowser {
 		// The engine keeps each detached window's process identifier while it
 		// runs, to let that window come to the front (window_raise.go).
 		if !editorStandalone {
@@ -439,14 +442,16 @@ func main() {
 	// After an update: the Updates page shows from its first status read that
 	// the separate programs will be added (updater_companions_auto.go).
 	a.markCompanionsPending()
-	if runtime.GOOS == "windows" && !*noBrowser {
+	if runtime.GOOS == "windows" && !*noBrowser && !browserWindow {
 		a.uiHost = "webview2"
 	}
-	if runtime.GOOS == "linux" && !*noBrowser {
-		// Linux window mode: the page is opened through a one-time launch link
-		// and only that window receives the session token (browser_launch_gate.go).
+	if (runtime.GOOS == "linux" || browserWindow) && !*noBrowser {
+		// Browser window: the page is opened through a one-time launch link and
+		// only that window receives the session token (browser_launch_gate.go).
+		nativeHostBootstrap = false
+		desktop.SetBrowserHosted(browserWindow)
 		a.launchGate = newBrowserLaunchGate()
-		setLinuxLaunchGate(a.launchGate)
+		setAppLaunchGate(a.launchGate)
 	}
 	var serverShutdownDone chan struct{}
 	defer func() {

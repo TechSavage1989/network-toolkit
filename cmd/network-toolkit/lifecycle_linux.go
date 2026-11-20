@@ -26,9 +26,6 @@ import (
 // The page is opened through a one-time launch link (browserLaunchGate), so the
 // session token is never served to other local processes or users.
 
-// linuxLaunchGate is set by main for the Linux window mode.
-var linuxLaunchGate *browserLaunchGate
-
 type appBrowser struct {
 	command []string // executable and any wrapper arguments (flatpak run ID)
 	name    string
@@ -119,13 +116,6 @@ func flatpakAppInstalled(id string) bool {
 	return exec.Command(path, "info", id).Run() == nil
 }
 
-func linuxLaunchURL(base string) string {
-	if linuxLaunchGate == nil {
-		return base
-	}
-	return strings.TrimSuffix(base, "/") + linuxLaunchGate.Ticket()
-}
-
 func runLifecycle(ctx context.Context, url, sessionToken string, stop context.CancelFunc, noBrowser bool, dataDir, title string, activate <-chan struct{}, onClosing, onReady func()) {
 	if noBrowser {
 		<-ctx.Done()
@@ -148,7 +138,7 @@ func runLifecycle(ctx context.Context, url, sessionToken string, stop context.Ca
 		runBrowserTab(ctx, url, stop, activate, onReady)
 		return
 	}
-	cmd := exec.Command(browser.command[0], appWindowArgs(browser, linuxLaunchURL(url), profile)[1:]...)
+	cmd := exec.Command(browser.command[0], appWindowArgs(browser, appLaunchURL(url), profile)[1:]...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil
 	if err := cmd.Start(); err != nil {
@@ -194,23 +184,9 @@ func runLifecycle(ctx context.Context, url, sessionToken string, stop context.Ca
 	}
 }
 
-// The page polls the engine about every 2 seconds while open. After the
-// window process exits, a page that is still polling lives in another browser
-// process; a closed window goes quiet.
-const pageQuietAfterExit = 8 * time.Second
-
-func pageStillOpen(ctx context.Context, exited time.Time, wait time.Duration) bool {
-	select {
-	case <-ctx.Done():
-		return false
-	case <-time.After(wait):
-	}
-	return time.Unix(0, lastPageRequest.Load()).After(exited.Add(wait / 4))
-}
-
 func runBrowserTab(ctx context.Context, url string, stop context.CancelFunc, activate <-chan struct{}, onReady func()) {
 	setAppUIHost("browser-tab")
-	launch := linuxLaunchURL(url)
+	launch := appLaunchURL(url)
 	if err := platform.OpenBrowser(launch); err != nil {
 		platform.NotifyFatal("No browser could be opened. Open this address in a browser on this PC within two minutes: " + launch)
 	}
@@ -227,7 +203,7 @@ func waitBrowserTab(ctx context.Context, url string, activate <-chan struct{}) {
 		case <-ctx.Done():
 			return
 		case <-activate:
-			_ = platform.OpenBrowser(linuxLaunchURL(url))
+			_ = platform.OpenBrowser(appLaunchURL(url))
 		}
 	}
 }

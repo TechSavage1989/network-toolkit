@@ -1,3 +1,13 @@
+# v1.21.73 Beta 1 - Windows without WebView2 opens in Edge or Chrome
+
+v1.21.72 was published and verified: tag at merge commit 05fef55 (PR #203), release run 44063089032 green, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` passing, stable channel still v1.21.34. The comparison gutter check of `editor-workflows108` failed twice on that branch (numbers visible a moment later in both screenshots); it now records 30 frames of the gutter when it fails.
+
+Owner report on v1.21.72: on Windows Server 2022 Datacenter (Edge installed) the app showed "The application window is unavailable" because no WebView2 Runtime was registered; the owner's Server Inventory Configuration Manager opens on the same server because it opens in Edge (WebView2 is only its fallback). Owner decisions: open in Edge/Chrome without WebView2; minimum Windows 10 / Server 2016 (Go 1.21+ does not run on Server 2012; staying on Go 1.20 or a community fork was declined).
+
+What changed (rule in AGENTS.md, "Windows without WebView2"): see CHANGELOG. 
+
+Known limits: in a browser window there are no pop-out Terminal/Text Editor windows, no dragging files out to Explorer, and the close prompts are the browser's (as in the Linux edition). The topmost dialog owner is unverified on a real Windows Server: if Windows still keeps a dialog behind the browser, its taskbar button flashes. A browser profile left open by an earlier run takes the window over, and the page then offers Quit. Not checked on real Windows.
+
 # v1.21.72 Beta 1 - The other side of a comparison follows Find
 
 v1.21.71 was published and verified: tag at merge commit 34f9058 (PR #202), release run 44041838584 green, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` passing, stable channel still v1.21.34.

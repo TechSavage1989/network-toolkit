@@ -1,0 +1,14 @@
+Network Toolkit 1.21.73
+
+## What's New
+
+- Network Toolkit now opens on Windows Server. Windows Server doesn't include the Microsoft Edge WebView2 Runtime, even when Edge is installed, so the app now opens in a Microsoft Edge or Google Chrome window there instead of showing an error.
+- If neither the runtime nor Edge or Chrome is installed, the app explains what's missing and offers a button to Microsoft's download page.
+
+## Additional Details
+
+- In an Edge or Chrome window, Terminal and Text Editor tabs can't pop out into separate windows, and files can't be dragged out to Explorer. Everything else works as before. Installing the WebView2 Runtime (Evergreen Standalone Installer, x64) gives the app its own window again.
+- The window opens with its own private browser profile and a one-time link, so no other program or user can reach your session. Closing it closes Network Toolkit.
+- Vault password and Save As dialogs appear above the browser window.
+- Network Toolkit needs Windows 10 or Windows Server 2016 or later.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

@@ -18,6 +18,9 @@ func runLifecycle(ctx context.Context, url, sessionToken string, stop context.Ca
 		return
 	}
 	defer stop()
+	if appLaunchGate != nil && runBrowserWindow(ctx, url, stop, dataDir, activate, onClosing, onReady) {
+		return
+	}
 	icon := uint16(desktop.IconToolkit)
 	switch title {
 	case appName + " Terminal":

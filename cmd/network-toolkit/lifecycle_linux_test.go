@@ -3,13 +3,11 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
-	"time"
 )
 
 func fakeLookPath(found map[string]string) func(string) (string, error) {
@@ -71,29 +69,6 @@ func TestAppWindowArgsOpenADedicatedAppWindow(t *testing.T) {
 		if strings.Contains(arg, "no-sandbox") || strings.Contains(arg, "disable-web-security") {
 			t.Fatalf("the app window must keep the browser's protections: %v", args)
 		}
-	}
-}
-
-func TestLinuxLaunchURLUsesOneTimeTickets(t *testing.T) {
-	old := linuxLaunchGate
-	t.Cleanup(func() { linuxLaunchGate = old })
-	linuxLaunchGate = newBrowserLaunchGate()
-	a, b := linuxLaunchURL("http://127.0.0.1:4000/"), linuxLaunchURL("http://127.0.0.1:4000/")
-	if !strings.HasPrefix(a, "http://127.0.0.1:4000/launch?ticket=") || a == b {
-		t.Fatalf("launch links are not fresh one-time tickets: %q %q", a, b)
-	}
-}
-
-func TestWindowCloseIsToldApartFromAHandedOffWindow(t *testing.T) {
-	exited := time.Now()
-	lastPageRequest.Store(exited.Add(-time.Second).UnixNano())
-	if pageStillOpen(context.Background(), exited, 40*time.Millisecond) {
-		t.Fatal("a page that went quiet when the window closed was treated as still open")
-	}
-	exited = time.Now()
-	go func() { time.Sleep(25 * time.Millisecond); lastPageRequest.Store(time.Now().UnixNano()) }()
-	if !pageStillOpen(context.Background(), exited, 60*time.Millisecond) {
-		t.Fatal("a page still polling after the browser process exited was treated as closed")
 	}
 }
 

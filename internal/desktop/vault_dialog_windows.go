@@ -221,7 +221,7 @@ func showNativeVaultDialogObserved(ctx context.Context, spec vaultDialogSpec, re
 		// The HTTP backend has no HWND. An invisible native window on this UI
 		// thread owns the modal dialog and is destroyed after the dialog exits.
 		class, title := utf16String("STATIC"), utf16String("Network Toolkit vault owner")
-		owner, _, callErr = wndCreateWindow.Call(0x00000080, uintptr(unsafe.Pointer(class)), uintptr(unsafe.Pointer(title)), 0x80000000,
+		owner, _, callErr = wndCreateWindow.Call(dialogOwnerStyle(), uintptr(unsafe.Pointer(class)), uintptr(unsafe.Pointer(title)), 0x80000000,
 			0, 0, 0, 0, 0, 0, instance, 0)
 		runtime.KeepAlive(class)
 		runtime.KeepAlive(title)
