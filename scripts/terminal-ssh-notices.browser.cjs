@@ -75,7 +75,7 @@ let browser,page;
    const profile=saved.terminalProfiles.find(row=>row.id==='notice-profile');assert.equal(profile.sshAutoContinueNotices,true);assert.equal(profile.folder,'Lab');assert.equal(profile.credentialId,'synthetic-credential');
    // A click scrolls the checkbox itself into view, while its explanatory text
    // can remain below the pinned footer. Capture and verify the entire row.
-   const optionRow=checkbox.locator('..');await optionRow.scrollIntoViewIfNeeded();
+   const optionRow=checkbox.locator('..');await optionRow.evaluate(label=>label.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));
    const optionVisibility=await optionRow.evaluate(label=>{
     const row=label.getBoundingClientRect(),body=label.closest('.modal-body').getBoundingClientRect(),footer=label.closest('.modal').querySelector('.modal-foot').getBoundingClientRect();
     const controls=[label.querySelector('input'),label.querySelector('strong'),label.querySelector('p')].map(element=>{
