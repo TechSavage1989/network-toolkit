@@ -9,11 +9,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+	"unsafe"
 )
 
 // This is a real installed-WebView2/native-window test, not a COM mock or a
@@ -53,6 +56,13 @@ func runNativeBootstrapDocument(t *testing.T, document string, popup bool) {
 	token := strings.Repeat("cd", 32)
 	var validProbe, ready, forbiddenExecuted atomic.Bool
 	var settingsError error // Written on the Run UI thread; read after Run returns.
+	var reportError error
+	var reportVerified atomic.Bool
+	var reportSaves atomic.Int32
+	reportStarted := false
+	reportDone := make(chan struct{})
+	reportPath := filepath.Join(t.TempDir(), "native-security-report.json")
+	const reportBytes = "{\"synthetic\":\"NATIVE_REPORT\"}\n"
 	var unexpectedNavigation, nativeDocumentRequests atomic.Int32
 	var requestMu sync.Mutex
 	var unexpectedRequests []string
@@ -88,7 +98,7 @@ func runNativeBootstrapDocument(t *testing.T, document string, popup bool) {
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
-			if r.URL.Path == "/forbidden-frame" || r.URL.Path == "/forbidden-navigation" {
+			if r.URL.Path == "/forbidden-frame" || r.URL.Path == "/forbidden-navigation" || r.URL.Path == "/forbidden-cross-site-frame" {
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				// Only record whether a capability exists, never its value.
 				_, _ = io.WriteString(w, `<!doctype html><script>fetch('/forbidden-executed?capability='+(typeof window.__networkToolkitNativeSession!=='undefined')).finally(()=>{window.__networkToolkitStartupState=1;});</script>`)
@@ -113,6 +123,7 @@ fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
  ` + popupScript + `
  const frame=document.createElement('iframe');frame.src='/forbidden-frame';document.body.appendChild(frame);
  const exactFrame=document.createElement('iframe');exactFrame.src=location.href;document.body.appendChild(exactFrame);
+ const crossSiteFrame=document.createElement('iframe');const crossSiteURL=new URL('/forbidden-cross-site-frame',location.href);crossSiteURL.hostname='localhost';crossSiteFrame.src=crossSiteURL.href;document.body.appendChild(crossSiteFrame);
  location.href='/forbidden-navigation';
  setTimeout(()=>{location.hash='same-document';},75);
  setTimeout(()=>{location.reload();},150);
@@ -159,18 +170,59 @@ fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
 	err = Run(ctx, Config{Title: "Network Toolkit native security test", URL: server.URL + document, SessionToken: token, DataDir: dataDir, Stop: cancel, OnReady: func() {
 		ready.Store(true)
 		settingsError = checkNativeBrowserSettings(dataDir)
+		if settingsError == nil && document == "/" && !popup {
+			reportError = startNativeSecurityBlobReport(dataDir, reportPath, &reportSaves)
+			if reportError == nil {
+				reportStarted = true
+				go func() {
+					defer close(reportDone)
+					deadline := time.NewTimer(15 * time.Second)
+					defer deadline.Stop()
+					ticker := time.NewTicker(25 * time.Millisecond)
+					defer ticker.Stop()
+					for {
+						if data, err := os.ReadFile(reportPath); err == nil && string(data) == reportBytes {
+							reportVerified.Store(true)
+							cancel()
+							return
+						}
+						select {
+						case <-ctx.Done():
+							return
+						case <-deadline.C:
+							cancel()
+							return
+						case <-ticker.C:
+						}
+					}
+				}()
+				return
+			}
+		}
 		cancel()
 	}, navigationObserver: func(observation nativeNavigationObservation) {
-		t.Logf("native navigation: kind=%s URI=%q blocked=%t cancelHRESULT=%#x readHRESULT=%#x cancelled=%t initialPermit=%t resourceContext=%d contextHRESULT=%#x responseHRESULT=%#x runtime=%q", observation.Kind, observation.URI, observation.Blocked, observation.CancelResult, observation.CancelReadResult, observation.Cancelled, observation.InitialDocumentPermit, observation.ResourceContext, observation.ResourceContextResult, observation.ResponseResult, observation.RuntimeVersion)
+		t.Logf("native navigation: kind=%s URI=%q blocked=%t cancelHRESULT=%#x readHRESULT=%#x cancelled=%t initialPermit=%t resourceContext=%d contextHRESULT=%#x responseHRESULT=%#x protocolMethod=%q protocolSession=%q runtime=%q", observation.Kind, observation.URI, observation.Blocked, observation.CancelResult, observation.CancelReadResult, observation.Cancelled, observation.InitialDocumentPermit, observation.ResourceContext, observation.ResourceContextResult, observation.ResponseResult, observation.ProtocolMethod, observation.ProtocolSession, observation.RuntimeVersion)
 	}})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if reportStarted {
+		<-reportDone
 	}
 	if !ready.Load() || !validProbe.Load() {
 		t.Fatal("installed WebView2 did not initialize through native-only capability")
 	}
 	if settingsError != nil {
 		t.Fatal(settingsError)
+	}
+	if document == "/" && !popup {
+		if reportError != nil || !reportVerified.Load() || reportSaves.Load() != 1 {
+			t.Fatalf("native blob report did not complete through DownloadStarting: saves=%d exactBytes=%t error=%v", reportSaves.Load(), reportVerified.Load(), reportError)
+		}
+		if data, err := os.ReadFile(reportPath); err != nil || string(data) != reportBytes {
+			t.Fatalf("native blob report did not retain exact bytes after host shutdown: %v", err)
+		}
+		t.Log("native blob report completed through DownloadStarting with exact synthetic bytes")
 	}
 	if nativeDocumentRequests.Load() != 1 {
 		t.Fatalf("expected exactly one native document request, got %d", nativeDocumentRequests.Load())
@@ -181,4 +233,33 @@ fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
 		requestMu.Unlock()
 		t.Fatalf("native host permitted another document or frame navigation (forbidden script executed=%t): %v", forbiddenExecuted.Load(), requests)
 	}
+}
+
+// Use the actual native DownloadStarting/deferral path, with only the test
+// host's destination chooser replaced by an already-approved temporary path.
+// This keeps the unattended fixture from opening a Windows Save dialog.
+func startNativeSecurityBlobReport(dataDir, destination string, saves *atomic.Int32) error {
+	var view *WebView
+	wndWindows.Range(func(_, value any) bool {
+		if host, ok := value.(*hostWindow); ok && host.cfg.DataDir == dataDir && host.ready {
+			view = host.view
+		}
+		return true
+	})
+	if view == nil || view.closed || view.core == 0 {
+		return fmt.Errorf("native blob report fixture host was not found")
+	}
+	view.cfg.SaveDownload = func(suggested string) (string, bool) {
+		if suggested != "native-security-report.json" {
+			return "", false
+		}
+		saves.Add(1)
+		return destination, true
+	}
+	script := utf16String(`(()=>{const blob=new Blob(['{"synthetic":"NATIVE_REPORT"}\n'],{type:'application/json'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='native-security-report.json';document.body.appendChild(link);link.click();link.remove();})();`)
+	handler := newCOMHandler(iidScriptCompleted, func(result, value uintptr) uintptr { return hresultOK })
+	hr := comCall(view.core, 29, uintptr(unsafe.Pointer(script)), handler.pointer())
+	handler.release()
+	runtime.KeepAlive(script)
+	return hresultError("Start native synthetic blob report", hr)
 }

@@ -73,6 +73,8 @@ type nativeNavigationObservation struct {
 	ResourceContext       int32
 	ResourceContextResult uint32
 	ResponseResult        uint32
+	ProtocolMethod        string
+	ProtocolSession       string
 	RuntimeVersion        string
 }
 

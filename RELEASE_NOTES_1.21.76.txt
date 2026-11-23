@@ -11,6 +11,7 @@ Network Toolkit 1.21.76
 
 - Shared interaction rules apply to the main app, the separate Text Editor and Terminal programs, and detached windows. Normal keyboard editing, terminal selection and explicit Copy actions remain available.
 - App text-entry and confirmation dialogs preserve the previous dialog's fields and focus. Cancel, Escape, dismissal or replacement cancels the pending action; connection and item identity are checked again before applying an answer.
+- The Windows embedded host strengthens document-navigation restrictions while preserving native report downloads. Cancelled native transfers retain their cancelled status regardless of notification order.
 - Windows fallback and Linux Chromium-family app windows use the same dedicated-profile launch policy. Browser sandboxing, file dialogs, clipboard access, explicit external links and protections for unsaved work remain enabled.
 - An external browser still controls its own window-close confirmation when unsaved work or active sessions need protection. The Linux default-browser fallback also remains subject to that browser's own settings; the Windows embedded host provides the fully app-controlled window.
 - Multiline command review offers raw paste or one line at a time, and disabled sends explain their reason. ESXi output cleanup recognizes standard prompts and echoes while preserving ambiguous response text; the output preview explains why direct terminal selection is unavailable.

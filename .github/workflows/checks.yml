@@ -1647,14 +1647,6 @@ jobs:
           NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
           NTK_LAYOUT_BASELINE110_DIR: ${{ runner.temp }}/ntk-layout-baseline110
         run: node scripts/editor-layout-map.browser.cjs
-      - name: Diagnose editor selection with and without the body selection rule
-        if: success() || failure()
-        timeout-minutes: 15
-        env:
-          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
-          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
-          NTK_LAYOUT_BASELINE110_DIR: ${{ runner.temp }}/ntk-layout-baseline110
-        run: node scripts/editor-layout-map-selection-diagnostic.cjs
       - name: Check ten-second graph density elapsed labels and timeline wheel navigation
         if: success() || failure()
         env:

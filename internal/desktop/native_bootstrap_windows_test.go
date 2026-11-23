@@ -36,7 +36,7 @@ func TestNativeBootstrapWaitsForSuccessfulRegistration(t *testing.T) {
 			pinned.Pin(object)
 			defer pinned.Unpin()
 			var posted []func()
-			w := &WebView{core: uintptr(unsafe.Pointer(object)), cfg: WebViewConfig{
+			w := &WebView{core: uintptr(unsafe.Pointer(object)), documentFetchReady: true, cfg: WebViewConfig{
 				AppURL: "http://127.0.0.1:1234/", SessionToken: strings.Repeat("ab", 32),
 				Post: func(fn func()) bool {
 					if scenario == "dispatch-refused" {
@@ -92,7 +92,7 @@ func TestNativeBootstrapWaitsForSuccessfulRegistration(t *testing.T) {
 				fn()
 			}
 			if scenario == "success" {
-				if navigations != 1 || w.bootstrapScriptID != id || failures != 0 || !w.documentRequestPermit.pending || !w.documentRequestPermit.navigationPending {
+				if navigations != 1 || w.bootstrapScriptID != id || failures != 0 || !w.documentRequestPermit.pending || !w.documentRequestPermit.navigationPending || !w.documentFetchPermit.pending {
 					t.Fatal("successful callback did not release exact navigation")
 				}
 			} else if navigations != 0 {
@@ -102,7 +102,7 @@ func TestNativeBootstrapWaitsForSuccessfulRegistration(t *testing.T) {
 				t.Fatal("asynchronous bootstrap failure not reported")
 			}
 			w.Close()
-			if w.documentRequestPermit.pending || w.documentRequestPermit.navigationPending {
+			if w.documentRequestPermit.pending || w.documentRequestPermit.navigationPending || w.documentFetchPermit.pending {
 				t.Fatal("closed host retained an initial navigation permit")
 			}
 			if scenario == "success" && removals != 1 {
