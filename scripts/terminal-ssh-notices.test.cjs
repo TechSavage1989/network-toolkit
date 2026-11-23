@@ -14,31 +14,55 @@ function harness(prompt={id:'notice',kind:'keyboard-interactive',title:'SSH auth
  c.window=c;vm.createContext(c);
  vm.runInContext(html.match(/^const esc=.*$/m)[0]+'\nthis.escapeText=esc;',c);
  vm.runInContext(html.match(/^const TERMINAL_SAFE_FIELDS=.*$/m)[0],c);
- for(const name of ['safeTerminalConfig','terminalConnectPayload','terminalTransferConfig','terminalConfigForDevice','openSeparateTerminal','respondTerminalPrompt'])vm.runInContext(functionSource(name),c);
+ for(const name of ['safeTerminalConfig','terminalConnectPayload','terminalTransferConfig','terminalConfigForDevice','openSeparateTerminal','respondTerminalPrompt','handleExtendedChange'])vm.runInContext(functionSource(name),c);
  vm.runInContext(html.slice(html.indexOf('function renderTerminalPrompt(){'),html.indexOf('\nasync function respondTerminalPrompt(')),c);
  return {c,entry,elements,requests};
 }
-test('SSH notices are an explicit boolean preference, off for old profiles and all other protocols',()=>{
+test('SSH notices default on only when absent and preserve explicit opt-outs and malformed values',()=>{
  const {c}=harness();
- assert.equal(c.safeTerminalConfig().sshAutoContinueNotices,false);
- for(const value of [undefined,false,'true','false',1,{},[]])assert.equal(c.safeTerminalConfig({sshAutoContinueNotices:value}).sshAutoContinueNotices,false);
+ assert.equal(c.safeTerminalConfig().sshAutoContinueNotices,true);
+ assert.equal(c.safeTerminalConfig({type:'ssh',host:'old-profile.test'}).sshAutoContinueNotices,true);
+ for(const value of [undefined,null,false,'true','false',0,1,{},[]])assert.equal(c.safeTerminalConfig({sshAutoContinueNotices:value}).sshAutoContinueNotices,false);
  assert.equal(c.safeTerminalConfig({type:'ssh',sshAutoContinueNotices:true}).sshAutoContinueNotices,true);
+ assert.equal(c.terminalConnectPayload({type:'ssh',host:'new.test'}).sshAutoContinueNotices,true);
+ const disabled=JSON.parse(JSON.stringify(c.terminalConnectPayload({type:'ssh',host:'old.test',sshAutoContinueNotices:false})));
+ assert.equal(Object.hasOwn(disabled,'sshAutoContinueNotices'),true);assert.equal(disabled.sshAutoContinueNotices,false);
+ assert.equal(c.safeTerminalConfig(disabled).sshAutoContinueNotices,false);
  for(const type of ['telnet','serial','cmd','powershell']){
+  assert.equal(c.safeTerminalConfig({type}).sshAutoContinueNotices,false);
   assert.equal(c.safeTerminalConfig({type,sshAutoContinueNotices:true}).sshAutoContinueNotices,false);
   assert.equal(Object.hasOwn(c.terminalConnectPayload({type,sshAutoContinueNotices:true}),'sshAutoContinueNotices'),false);
  }
 });
 test('separate terminal presets preserve the notice preference without exporting credentials or secrets',()=>{
- const {c}=harness(),config=c.terminalTransferConfig({type:'ssh',host:'lab.test',sshAutoContinueNotices:true,credentialId:'protected-id',password:'secret-canary',privateKey:'key-canary'});
- assert.equal(config.sshAutoContinueNotices,true);assert.equal(config.host,'lab.test');
- for(const name of ['credentialId','password','privateKey','passphrase'])assert.equal(Object.hasOwn(config,name),false);
- assert(!JSON.stringify(config).includes('canary'));
+ for(const enabled of [true,false]){
+  const {c}=harness(),config=JSON.parse(JSON.stringify(c.terminalTransferConfig({type:'ssh',host:'lab.test',sshAutoContinueNotices:enabled,credentialId:'protected-id',password:'secret-canary',privateKey:'key-canary'})));
+  assert.equal(config.sshAutoContinueNotices,enabled);assert.equal(config.host,'lab.test');
+  for(const name of ['credentialId','password','privateKey','passphrase'])assert.equal(Object.hasOwn(config,name),false);
+  assert(!JSON.stringify(config).includes('canary'));
+ }
 });
-test('an unrelated device connection does not inherit another server notice preference',()=>{
+test('new device connections default on while saved profile opt-outs remain disabled',()=>{
  const {c}=harness();
- assert.equal(c.terminalConfigForDevice({host:'new.test',sourceTool:'scan'},'ssh').sshAutoContinueNotices,false);
+ c.state.terminalConnection.sshAutoContinueNotices=false;
+ assert.equal(c.terminalConfigForDevice({host:'new.test',sourceTool:'scan'},'ssh').sshAutoContinueNotices,true);
+ assert.equal(c.terminalConfigForDevice({host:'new.test',sourceTool:'scan',sshAutoContinueNotices:false},'ssh').sshAutoContinueNotices,true);
+ assert.equal(c.terminalConfigForDevice({host:'old-profile.test',sourceTool:'terminal-profile'},'ssh').sshAutoContinueNotices,true);
  assert.equal(c.terminalConfigForDevice({host:'new.test',sourceTool:'terminal-profile',sshAutoContinueNotices:true},'ssh').sshAutoContinueNotices,true);
+ for(const sourceTool of ['terminal','terminal-profile'])for(const value of [false,null,undefined,'true',1]){
+  assert.equal(c.terminalConfigForDevice({host:'old.test',sourceTool,sshAutoContinueNotices:value},'ssh').sshAutoContinueNotices,false);
+ }
  assert.equal(c.terminalConfigForDevice({host:'new.test',sourceTool:'terminal-profile',sshAutoContinueNotices:true},'telnet').sshAutoContinueNotices,false);
+});
+test('switching a non-SSH connection to SSH applies its default while an unchanged SSH opt-out is retained',()=>{
+ for(const [before,after,enabled] of [['telnet','ssh',true],['serial','ssh',true],['cmd','ssh',true],['powershell','ssh',true],['ssh','ssh',false],['ssh','telnet',false]]){
+  const {c}=harness();c.terminalDraft=c.safeTerminalConfig({type:before,sshAutoContinueNotices:false});
+  c.handleListChange=()=>false;c.captureTerminalConnection=()=>{c.terminalDraft=c.safeTerminalConfig({...c.terminalDraft,type:after});};
+  c.saveState=()=>{};c.clearTerminalSecrets=()=>{};c.renderTerminalConnectFields=()=>{};
+  assert.equal(c.handleExtendedChange({target:{id:'con-type',dataset:{terminalField:'type'}}}),true);
+  assert.equal(c.terminalDraft.sshAutoContinueNotices,enabled,before+' to '+after);
+  assert.equal(c.state.terminalConnection.sshAutoContinueNotices,enabled);
+ }
 });
 test('separate-window controls are re-enabled after both successful and failed launches',async()=>{
  for(const rejected of [false,true]){

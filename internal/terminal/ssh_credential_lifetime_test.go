@@ -14,8 +14,8 @@ import (
 func TestExpectedHostFingerprintCannotBeSuppliedOrExposedThroughJSON(t *testing.T) {
 	for _, name := range []string{"expectedHostFingerprint", "ExpectedHostFingerprint", "expectedhostfingerprint"} {
 		var req ConnectRequest
-		if err := json.Unmarshal([]byte(`{"`+name+`":"SHA256:client-controlled"}`), &req); err != nil {
-			t.Fatal(err)
+		if err := json.Unmarshal([]byte(`{"`+name+`":"SHA256:client-controlled"}`), &req); err == nil {
+			t.Fatal("request decoding accepted a client-supplied backend host fingerprint")
 		}
 		if req.ExpectedHostFingerprint != "" {
 			t.Fatal("JSON supplied a backend-only host fingerprint")

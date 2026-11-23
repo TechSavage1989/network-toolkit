@@ -1,0 +1,12 @@
+Network Toolkit 1.21.79
+
+## What's New
+
+- SSH sign-in notices that ask for no answer now continue automatically by default. You can turn this off in the connection settings.
+
+## Additional Details
+
+- New SSH connections and profiles without a saved choice enable Automatically continue through SSH notices. Existing saved off settings remain off, including profiles saved with the earlier default.
+- Saved choices are retained through profile editing, recent connections, reconnect, separate Terminal windows, detached workspaces and shared SFTP profiles.
+- Available server notice text remains visible as safe terminal output. Password and MFA questions, password changes, SSH host-key approval and the saved-password limits keep their existing behavior.
+- Stable channel. Existing saved connections, credentials, settings and update-consent requirements are preserved.

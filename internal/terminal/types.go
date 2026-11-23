@@ -18,7 +18,7 @@ type ConnectRequest struct {
 	CredentialID           string `json:"credentialId,omitempty"`
 	LineEnding             string `json:"lineEnding,omitempty"`
 	SSHCompatibility       string `json:"sshCompatibility,omitempty"`
-	SSHAutoContinueNotices bool   `json:"sshAutoContinueNotices,omitempty"`
+	SSHAutoContinueNotices bool   `json:"sshAutoContinueNotices"`
 	Host                   string `json:"host,omitempty"`
 	Port                   int    `json:"port,omitempty"`
 	Username               string `json:"username,omitempty"`
@@ -60,7 +60,7 @@ type SessionInfo struct {
 	Port                   int     `json:"port,omitempty"`
 	Username               string  `json:"username,omitempty"`
 	SSHCompatibility       string  `json:"sshCompatibility,omitempty"`
-	SSHAutoContinueNotices bool    `json:"sshAutoContinueNotices,omitempty"`
+	SSHAutoContinueNotices bool    `json:"sshAutoContinueNotices"`
 	SerialPort             string  `json:"serialPort,omitempty"`
 	State                  string  `json:"state"`
 	CreatedAt              string  `json:"createdAt"`

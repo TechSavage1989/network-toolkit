@@ -52,7 +52,7 @@ type terminalWindowPreset struct {
 	Username               string `json:"username"`
 	AuthMethod             string `json:"authMethod"`
 	SSHCompatibility       string `json:"sshCompatibility"`
-	SSHAutoContinueNotices bool   `json:"sshAutoContinueNotices,omitempty"`
+	SSHAutoContinueNotices bool   `json:"sshAutoContinueNotices"`
 	TimeoutMs              int    `json:"timeoutMs"`
 	SerialPort             string `json:"serialPort"`
 	BaudRate               int    `json:"baudRate"`

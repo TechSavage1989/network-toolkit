@@ -58,8 +58,8 @@ func TestExplicitDisplayNameProvenance128(t *testing.T) {
 		t.Fatal(err)
 	}
 	var decoded ConnectRequest
-	if err := json.Unmarshal([]byte(`{"type":"ssh","DisplayName":"injected","DisplayNameExplicit":true,"manualName":"injected","nameExplicit":true,"labelSource":"manual"}`), &decoded); err != nil {
-		t.Fatal(err)
+	if err := json.Unmarshal([]byte(`{"type":"ssh","DisplayName":"injected","DisplayNameExplicit":true,"manualName":"injected","nameExplicit":true,"labelSource":"manual"}`), &decoded); err == nil {
+		t.Fatal("request decoding accepted client-supplied backend provenance")
 	}
 	if decoded.DisplayName != "" || decoded.DisplayNameExplicit {
 		t.Fatal("client supplied backend-only provenance")

@@ -23,13 +23,15 @@ import (
 // and offers keyboard-interactive authentication without the password method.
 func TestCredentialKeyboardInteractiveSavedPasswordAndServerPin(t *testing.T) {
 	for _, test := range []struct {
-		name     string
-		wrongPin bool
-		notice   bool
+		name       string
+		wrongPin   bool
+		notice     bool
+		omitNotice bool
 	}{
 		{name: "approved-saved-password"},
 		{name: "different-server-fingerprint", wrongPin: true},
 		{name: "saved-password-followed-by-notice", notice: true},
+		{name: "saved-password-followed-by-default-notice", notice: true, omitNotice: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			const secret = "SYNTHETIC_SAVED_KEYBOARD_PASSWORD_77"
@@ -131,11 +133,27 @@ func TestCredentialKeyboardInteractiveSavedPasswordAndServerPin(t *testing.T) {
 				t.Fatal("synthetic saved password was not protected before connection")
 			}
 			profile := map[string]any{"id": "synthetic-keyboard-profile", "name": "Synthetic SSH", "type": "ssh", "host": "127.0.0.1", "port": port, "username": "operator", "authMethod": "password", "credentialId": item.ID, "sshAutoContinueNotices": test.notice}
+			if test.omitNotice {
+				delete(profile, "sshAutoContinueNotices")
+			}
 			if response := viewTestRequest(a, a.token, http.MethodPut, "/api/state", map[string]any{"terminalProfiles": []any{profile}}, nil); response.Code != http.StatusOK {
 				t.Fatalf("saved profile setup status %d", response.Code)
 			}
 			request := terminal.ConnectRequest{Type: "ssh", Host: "127.0.0.1", Port: port, Username: "operator", AuthMethod: "password", CredentialID: item.ID, ProfileID: "synthetic-keyboard-profile", SSHAutoContinueNotices: test.notice, TimeoutMs: 3000}
-			response := viewTestRequest(a, a.token, http.MethodPost, "/api/terminals", request, nil)
+			var payload any = request
+			if test.omitNotice {
+				encoded, err := json.Marshal(request)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var omitted map[string]any
+				if err := json.Unmarshal(encoded, &omitted); err != nil {
+					t.Fatal(err)
+				}
+				delete(omitted, "sshAutoContinueNotices")
+				payload = omitted
+			}
+			response := viewTestRequest(a, a.token, http.MethodPost, "/api/terminals", payload, nil)
 			if response.Code != http.StatusCreated || bytes.Contains(response.Body.Bytes(), []byte(secret)) {
 				t.Fatalf("saved-credential connection status %d, or secret in response", response.Code)
 			}

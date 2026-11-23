@@ -29,15 +29,51 @@ func TestSSHNoticePreferenceIsSSHOnly(t *testing.T) {
 			}
 		}
 	}
-	for _, raw := range []string{`{}`, `{"sshAutoContinueNotices":false}`} {
+	for _, test := range []struct {
+		raw  string
+		want bool
+	}{
+		{`{"type":"ssh"}`, true},
+		{`{"type":" SSH "}`, true},
+		{`{"type":"ssh","sshAutoContinueNotices":false}`, false},
+		{`{"type":"ssh","SSHAutoContinueNotices":false}`, false},
+		{`{"type":"ssh","sshAutoContinueNotices":true,"SSHAutoContinueNotices":false}`, false},
+		{`{"type":"ssh","SSHAutoContinueNotices":false,"sshAutoContinueNotices":true}`, true},
+		{`{"type":"telnet"}`, false},
+		{`{"type":"telnet","sshAutoContinueNotices":true}`, false},
+		{`{}`, false},
+	} {
 		var req ConnectRequest
-		if err := json.Unmarshal([]byte(raw), &req); err != nil || req.SSHAutoContinueNotices {
-			t.Fatalf("missing/disabled notice preference enabled automatic continuation: %v", err)
+		if err := json.Unmarshal([]byte(test.raw), &req); err != nil || req.SSHAutoContinueNotices != test.want {
+			t.Fatalf("notice default for %s: value=%v, want=%v, error=%v", test.raw, req.SSHAutoContinueNotices, test.want, err)
 		}
 	}
-	var req ConnectRequest
-	if err := json.Unmarshal([]byte(`{"sshAutoContinueNotices":"true"}`), &req); err == nil {
-		t.Fatal("request accepted a non-boolean notice preference")
+	for _, raw := range []string{`{"type":"ssh","sshAutoContinueNotices":"true"}`, `{"type":"ssh","sshAutoContinueNotices":null}`, `{"type":"ssh","sshAutoContinueNotices":1}`, `{"type":"ssh","sshAutoContinueNotices":"true","SSHAutoContinueNotices":false}`, `{"type":"ssh","unknown":true}`, `{"type":"ssh","expectedHostFingerprint":"forged"}`} {
+		var req ConnectRequest
+		if err := json.Unmarshal([]byte(raw), &req); err == nil {
+			t.Fatalf("request accepted a malformed preference or unknown field: %s", raw)
+		}
+	}
+}
+
+func TestSSHNoticeDisabledJSONRoundTrips(t *testing.T) {
+	for _, value := range []any{ConnectRequest{Type: "ssh"}, SessionInfo{Type: "ssh"}} {
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var fields map[string]any
+		if err := json.Unmarshal(encoded, &fields); err != nil || fields["sshAutoContinueNotices"] != false {
+			t.Fatal("disabled notice preference was omitted from connection/session JSON")
+		}
+	}
+	encoded, err := json.Marshal(ConnectRequest{Type: "ssh", Host: "notice.example", SSHAutoContinueNotices: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var restored ConnectRequest
+	if err := json.Unmarshal(encoded, &restored); err != nil || restored.SSHAutoContinueNotices || restored.Host != "notice.example" {
+		t.Fatal("connection JSON round trip changed an explicit notice opt-out")
 	}
 }
 

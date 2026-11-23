@@ -278,12 +278,10 @@ func safeTerminalProfile(value any, named bool) map[string]any {
 	// Unknown/imported values keep the modern policy and other transports ignore it.
 	clean["sshCompatibility"] = "modern"
 	kind, _ := profile["type"].(string)
-	// This opt-in acknowledges only SSH notices with no answer fields.
-	// Imported values must be actual booleans; missing and non-SSH values stay off.
+	// Missing SSH preferences adopt the default. Explicit false is retained;
+	// malformed imported values remain off, and other transports ignore it.
 	if kind == "" || kind == "ssh" {
-		if automatic, ok := profile["sshAutoContinueNotices"].(bool); ok {
-			clean["sshAutoContinueNotices"] = automatic
-		}
+		clean["sshAutoContinueNotices"] = savedSSHNoticePreference(profile)
 	}
 	if kind == "cmd" || kind == "powershell" {
 		if directory, ok := profile["workingDirectory"].(string); ok && len(directory) <= 32760 && !strings.ContainsRune(directory, 0) {

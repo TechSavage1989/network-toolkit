@@ -1,9 +1,11 @@
 'use strict';
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),{test}=require('node:test');
 const source=fs.readFileSync(require.resolve('../web/assets/remote-browser.js'),'utf8');
-function harness({authMethod='password',sshAutoContinueNotices=false}={}){
- const profile={id:'router-one',name:'Lab Router',type:'ssh',host:'192.0.2.44',port:2202,username:'operator',authMethod,sshAutoContinueNotices,folder:'Lab',credentialId:'win-credential-id'};
- const state={terminalProfiles:[profile],remoteBrowserSettings:{}};
+function harness(options={}){
+ const {authMethod='password'}=options;
+ const profile={id:'router-one',name:'Lab Router',type:'ssh',host:'192.0.2.44',port:2202,username:'operator',authMethod,folder:'Lab',credentialId:'win-credential-id'};
+ if(Object.hasOwn(options,'sshAutoContinueNotices'))profile.sshAutoContinueNotices=options.sshAutoContinueNotices;
+ const state={terminalProfiles:[profile],remoteBrowserSettings:options.remoteBrowserSettings||{}};
  const outgoing=[],saved=[];
  const document={addEventListener(){},getElementById(){return null;},querySelector(){return null;}};
  const root={state,document,Map,Set,Date,Math,JSON,Number,String,console,esc:String,icon:()=>'',saveState:()=>saved.push(JSON.stringify(state)),
@@ -38,21 +40,38 @@ test('changed SSH host and port invalidate a previously selected saved profile b
 });
 
 test('SSH notice preference survives shared SFTP profile load, request, and edit without changing its credential link',async()=>{
- const h=harness({sshAutoContinueNotices:true});await h.api.loadProfile('ssh',h.profile.id);
+ for(const enabled of [true,false]){
+  const h=harness({sshAutoContinueNotices:enabled});await h.api.loadProfile('ssh',h.profile.id);
+  assert.equal(h.api.configurations.ssh.sshAutoContinueNotices,enabled);
+  assert.equal(h.state.remoteBrowserSettings.ssh.sshAutoContinueNotices,enabled);
+  await h.api.request('ssh','connect',{path:'.'});
+  assert.equal(h.outgoing.at(-1).body.sshAutoContinueNotices,enabled);
+  await h.api.saveSharedSSHProfile('Renamed lab router');
+  const profile=h.state.terminalProfiles.find(row=>row.id===h.profile.id);
+  assert.equal(profile.sshAutoContinueNotices,enabled);assert.equal(profile.credentialId,'win-credential-id');assert.equal(profile.folder,'Lab');
+  await h.api.loadProfile('ssh',profile.id);assert.equal(h.api.configurations.ssh.sshAutoContinueNotices,enabled);
+ }
+});
+test('new SFTP connections and saved profiles without a notice setting default on',async()=>{
+ const h=harness();
+ assert.equal(h.api.configurations.ssh.sshAutoContinueNotices,true);
+ assert.equal((await h.api.requestPayload('ssh','connect')).sshAutoContinueNotices,true);
+ await h.api.loadProfile('ssh',h.profile.id);
  assert.equal(h.api.configurations.ssh.sshAutoContinueNotices,true);
  assert.equal(h.state.remoteBrowserSettings.ssh.sshAutoContinueNotices,true);
- await h.api.request('ssh','connect',{path:'.'});
- assert.equal(h.outgoing.at(-1).body.sshAutoContinueNotices,true);
- await h.api.saveSharedSSHProfile('Renamed lab router');
- const profile=h.state.terminalProfiles.find(row=>row.id===h.profile.id);
- assert.equal(profile.sshAutoContinueNotices,true);assert.equal(profile.credentialId,'win-credential-id');assert.equal(profile.folder,'Lab');
- await h.api.loadProfile('ssh',profile.id);assert.equal(h.api.configurations.ssh.sshAutoContinueNotices,true);
+ assert.equal((await h.api.requestPayload('ssh','connect')).sshAutoContinueNotices,true);
 });
-test('SFTP treats absent or malformed notice preferences as off and never includes them in FTP requests',async()=>{
- for(const value of [undefined,false,'true',1,{}]){
+test('SFTP retains disabled or malformed notice preferences as off and excludes them from FTP requests',async()=>{
+ for(const value of [undefined,null,false,'true','false',0,1,{},[]]){
   const h=harness({sshAutoContinueNotices:value});await h.api.loadProfile('ssh',h.profile.id);
   assert.equal(h.api.configurations.ssh.sshAutoContinueNotices,false);
   assert.equal((await h.api.requestPayload('ssh','connect')).sshAutoContinueNotices,false);
   assert.equal(Object.hasOwn(await h.api.requestPayload('ftp','connect'),'sshAutoContinueNotices'),false);
+ }
+});
+test('remembered SFTP settings distinguish a missing default from explicit false and malformed values',()=>{
+ for(const saved of [{host:'192.0.2.44'},{sshAutoContinueNotices:true},{sshAutoContinueNotices:false},{sshAutoContinueNotices:null},{sshAutoContinueNotices:'true'}]){
+  const h=harness({remoteBrowserSettings:{ssh:saved}});h.api.get('ssh').saved=false;h.api.render('ssh');
+  assert.equal(h.api.configurations.ssh.sshAutoContinueNotices,!Object.hasOwn(saved,'sshAutoContinueNotices')||saved.sshAutoContinueNotices===true);
  }
 });

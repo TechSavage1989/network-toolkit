@@ -54,6 +54,8 @@ type remoteBrowserRequest struct {
 	BOM                    bool   `json:"bom,omitempty"`
 	Encoding               string `json:"encoding,omitempty"`
 	Permissions            string `json:"permissions,omitempty"`
+
+	sshNoticePreferencePresent bool
 }
 
 func (r remoteBrowserRequest) opts() map[string]any {
@@ -210,7 +212,7 @@ func (a *application) handleRemoteBrowser(w http.ResponseWriter, request *http.R
 	if r.SessionID != "" {
 		// Terminal-owned SSH connections have already authenticated and
 		// verified the server key. Reject mixed or forged credential fields.
-		if r.Protocol == "ftp" || r.CredentialID != "" || r.Action == "fingerprint" || r.Host != "" || r.Username != "" || r.Password != "" || r.KeyPath != "" || r.PrivateKey != "" || r.Passphrase != "" || r.Fingerprint != "" || r.SSHAutoContinueNotices {
+		if r.Protocol == "ftp" || r.CredentialID != "" || r.Action == "fingerprint" || r.Host != "" || r.Username != "" || r.Password != "" || r.KeyPath != "" || r.PrivateKey != "" || r.Passphrase != "" || r.Fingerprint != "" || r.SSHAutoContinueNotices || r.sshNoticePreferencePresent {
 			jsonError(w, 400, "Terminal session mode requires only a session ID and file operation")
 			return
 		}
