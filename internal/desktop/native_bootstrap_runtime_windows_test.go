@@ -57,6 +57,7 @@ func runNativeBootstrapDocument(t *testing.T, document string, popup bool) {
 	var validProbe, ready, forbiddenExecuted atomic.Bool
 	var settingsError error // Written on the Run UI thread; read after Run returns.
 	var reportError error
+	var report *nativeSecurityBlobReport
 	var reportVerified atomic.Bool
 	var reportSaves atomic.Int32
 	reportStarted := false
@@ -171,9 +172,10 @@ fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
 		ready.Store(true)
 		settingsError = checkNativeBrowserSettings(dataDir)
 		if settingsError == nil && document == "/" && !popup {
-			reportError = startNativeSecurityBlobReport(dataDir, reportPath, &reportSaves)
+			report, reportError = startNativeSecurityBlobReport(dataDir, reportPath, &reportSaves)
 			if reportError == nil {
 				reportStarted = true
+				post := report.view.cfg.Post
 				go func() {
 					defer close(reportDone)
 					deadline := time.NewTimer(15 * time.Second)
@@ -181,8 +183,39 @@ fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
 					ticker := time.NewTicker(25 * time.Millisecond)
 					defer ticker.Stop()
 					for {
-						if data, err := os.ReadFile(reportPath); err == nil && string(data) == reportBytes {
-							reportVerified.Store(true)
+						status := make(chan struct {
+							state int32
+							err   error
+						}, 1)
+						if !post(func() {
+							state, err := report.state()
+							status <- struct {
+								state int32
+								err   error
+							}{state, err}
+						}) {
+							reportError = fmt.Errorf("native blob report state dispatch was refused")
+							cancel()
+							return
+						}
+						select {
+						case current := <-status:
+							if current.err != nil || current.state == 1 {
+								reportError = fmt.Errorf("native blob report did not complete: state=%d error=%v", current.state, current.err)
+								cancel()
+								return
+							}
+							if current.state == 2 {
+								if data, err := os.ReadFile(reportPath); err == nil && string(data) == reportBytes {
+									reportVerified.Store(true)
+									cancel()
+									return
+								}
+							}
+						case <-ctx.Done():
+							return
+						case <-deadline.C:
+							reportError = fmt.Errorf("native blob report completion timed out")
 							cancel()
 							return
 						}
@@ -190,6 +223,7 @@ fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
 						case <-ctx.Done():
 							return
 						case <-deadline.C:
+							reportError = fmt.Errorf("native blob report completion timed out")
 							cancel()
 							return
 						case <-ticker.C:
@@ -200,6 +234,10 @@ fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
 			}
 		}
 		cancel()
+	}, OnClosing: func() {
+		if report != nil {
+			report.close()
+		}
 	}, navigationObserver: func(observation nativeNavigationObservation) {
 		t.Logf("native navigation: kind=%s URI=%q blocked=%t cancelHRESULT=%#x readHRESULT=%#x cancelled=%t initialPermit=%t resourceContext=%d contextHRESULT=%#x responseHRESULT=%#x protocolMethod=%q protocolSession=%q runtime=%q", observation.Kind, observation.URI, observation.Blocked, observation.CancelResult, observation.CancelReadResult, observation.Cancelled, observation.InitialDocumentPermit, observation.ResourceContext, observation.ResourceContextResult, observation.ResponseResult, observation.ProtocolMethod, observation.ProtocolSession, observation.RuntimeVersion)
 	}})
@@ -222,7 +260,7 @@ fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
 		if data, err := os.ReadFile(reportPath); err != nil || string(data) != reportBytes {
 			t.Fatalf("native blob report did not retain exact bytes after host shutdown: %v", err)
 		}
-		t.Log("native blob report completed through DownloadStarting with exact synthetic bytes")
+		t.Log("native blob report reached DownloadState Completed and retained exact synthetic bytes after host shutdown")
 	}
 	if nativeDocumentRequests.Load() != 1 {
 		t.Fatalf("expected exactly one native document request, got %d", nativeDocumentRequests.Load())
@@ -238,7 +276,7 @@ fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
 // Use the actual native DownloadStarting/deferral path, with only the test
 // host's destination chooser replaced by an already-approved temporary path.
 // This keeps the unattended fixture from opening a Windows Save dialog.
-func startNativeSecurityBlobReport(dataDir, destination string, saves *atomic.Int32) error {
+func startNativeSecurityBlobReport(dataDir, destination string, saves *atomic.Int32) (*nativeSecurityBlobReport, error) {
 	var view *WebView
 	wndWindows.Range(func(_, value any) bool {
 		if host, ok := value.(*hostWindow); ok && host.cfg.DataDir == dataDir && host.ready {
@@ -247,11 +285,19 @@ func startNativeSecurityBlobReport(dataDir, destination string, saves *atomic.In
 		return true
 	})
 	if view == nil || view.closed || view.core == 0 {
-		return fmt.Errorf("native blob report fixture host was not found")
+		return nil, fmt.Errorf("native blob report fixture host was not found")
 	}
+	report := &nativeSecurityBlobReport{view: view}
 	view.cfg.SaveDownload = func(suggested string) (string, bool) {
-		if suggested != "native-security-report.json" {
+		if report.closed || suggested != "native-security-report.json" || report.operation != 0 || len(view.pendingDownloads) != 1 {
 			return "", false
+		}
+		// The chooser runs on the UI thread while DownloadStarting still owns
+		// this sole synthetic operation. Keep a separate reference because the
+		// production StateChanged callback releases its own on completion.
+		for pending := range view.pendingDownloads {
+			report.operation = pending.operation
+			comAddRef(report.operation)
 		}
 		saves.Add(1)
 		return destination, true
@@ -261,5 +307,33 @@ func startNativeSecurityBlobReport(dataDir, destination string, saves *atomic.In
 	hr := comCall(view.core, 29, uintptr(unsafe.Pointer(script)), handler.pointer())
 	handler.release()
 	runtime.KeepAlive(script)
-	return hresultError("Start native synthetic blob report", hr)
+	return report, hresultError("Start native synthetic blob report", hr)
+}
+
+// All fields and COM access remain on the native UI thread. The file polling
+// goroutine posts state reads, and OnClosing releases the retained operation.
+type nativeSecurityBlobReport struct {
+	view      *WebView
+	operation uintptr
+	closed    bool
+}
+
+func (r *nativeSecurityBlobReport) state() (int32, error) {
+	if r.closed || r.view.closed {
+		return -1, fmt.Errorf("native blob report host closed before completion")
+	}
+	if r.operation == 0 {
+		return 0, nil
+	}
+	state := int32(-1)
+	err := hresultError("Read native synthetic download state", comCall(r.operation, 16, uintptr(unsafe.Pointer(&state))))
+	return state, err
+}
+
+func (r *nativeSecurityBlobReport) close() {
+	if !r.closed {
+		r.closed = true
+		comRelease(r.operation)
+		r.operation = 0
+	}
 }
