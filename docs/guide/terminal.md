@@ -4,6 +4,14 @@ Open Terminal to connect to a permitted device using SSH, Telnet or serial acces
 
 Saved and recent connections, saved credentials, trusted SSH host keys, macros and all Terminal settings are the same in the main window's Terminal page and in the separate **Network Toolkit Terminal** window, and a change in one appears in the other within a few seconds. See [One set of settings and saved data for all apps](settings-and-updates.md#one-set-of-settings-and-saved-data-for-all-apps).
 
+## SSH passwords and interactive prompts
+
+Choose **Password** authentication and select a saved credential or enter the login password. If the SSH server uses a standard interactive password prompt, including on ESXi, Network Toolkit can use that same password without asking you to type it again.
+
+Only the first clear, hidden password-only challenge is eligible. The password is supplied automatically at most once during the connection attempt, across ordinary password authentication and interactive challenges. If the server then sends another interactive challenge, the existing prompt lets you respond manually. MFA codes, password changes, unfamiliar instructions, multiple questions and later challenges stay manual; an earlier notice or other challenge also leaves subsequent questions for you to answer.
+
+**Keyboard-interactive** connections without a linked saved password keep questions manual. When a saved password is linked, the connection uses Password authentication as before. SSH host-key verification still applies, and the saved password is used without displaying it.
+
 ## Sessions and panes
 You can work with multiple tabs and split panes. Open another tab with the **+** at the end of the tab strip (or "Open a new terminal tab" in command search). The sidebar contains Saved, Recent, Files and Macros tabs; click the selected tab to hide the sidebar and any tab to show it again, and use ⇄ at the bottom of its icon strip to move it to the other side; tabs and panes may have context menus and drag interactions. Keep sessions open while you navigate other tools.
 

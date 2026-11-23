@@ -1,0 +1,14 @@
+Network Toolkit 1.21.77
+
+## What's New
+
+- Terminal and SFTP connections can now reuse a saved login password for standard SSH password prompts, including those used by ESXi.
+
+## Additional Details
+
+- With Password authentication selected, the first clear keyboard-interactive password challenge can use the supplied or saved login password. It must contain one hidden Password field and ordinary password-login context.
+- The password is sent automatically at most once per connection attempt, across ordinary password and keyboard-interactive authentication. Rejection or partial authentication never causes an automatic resend.
+- In Terminal, MFA codes, password changes, multiple fields, visible or unfamiliar prompts, and later challenges continue through the existing manual prompt. Keyboard-interactive connections without a linked saved password remain manual.
+- Direct SFTP connections use the same password handling. When a server needs manual answers, File Transfer keeps its existing guidance to open a Terminal connection and use it for SFTP.
+- Host-key verification, cancellation, credential-vault protection and saved-profile storage are preserved. Saved passwords remain in the backend and are not returned to the browser to answer a challenge.
+- Published on the stable channel. Existing saved connections, credentials, settings and update-consent requirements are preserved.
