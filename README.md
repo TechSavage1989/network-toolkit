@@ -75,6 +75,8 @@
 
 ## Download
 
+**Latest beta: 1.21.75** improves Select output and Copy output for VMware ESXi and explains the Select output preview. Available on the [releases page](https://github.com/TechSavage1989/network-toolkit/releases).
+
 [Download the latest stable release](https://github.com/TechSavage1989/network-toolkit/releases/latest). It provides the portable package **`Network_Toolkit_<version>_Portable.zip`**, the executable **`Network_Toolkit.exe`** and **`SHA256SUMS`** for checking the files.
 
 The [releases page](https://github.com/TechSavage1989/network-toolkit/releases) also offers **`Network_Toolkit_<version>_Windows_x64_Setup.exe`**. Choose an install folder, an optional desktop shortcut and an optional **Edit with Network Toolkit Text Editor** entry in the Explorer right-click menu. Setup adds separate Start menu shortcuts for Toolkit, Text Editor and Terminal; the Text Editor and Terminal apps can send text to each other.

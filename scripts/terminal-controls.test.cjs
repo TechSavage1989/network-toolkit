@@ -5,7 +5,8 @@ function appFunction(name){const tail=html.slice(html.search(new RegExp('^functi
 function harness(options={}){
  let saves=0,fits=0;let entry,clipboard='',inputBlocked=false;const window={Terminal,addEventListener(){},NetworkToolkitTerminalCopy:{suppressesInput:()=>inputBlocked},NetworkToolkitTerminalInteraction:{preferences:()=>({}),suppressesInput:()=>false,copyValue:async text=>{clipboard=text;return true;},noteInput:(e,data)=>window.NetworkToolkitTerminalExtras.noteManualInput(e,data)}};
  const c={window,root:window,TextEncoder,TextDecoder,Date,Math,state:{terminalFontSize:13},saveState(){saves++;},scheduleTerminalFit(){fits++;},TERMINAL_ONLY:options.terminalOnly===true,icon:()=>'',esc:String,setTimeout:()=>0,clearTimeout(){},toast(){},terminalEntryAcceptsInput:e=>!!e&&e.info.state==='connected',terminalLive:e=>e?.info.state==='connected',terminalOwnerCanMutate:()=>true,terminalReconnectAllowed:e=>!!e,terminalSessions:new Map(),currentTerminal:()=>entry,online:true,innerHeight:800,innerWidth:1200};
- c.NetworkToolkitTerminalInteraction=window.NetworkToolkitTerminalInteraction;vm.createContext(c);vm.runInContext(appFunction('terminalToolsHTML'),c);c.document=makeDocument('<div class="terminal-panel"><div id="terminalCommandBar"><div class="terminal-quick-tools"></div></div>'+c.terminalToolsHTML()+(options.tabs?'<div id="terminalTabs" class="terminal-tabs"><button>Retained tab</button></div>':'')+'<div id="terminalStage"><div id="retainedConsole">Retained console</div></div><div class="terminal-statusbar"></div></div>');vm.runInContext(appFunction('enqueueTerminalInput'),c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/assets/terminal-output-archive.js'),'utf8'),c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/assets/terminal-extras.js'),'utf8'),c);
+ const interactionStub=window.NetworkToolkitTerminalInteraction;vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/assets/terminal-interaction.js'),'utf8'),c);window.NetworkToolkitTerminalInteraction={...window.NetworkToolkitTerminalInteraction,...interactionStub};
+ c.NetworkToolkitTerminalInteraction=window.NetworkToolkitTerminalInteraction;vm.runInContext(appFunction('terminalToolsHTML'),c);c.document=makeDocument('<div class="terminal-panel"><div id="terminalCommandBar"><div class="terminal-quick-tools"></div></div>'+c.terminalToolsHTML()+(options.tabs?'<div id="terminalTabs" class="terminal-tabs"><button>Retained tab</button></div>':'')+'<div id="terminalStage"><div id="retainedConsole">Retained console</div></div><div class="terminal-statusbar"></div></div>');vm.runInContext(appFunction('enqueueTerminalInput'),c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/assets/terminal-output-archive.js'),'utf8'),c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/assets/terminal-extras.js'),'utf8'),c);
  const term=new Terminal({cols:40,rows:6,allowProposedApi:true,scrollback:100});term.focus=()=>{};let selection;term.selectLines=(start,end)=>{selection={start,end};};const scroll=[];const nativeScroll=term.scrollToLine.bind(term);term.scrollToLine=line=>{scroll.push(line);nativeScroll(line);};
  entry={info:{id:'one',state:'connected',type:'ssh'},xterm:term,element:new Element(),disposables:[],inputChunks:[],inputBytes:0};c.terminalSessions.set('one',entry);term.onData(data=>c.enqueueTerminalInput(entry,data));const api=window.NetworkToolkitTerminalExtras;api.sync();
  const input=text=>{term.input(text,true);entry.inputChunks=[];entry.inputBytes=0;};const write=async text=>{const pos=api.beforeOutput(entry);api.observeOutput(entry,text);await new Promise(resolve=>term.write(text,resolve));api.afterOutput(entry,pos);await api.flush(entry);};
@@ -285,4 +286,49 @@ test('Disconnect split group sits immediately beside Reconnect and exposes a sep
  h.api.sync();
  assert.equal(arrow.disabled,false);assert.equal(secondary.disabled,true);assert.equal(closeAll.disabled,false);
  h.dispose();
+});
+
+test('ESXi output selection keeps native continuous rows and explains excluded gaps or captured text differences',async()=>{
+ const h=harness(),prompt='[root@esxi-lab:~] ';
+ try{
+  await h.write(prompt);const block=h.api.notePaste(h.entry,'first\nsecond\n');await h.write('first\r\nFIRST\r\n'+prompt+'second\r\nSECOND\r\n'+prompt);
+  await h.api.select(h.entry,false,'last-paste');assert.equal(h.document.querySelector('#terminalSelectedOutput').value,'FIRST\nSECOND');assert.equal(h.document.querySelector('label[for="terminalSelectedOutput"]').textContent,'Output with recognized command echoes excluded');assert.equal(h.document.querySelector('#fixtureModal .hint').textContent,'The output is separated by other terminal lines. Select it here without including those lines.');
+  h.document.querySelector('#fixtureModal').remove();await h.api.select(h.entry,true,'last-paste');assert.equal(h.document.querySelector('#fixtureModal'),null);const displayed=h.api.screenOutput(h.entry,block,true);assert.deepEqual(h.selection,{start:displayed.lines[0].start,end:displayed.lines.at(-1).end});
+  block.pacedRunId='esxi-selection';assert(h.api.completePacedPaste(h.entry,block,{runId:'esxi-selection',sessionId:'one',state:'completed',steps:[{index:1,command:'first',output:prompt+'first\r\nFIRST\r\n'+prompt},{index:2,command:'second',output:prompt+'second\r\nSECOND\r\n'+prompt}]}));
+  await h.api.select(h.entry,true,'last-paste');assert.equal(h.document.querySelector('#terminalSelectedOutput').value,'first\nFIRST\nsecond\nSECOND');assert.equal(h.document.querySelector('label[for="terminalSelectedOutput"]').textContent,'Output with command lines included');assert.equal(h.document.querySelector('#fixtureModal .hint').textContent,'The captured output differs from the text still in the terminal. Select or copy it here.');
+  for(const include of [false,true]){await h.api.select(h.entry,include,'last-command');assert.equal(h.document.querySelector('#terminalSelectedOutput').value,include?'second\nSECOND':'SECOND');assert.equal(h.document.querySelector('label[for="terminalSelectedOutput"]').textContent,include?'Output with command lines included':'Output with recognized command echoes excluded');assert.equal(h.document.querySelector('#fixtureModal .hint').textContent,'This output is retained separately from the console scrollback.');}
+  assert.equal(h.entry.inputBytes,0);
+ }finally{h.dispose();}
+});
+
+test('archived ESXi output excludes boundary prompts after scrollback eviction and labels both preview choices',async()=>{
+ const h=harness(),prompt='[root@esxi-lab:/vmfs/volumes/Fixture Store] ',command='cat fixture-status.txt',output=Array.from({length:220},(_,i)=>'fixture row '+i).join('\n');
+ try{
+  await h.write(prompt);h.input(command);h.input('\r');await h.write(command+'\r\n'+output.replaceAll('\n','\r\n')+'\r\n'+prompt);
+  const block=h.api.current(h.entry,'last-command');assert.equal(block.start.isDisposed,true);assert.equal(h.api.rows(h.entry,block),null);
+  assert.equal(h.api.output(h.entry,block,false).text,output);assert.equal(h.api.output(h.entry,block,true).text,prompt+command+'\n'+output);
+  await h.api.copy(h.entry,false,'last-command');assert.equal(h.clipboard,output);
+  for(const include of [false,true]){await h.api.select(h.entry,include,'last-command');const field=h.document.querySelector('#terminalSelectedOutput');assert.equal(field.value,include?prompt+command+'\n'+output:output);assert.equal(field.selectionStart,0);assert.equal(field.selectionEnd,field.value.length);assert.equal(h.document.querySelector('label[for="terminalSelectedOutput"]').textContent,include?'Output with command lines included':'Output with recognized command echoes excluded');assert.equal(h.document.querySelector('#fixtureModal .hint').textContent,'This output is retained separately from the console scrollback.');}
+ }finally{h.dispose();}
+});
+
+test('consecutive wrapped ESXi prompts bound raw batches and closed archives without preceding output',async()=>{
+ const h=harness(),other=harness(),firstPrompt='[root@esxi-lab:/vmfs/volumes/Fixture Store/First VM] ',secondPrompt='[root@esxi-lab:/vmfs/volumes/Fixture Store/Second VM] ',lastPrompt='[root@esxi-lab:/vmfs/volumes/Fixture Store/Final VM] ';
+ const transcript='PRECEDING OUTPUT\r\n'+firstPrompt+'first\r\nFIRST RESULT\r\n'+secondPrompt+'second\r\nSECOND RESULT\r\n'+lastPrompt;
+ try{
+  await h.write('PRECEDING OUTPUT\r\n'+firstPrompt);const first=h.api.notePaste(h.entry,'first\n');assert.equal(first.start.line,1);await h.write('first\r\nFIRST RESULT\r\n'+secondPrompt);
+  assert.equal(h.api.output(h.entry,first).text,'FIRST RESULT');const second=h.api.notePaste(h.entry,'second\n');await h.api.flush(h.entry);assert.equal(first.end.line,second.start.line);
+  assert.equal(h.api.screenOutput(h.entry,first).text,'FIRST RESULT');assert.equal(h.api.output(h.entry,first).text,'FIRST RESULT');assert.equal(h.api.output(h.entry,first,true).text,firstPrompt+'first\nFIRST RESULT');
+  await h.write('second\r\nSECOND RESULT\r\n'+lastPrompt);h.api.finalize(h.entry);await h.api.flush(h.entry);assert.equal(h.api.screenOutput(h.entry,second).text,'SECOND RESULT');assert.equal(h.api.output(h.entry,second).text,'SECOND RESULT');assert.equal(h.api.output(h.entry,second,true).text,secondPrompt+'second\nSECOND RESULT');
+  const saved=JSON.parse(JSON.stringify(h.api.snapshot(h.entry)));await other.write(transcript);other.api.restore(other.entry,saved);await other.api.flush(other.entry);
+  assert.equal(other.api.output(other.entry,other.api.current(other.entry,first.id)).text,'FIRST RESULT');assert.equal(other.api.output(other.entry,other.api.current(other.entry,second.id),true).text,secondPrompt+'second\nSECOND RESULT');
+ }finally{h.dispose();other.dispose();}
+});
+
+test('history boundaries do not rewind over unrelated wrapped output',async()=>{
+ const h=harness(),response='RESPONSE DATA '.repeat(12);
+ try{
+  await h.write('switch# ');const first=h.api.notePaste(h.entry,'first\n');await h.write('first\r\n'+response);const b=h.entry.xterm.buffer.normal,cursor=b.baseY+b.cursorY;assert(b.getLine(cursor).isWrapped);
+  assert.equal(h.api.promptBoundary(h.entry),cursor);const second=h.api.notePaste(h.entry,'second\n');await h.api.flush(h.entry);assert.equal(first.end.line,cursor);assert.equal(second.start.line,cursor);assert(h.api.output(h.entry,first).text.startsWith('RESPONSE DATA RESPONSE DATA'));
+ }finally{h.dispose();}
 });

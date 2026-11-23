@@ -3,10 +3,12 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 global.self=global;
 const {Terminal}=require('../web/assets/xterm.js');
 const source=fs.readFileSync(path.join(__dirname,'../web/assets/terminal-extras.js'),'utf8');
+const interaction=fs.readFileSync(path.join(__dirname,'../web/assets/terminal-interaction.js'),'utf8');
 function harness(){
  let active,clipboard='',messages=[],sent=[],modals=[];
  const window={NetworkToolkitTerminalInteraction:{preferences:()=>({autoPager:false,pagerKey:'auto',pasteReview:true,pasteIncludeCommands:false}),copyValue:async text=>{clipboard=text;return true;},suppressesInput:()=>false}};
  const context={window,document:{querySelector:()=>null},TextDecoder,TextEncoder,Date,Math,setTimeout,clearTimeout,toast:text=>messages.push(text),terminalEntryAcceptsInput:e=>e.info.state==='connected',currentTerminal:()=>active,enqueueTerminalInput:(e,data)=>{sent.push([e.info.id,data]);return true;},openModal:(...args)=>modals.push(args),esc:String,icon:()=>'',console};
+ const interactionStub=window.NetworkToolkitTerminalInteraction;vm.runInNewContext(interaction,context);window.NetworkToolkitTerminalInteraction={...window.NetworkToolkitTerminalInteraction,...interactionStub};
  vm.runInNewContext(source,context);const api=window.NetworkToolkitTerminalExtras;
  function entry(id='one',cols=80,rows=12,scrollback=10000){const e={info:{id,state:'connected'},disposables:[],xterm:new Terminal({cols,rows,scrollback,allowProposedApi:true}),inputBytes:0};e.xterm.selectLines=(start,end)=>{e.selection={start,end};};e.xterm.onData(data=>api.noteManualInput(e,data));active=e;return e;}
  async function write(e,text){const pos=api.beforeOutput(e);api.observeOutput(e,text);await new Promise(resolve=>e.xterm.write(text,resolve));api.afterOutput(e,pos);if(api.prefs(e).autoPager)await new Promise(resolve=>setTimeout(resolve,45));}
@@ -55,4 +57,34 @@ test('a command echo arriving after Enter still excludes every wrapped part',asy
 });
 test('editing a pasted command keeps its complete displayed input optional',async()=>{
  const h=harness(),e=h.entry();await h.write(e,'switch# ');e.xterm.input('show ',true);await h.write(e,'show ');h.api.notePaste(e,'version');await h.write(e,'version');e.xterm.input(' detail',true);await h.write(e,' detail');e.xterm.input('\r',true);await h.write(e,'\r\nDETAILED VERSION\r\nswitch# ');assert.equal(h.text(e),'DETAILED VERSION');assert.equal(h.text(e,true),'switch# show version detail\nDETAILED VERSION');e.xterm.dispose();
+});
+test('ESXi output cleanup follows the shared bracket prompt grammar without broadening conventional cleanup',()=>{
+ const h=harness(),fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/terminal-paced-prompts.json'),'utf8'));
+ for(const item of fixture.cases.filter(item=>item.line.includes('[')))assert.equal(h.api.idlePrompt(item.line),item.accepted,item.name);
+ for(const text of ['progress!#','result = 20%','[root@esxi-lab:~]\n','[root@esxi-lab:~]\r','[root@esxi-lab:~] extra'])assert.equal(h.api.idlePrompt(text),false,text);
+ for(const text of ['switch(config)# ','user@lab:~$ ','host>','host%'])assert.equal(h.api.idlePrompt(text),true,text);
+});
+test('raw ESXi batches remove wrapped echoes and final prompts while preserving bracketed responses and repeated output',async()=>{
+ const h=harness(),e=h.entry('esxi',32),home='[root@esxi-lab:~] ',pathPrompt='[root@esxi-lab:/vmfs/volumes/Fixture Store/Fixture VM (Copy)] ',first='lsof | grep fixture',second='ps -c | grep fixture';
+ try{
+  await h.write(e,home);h.api.notePaste(e,first+'\n'+second+'\n');await h.write(e,first+'\r\nFIRST\r\n[OK]\r\n'+first+'\r\n'+pathPrompt);
+  await h.write(e,second);await h.write(e,'\r\nSECOND\r\n[operation completed]\r\n[root@esxi-lab:~]\r\nkept after prompt-like response\r\n'+pathPrompt);
+  assert.equal(h.text(e),'FIRST\n[OK]\n'+first+'\nSECOND\n[operation completed]\n[root@esxi-lab:~]\nkept after prompt-like response');
+  assert.equal(h.text(e,true),home+first+'\nFIRST\n[OK]\n'+first+'\n'+pathPrompt+second+'\nSECOND\n[operation completed]\n[root@esxi-lab:~]\nkept after prompt-like response');
+  await h.api.copy(e,false,'last-paste');assert.equal(h.clipboard,h.text(e));
+ }finally{e.xterm.dispose();}
+});
+test('a delayed wrapped ESXi command echo remains optional when Enter precedes its display',async()=>{
+ const h=harness(),e=h.entry('esxi-delayed',30),prompt='[root@esxi-lab:/vmfs/volumes/Fixture Store] ',command='cat /vmfs/volumes/Fixture\\ Store/fixture-config.txt';
+ try{
+  await h.write(e,prompt);e.xterm.input(command,true);e.xterm.input('\r',true);await h.write(e,command);await h.write(e,'\r\nCONFIGURATION\r\n');await h.write(e,prompt);
+  assert.equal(h.text(e),'CONFIGURATION');assert.equal(h.text(e,true),prompt+command+'\nCONFIGURATION');
+ }finally{e.xterm.dispose();}
+});
+test('raw output does not treat arbitrary bracket prefixes or bare expected commands as echoes',async()=>{
+ const h=harness(),e=h.entry('esxi-output'),prompt='[root@esxi-lab:~] ';
+ try{
+  await h.write(e,prompt);h.api.notePaste(e,'first\nsecond\n');await h.write(e,'first\r\n[OK] second\r\nsecond\r\n[root@esxi-lab:0] second\r\n[operation completed]\r\n'+prompt);
+  assert.equal(h.text(e),'[OK] second\nsecond\n[root@esxi-lab:0] second\n[operation completed]');
+ }finally{e.xterm.dispose();}
 });

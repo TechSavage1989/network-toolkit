@@ -1,3 +1,10 @@
+## 1.21.75 Beta 1 - Clean ESXi command output
+
+- Select output and Copy output recognize standard bracket-only ESXi shell prompts and remove recognized prompt boundaries and echoed command lines from raw, paced, macro and archived command output when Include commands is off.
+- Cleanup preserves unrelated bracketed output and command-like text later in a result. Existing conventional prompt cleanup and the rules for direct terminal selection or preview are retained.
+- Command-block start and close markers, including archived captures, follow the start of a recognized wrapped idle prompt. Long datastore prompts stay with their command block, while unrelated wrapped output keeps its existing boundary and the snapshot format remains compatible.
+- The Select output preview label reflects the Include commands choice and explains whether the preview is needed because cleaned output spans gaps or the captured output differs from terminal text.
+
 ## 1.21.74 Beta 1 - Complete command lists in paste, the command bar and macros
 
 - Fixed paced paste rejecting standard ESXi shell prompts ending in a closing bracket. Both the browser readiness check and backend wait now recognize a bounded user, hostname and home or absolute path, including common datastore names with spaces.

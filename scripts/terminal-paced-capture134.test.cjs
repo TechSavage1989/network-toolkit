@@ -3,12 +3,14 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 global.self=global;
 const {Terminal}=require('../web/assets/xterm.js');
 const extras=fs.readFileSync(path.join(__dirname,'../web/assets/terminal-extras.js'),'utf8');
+const interaction=fs.readFileSync(path.join(__dirname,'../web/assets/terminal-interaction.js'),'utf8');
 const macros=fs.readFileSync(path.join(__dirname,'../web/assets/terminal-macros.js'),'utf8');
 const tick=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 function harness(){
  let active=null,clipboard='';
  const window={NetworkToolkitTerminalInteraction:{preferences:()=>({autoPager:false,pasteIncludeCommands:false}),copyValue:async text=>{clipboard=text;return true;}}};
  const ctx={window,document:{querySelector:()=>null},TextDecoder,TextEncoder,setTimeout,clearTimeout,Date,Math,toast(){},terminalEntryAcceptsInput:e=>e.info.state==='connected',currentTerminal:()=>active,openModal(){},icon(){return '';},console};
+ const interactionStub=window.NetworkToolkitTerminalInteraction;vm.runInNewContext(interaction,ctx);window.NetworkToolkitTerminalInteraction={...window.NetworkToolkitTerminalInteraction,...interactionStub};
  vm.runInNewContext(extras,ctx);
  const api=window.NetworkToolkitTerminalExtras;
  function entry(id='one'){
@@ -216,4 +218,26 @@ test('Select output uses the same include-commands filter for last paste and las
   assert.equal(modals.length,4);
   assert(!selected.value.includes('Command 440:'));
  }finally{entry.xterm.dispose();}
+});
+test('ESXi run captures clean boundary prompts and initial echoes without dropping response data',async()=>{
+ const h=harness(),e=h.entry('esxi'),home='[root@esxi-lab:~] ',pathPrompt='[root@esxi-lab:/vmfs/volumes/Fixture Store/Fixture VM] ';
+ try{
+  await h.write(e,home);const block=h.api.notePaste(e,'first\n\nsecond\n');block.pacedRunId='esxi-capture';
+  assert(h.api.completePacedPaste(e,block,{runId:'esxi-capture',sessionId:'esxi',state:'completed',steps:[
+   {index:1,command:'first',output:'\r\n'+home+'\r\n'+home+'first\r\n[OK]\r\nFIRST\r\nfirst\r\n[root@esxi-lab:~]\r\nkept after prompt-like response\r\n'+pathPrompt},
+   {index:2,command:'',output:'\r\n'+pathPrompt},
+   {index:3,command:'second',output:pathPrompt+'second\r\nSECOND\r\n--More--\r\n    \r\n[operation completed]\r\n\r\nKEPT BLANK ABOVE\r\n'+home}
+  ]}));
+  const first='[OK]\nFIRST\nfirst\n[root@esxi-lab:~]\nkept after prompt-like response',last='SECOND\n[operation completed]\n\nKEPT BLANK ABOVE';
+  assert.equal(h.api.output(e,h.api.current(e,'last-paste'),false).text,first+'\n'+last);
+  assert.equal(h.api.output(e,h.api.current(e,'last-paste'),true).text,'first\n'+first+'\n\nsecond\n'+last);
+  assert.equal(h.api.output(e,h.api.current(e,'last-command'),false).text,last);
+  assert.equal(h.api.output(e,h.api.current(e,'last-command'),true).text,'second\n'+last);
+  await h.api.copy(e,false,'last-paste');assert.equal(h.clipboard,first+'\n'+last);
+ }finally{e.xterm.dispose();}
+});
+test('captured bracket-like first and last response lines remain when they are not complete ESXi prompts',()=>{
+ const h=harness(),item={pacedCapture:{steps:[{index:1,command:'status',output:'[operation completed] status\nstatus\n[OK]'}]}};
+ assert.equal(h.api.output(null,item,false).text,'[operation completed] status\nstatus\n[OK]');
+ assert.equal(h.api.output(null,item,true).text,'status\n[operation completed] status\nstatus\n[OK]');
 });

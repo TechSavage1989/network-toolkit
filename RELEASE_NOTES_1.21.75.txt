@@ -1,0 +1,15 @@
+Network Toolkit 1.21.75 Beta
+
+## What's New
+
+- Select output and Copy output now remove recognized ESXi command echoes and surrounding prompts when Include commands is off.
+- The output window now reflects Include commands and explains why the text cannot be selected directly in the terminal.
+
+## Additional Details
+
+- The preview explains whether cleaned output spans separate parts of the terminal or the captured output differs from the current terminal text. Output that can be selected directly still uses the existing terminal selection.
+- Cleanup recognizes standard VMware ESXi prompts in raw pastes, paced pastes, macros and archived output. It preserves unrelated bracketed result lines and genuine output that happens to match a command later in the result.
+- Command output boundaries now follow complete wrapped datastore prompts, keeping preceding results out of the next command block and prompt fragments out of the previous block.
+- Raw output keeps ambiguous prompt-shaped lines inside responses. Paced and macro captures use verified command-step boundaries.
+- Cleanup changes the selected or copied result; it does not alter the terminal transcript or send another command.
+- This is an opt-in beta. Existing saved connections, credentials, macros and preferences are retained.
