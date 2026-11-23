@@ -1,3 +1,11 @@
+## 1.21.77 Stable - Saved passwords for SSH sign-in challenges
+
+- Terminal and direct SFTP connections using Password authentication can answer an initial password-only keyboard-interactive challenge with the supplied or backend-resolved saved login password, including standard ESXi password challenges. The rule applies to qualifying SSH servers without a device-specific exception.
+- Automatic answers require exactly one non-echoed Password field with a narrow, ordinary login context. Any prior challenge, including a notice with no questions, closes that automatic opportunity. MFA, password changes, ambiguous or multiple questions, echoed fields and later challenges remain manual.
+- Ordinary password and keyboard-interactive methods share a single automatic-use allowance per connection attempt. Rejected or partially accepted credentials are never silently replayed. Effective Keyboard-interactive authentication without a linked password credential stays manual; a linked password credential continues to resolve to Password authentication as before.
+- Callers without an interactive prompt UI retain the existing guidance to open a Terminal connection for authentication that needs manual answers.
+- Host-key identity checks, cancellation and backend-only saved-secret handling remain intact. No credential or profile migration is required.
+
 ## 1.21.76 Stable - App controls, selection and dialogs
 
 - Ordinary interface labels and controls no longer create browser text selections. Shared CSS retains selection in editable and read-only text fields, both editor engines, terminal output, result tables, logs and explicit copyable values. Controls inside selectable results remain nonselectable.

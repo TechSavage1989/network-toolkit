@@ -270,8 +270,13 @@ func openSSHConnection(parent context.Context, req ConnectRequest, cb transportC
 		acceptedKey = append([]byte(nil), key.Marshal()...)
 		return nil
 	}
+	passwordAuth := newSSHPasswordAuthentication(req.AuthMethod, req.Password)
+	defer passwordAuth.clear()
 	challengeCount := 0
-	keyboard := ssh.KeyboardInteractive(func(_ string, instruction string, questions []string, echo []bool) ([]string, error) {
+	keyboard := ssh.KeyboardInteractive(func(name string, instruction string, questions []string, echo []bool) ([]string, error) {
+		if err := lifetime.Err(); err != nil {
+			return nil, err
+		}
 		challengeCount++
 		if challengeCount > 16 || len(questions) > 16 || len(echo) != len(questions) {
 			return nil, errors.New("SSH authentication challenge exceeded its limit")
@@ -282,6 +287,9 @@ func openSSHConnection(parent context.Context, req ConnectRequest, cb transportC
 		}
 		if err := validatePrompt(prompt); err != nil {
 			return nil, err
+		}
+		if answers, ok := passwordAuth.answerChallenge(name, instruction, questions, echo); ok {
+			return answers, nil
 		}
 		reply, err := ask(lifetime, prompt)
 		if err != nil {
@@ -297,7 +305,12 @@ func openSSHConnection(parent context.Context, req ConnectRequest, cb transportC
 	case "key":
 		auth = append(auth, ssh.PublicKeys(signer))
 	case "password":
-		auth = append(auth, ssh.Password(req.Password))
+		auth = append(auth, ssh.PasswordCallback(func() (string, error) {
+			if err := lifetime.Err(); err != nil {
+				return "", err
+			}
+			return passwordAuth.takePassword()
+		}))
 	case "keyboard":
 	default:
 		return nil, errors.New("unsupported SSH authentication method")
@@ -324,6 +337,7 @@ func openSSHConnection(parent context.Context, req ConnectRequest, cb transportC
 	// transport, so clear the shared Auth backing array, not only config.Auth.
 	// Rekeying retains the host-key callback but never repeats user authentication.
 	releaseSSHAuthentication(config)
+	passwordAuth.clear()
 	signer = nil
 	req.Password, req.PrivateKey, req.Passphrase = "", "", ""
 	if err != nil {

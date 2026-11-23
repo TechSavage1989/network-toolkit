@@ -10,6 +10,8 @@ The connection sidebar (Client) and the server settings sidebar (Server) can be 
 - **TFTP:** lightweight file transfer where appropriate; be aware it does not provide SSH-style authentication or encryption.
 
 ## Before transferring
+Direct SFTP connections using **Password** authentication can reuse the supplied or saved login password for the first standard hidden password-only SSH challenge. The password is supplied automatically at most once during that connection attempt. If the server needs MFA, a password change or another manual answer, connect through Terminal and use that authenticated session for SFTP. Verify the SSH host fingerprint before connecting.
+
 Review the remote host, protocol, local and remote paths, overwrite confirmation and permissions. Do not assume files are safe to replace without checking their destination and the consequence of overwriting.
 
 Use the visible **Reset panes** action in the two-pane browser to restore the default layout. The divider can also be reset by double-clicking.
