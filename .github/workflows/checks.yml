@@ -289,6 +289,20 @@ jobs:
           path: ${{ runner.temp }}/ntk-paced-paste127-results
           if-no-files-found: error
           retention-days: 14
+      - name: Check SSH sign-in notices and saved continuation preferences
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-ssh-notices-results
+        run: node scripts/terminal-ssh-notices.browser.cjs
+      - name: Retain SSH notice browser evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: terminal-ssh-notices-checks
+          path: ${{ runner.temp }}/ntk-ssh-notices-results
+          if-no-files-found: error
+          retention-days: 14
   browser-editor112:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -774,10 +788,10 @@ jobs:
         env:
           GOTOOLCHAIN: local
         run: go test -mod=vendor ./internal/diag -run TestSharedSFTPCancellationUnblocksReadAndRetainsShell -count=1 -timeout=45s -v
-      - name: Test saved-password SSH challenges and interactive authentication on Windows
+      - name: Test SSH password challenges and notice continuation on Windows
         env:
           GOTOOLCHAIN: local
-        run: go test -mod=vendor ./internal/terminal -run '^Test(SSHPassword|SSHKeyboardInteractiveChallenges|FileConnectionUsesSharedInteractiveAuthentication|SavedSSHHostFingerprintMismatchRejectsBeforeAuthentication|ReleaseSSHAuthenticationClearsSharedBackingArray|SSHRekeyAndLiveTrafficDoNotRequireRetainedAuthentication)' -count=1 -timeout=2m -v
+        run: go test -mod=vendor ./internal/terminal -run '^Test(SSHPassword|SSHNotice|SSHKeyboardInteractiveChallenges|FileConnectionUsesSharedInteractiveAuthentication|SavedSSHHostFingerprintMismatchRejectsBeforeAuthentication|ReleaseSSHAuthenticationClearsSharedBackingArray|SSHRekeyAndLiveTrafficDoNotRequireRetainedAuthentication)' -count=1 -timeout=2m -v
       - name: Test paced paste literal commands and generation cancellation on Windows
         env:
           GOTOOLCHAIN: local
@@ -804,7 +818,7 @@ jobs:
       - name: Test native credential protection and capability isolation
         env:
           GOTOOLCHAIN: local
-        run: go test -mod=vendor ./cmd/network-toolkit -run 'TestWindowsCredential|TestCredential|TestVaultV2|TestPublicBootstrap|TestTerminalActivationRecord|TestEmbeddedUI|TestTerminalWindow|TestTerminalView' -count=1 -v
+        run: go test -mod=vendor ./cmd/network-toolkit -run 'TestWindowsCredential|TestCredential|TestSSHNotice|TestVaultV2|TestPublicBootstrap|TestTerminalActivationRecord|TestEmbeddedUI|TestTerminalWindow|TestTerminalView' -count=1 -v
       - name: Test the portable copy's Windows registration, the held, verified full-version Setup and the Start menu shortcuts of the separate programs on Windows
         env:
           GOTOOLCHAIN: local

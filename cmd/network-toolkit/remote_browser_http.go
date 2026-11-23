@@ -22,37 +22,38 @@ import (
 )
 
 type remoteBrowserRequest struct {
-	SafeExport       bool   `json:"-"`
-	ExportSize       int64  `json:"-"`
-	Protocol         string `json:"protocol"`
-	SessionID        string `json:"sessionId,omitempty"`
-	ConnectionID     string `json:"connectionId,omitempty"`
-	ProfileID        string `json:"profileId,omitempty"`
-	CredentialID     string `json:"credentialId,omitempty"`
-	TimeoutMs        int    `json:"timeoutMs,omitempty"`
-	Action           string `json:"action"`
-	Host             string `json:"host"`
-	Port             int    `json:"port"`
-	Username         string `json:"username"`
-	Password         string `json:"password"`
-	KeyPath          string `json:"keyPath"`
-	PrivateKey       string `json:"privateKey,omitempty"`
-	Passphrase       string `json:"passphrase"`
-	AuthMode         string `json:"authMode"`
-	Fingerprint      string `json:"fingerprint"`
-	SSHCompatibility string `json:"sshCompatibility,omitempty"`
-	Security         string `json:"security"`
-	Path             string `json:"path"`
-	NewPath          string `json:"newPath"`
-	LocalPath        string `json:"localPath"`
-	Confirm          bool   `json:"confirm"`
-	Overwrite        bool   `json:"overwrite"`
-	StagedUpload     bool   `json:"stagedUpload,omitempty"`
-	Content          string `json:"content,omitempty"`
-	ExpectedHash     string `json:"expectedHash,omitempty"`
-	BOM              bool   `json:"bom,omitempty"`
-	Encoding         string `json:"encoding,omitempty"`
-	Permissions      string `json:"permissions,omitempty"`
+	SafeExport             bool   `json:"-"`
+	ExportSize             int64  `json:"-"`
+	Protocol               string `json:"protocol"`
+	SessionID              string `json:"sessionId,omitempty"`
+	ConnectionID           string `json:"connectionId,omitempty"`
+	ProfileID              string `json:"profileId,omitempty"`
+	CredentialID           string `json:"credentialId,omitempty"`
+	TimeoutMs              int    `json:"timeoutMs,omitempty"`
+	Action                 string `json:"action"`
+	Host                   string `json:"host"`
+	Port                   int    `json:"port"`
+	Username               string `json:"username"`
+	Password               string `json:"password"`
+	KeyPath                string `json:"keyPath"`
+	PrivateKey             string `json:"privateKey,omitempty"`
+	Passphrase             string `json:"passphrase"`
+	AuthMode               string `json:"authMode"`
+	Fingerprint            string `json:"fingerprint"`
+	SSHCompatibility       string `json:"sshCompatibility,omitempty"`
+	SSHAutoContinueNotices bool   `json:"sshAutoContinueNotices,omitempty"`
+	Security               string `json:"security"`
+	Path                   string `json:"path"`
+	NewPath                string `json:"newPath"`
+	LocalPath              string `json:"localPath"`
+	Confirm                bool   `json:"confirm"`
+	Overwrite              bool   `json:"overwrite"`
+	StagedUpload           bool   `json:"stagedUpload,omitempty"`
+	Content                string `json:"content,omitempty"`
+	ExpectedHash           string `json:"expectedHash,omitempty"`
+	BOM                    bool   `json:"bom,omitempty"`
+	Encoding               string `json:"encoding,omitempty"`
+	Permissions            string `json:"permissions,omitempty"`
 }
 
 func (r remoteBrowserRequest) opts() map[string]any {
@@ -209,7 +210,7 @@ func (a *application) handleRemoteBrowser(w http.ResponseWriter, request *http.R
 	if r.SessionID != "" {
 		// Terminal-owned SSH connections have already authenticated and
 		// verified the server key. Reject mixed or forged credential fields.
-		if r.Protocol == "ftp" || r.CredentialID != "" || r.Action == "fingerprint" || r.Host != "" || r.Username != "" || r.Password != "" || r.KeyPath != "" || r.PrivateKey != "" || r.Passphrase != "" || r.Fingerprint != "" {
+		if r.Protocol == "ftp" || r.CredentialID != "" || r.Action == "fingerprint" || r.Host != "" || r.Username != "" || r.Password != "" || r.KeyPath != "" || r.PrivateKey != "" || r.Passphrase != "" || r.Fingerprint != "" || r.SSHAutoContinueNotices {
 			jsonError(w, 400, "Terminal session mode requires only a session ID and file operation")
 			return
 		}

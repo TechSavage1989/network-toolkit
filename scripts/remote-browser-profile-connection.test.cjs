@@ -116,3 +116,10 @@ test('successful manual saved-profile SSH sign-in clears secrets and reconnect o
  c.password='one-use-password';m.profileManualAuth=true;await h.browser.useSavedSSHProfile('manual');assert.equal(m.connected,true);assert.equal(c.password,'');
  await h.browser.reconnect('ssh');assert.equal(m.connected,false);assert.equal(h.events.filter(row=>row.body?.action==='connect').length,1);assert.match(h.dialogs.at(-1).body,/id="rbSSHProfilePassword"/);
 });
+
+test('successful SFTP connection preserves explicit SSH notice handling in both recent lists',async()=>{
+ const h=harness({profile:{...saved('notices'),sshAutoContinueNotices:true}});h.browser.get('ssh').sourceChoice='profile:notices';
+ await h.browser.useSavedSSHProfile('notices');assert.equal(h.browser.get('ssh').connected,true);
+ assert.equal(h.events.find(x=>x.path==='/remote-browser'&&x.body?.action==='connect').body.sshAutoContinueNotices,true);
+ assert.equal(h.state.sftpRecent[0].sshAutoContinueNotices,true);assert.equal(h.state.terminalRecent[0].sshAutoContinueNotices,true);
+});

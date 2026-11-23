@@ -423,7 +423,7 @@ func (a *application) connectTerminalForRequest(r *http.Request, request termina
 		return terminal.SessionInfo{}, err
 	}
 	a.views.pruneWorkspaceHistoryLocked()
-	config := &terminalWindowPreset{Type: session.Type, Host: session.Host, Port: session.Port, Username: session.Username, SSHCompatibility: session.SSHCompatibility, TimeoutMs: request.TimeoutMs}
+	config := &terminalWindowPreset{Type: session.Type, Host: session.Host, Port: session.Port, Username: session.Username, SSHCompatibility: session.SSHCompatibility, SSHAutoContinueNotices: session.SSHAutoContinueNotices, TimeoutMs: request.TimeoutMs}
 	if session.Type == "ssh" {
 		config.AuthMethod = request.AuthMethod
 		if config.AuthMethod == "" && request.PrivateKey != "" {

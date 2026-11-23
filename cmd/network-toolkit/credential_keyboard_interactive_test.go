@@ -25,9 +25,11 @@ func TestCredentialKeyboardInteractiveSavedPasswordAndServerPin(t *testing.T) {
 	for _, test := range []struct {
 		name     string
 		wrongPin bool
+		notice   bool
 	}{
 		{name: "approved-saved-password"},
 		{name: "different-server-fingerprint", wrongPin: true},
+		{name: "saved-password-followed-by-notice", notice: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			const secret = "SYNTHETIC_SAVED_KEYBOARD_PASSWORD_77"
@@ -44,7 +46,7 @@ func TestCredentialKeyboardInteractiveSavedPasswordAndServerPin(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			var accepts, challenges, correctAnswers atomic.Int32
+			var accepts, challenges, correctAnswers, notices atomic.Int32
 			config := &ssh.ServerConfig{KeyboardInteractiveCallback: func(peer ssh.ConnMetadata, challenge ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
 				challenges.Add(1)
 				if peer.User() != "operator" {
@@ -59,6 +61,16 @@ func TestCredentialKeyboardInteractiveSavedPasswordAndServerPin(t *testing.T) {
 				}
 				answers[0] = ""
 				correctAnswers.Add(1)
+				if test.notice {
+					answers, err = challenge("Synthetic server notice", "No additional answer is required.", nil, nil)
+					if err != nil {
+						return nil, err
+					}
+					if len(answers) != 0 {
+						return nil, errors.New("notice received an unexpected answer")
+					}
+					notices.Add(1)
+				}
 				return nil, nil
 			}}
 			config.AddHostKey(signer)
@@ -118,11 +130,11 @@ func TestCredentialKeyboardInteractiveSavedPasswordAndServerPin(t *testing.T) {
 			if err != nil || bytes.Contains(vaultBefore, []byte(secret)) {
 				t.Fatal("synthetic saved password was not protected before connection")
 			}
-			profile := map[string]any{"id": "synthetic-keyboard-profile", "name": "Synthetic SSH", "type": "ssh", "host": "127.0.0.1", "port": port, "username": "operator", "authMethod": "password", "credentialId": item.ID}
+			profile := map[string]any{"id": "synthetic-keyboard-profile", "name": "Synthetic SSH", "type": "ssh", "host": "127.0.0.1", "port": port, "username": "operator", "authMethod": "password", "credentialId": item.ID, "sshAutoContinueNotices": test.notice}
 			if response := viewTestRequest(a, a.token, http.MethodPut, "/api/state", map[string]any{"terminalProfiles": []any{profile}}, nil); response.Code != http.StatusOK {
 				t.Fatalf("saved profile setup status %d", response.Code)
 			}
-			request := terminal.ConnectRequest{Type: "ssh", Host: "127.0.0.1", Port: port, Username: "operator", AuthMethod: "password", CredentialID: item.ID, ProfileID: "synthetic-keyboard-profile", TimeoutMs: 3000}
+			request := terminal.ConnectRequest{Type: "ssh", Host: "127.0.0.1", Port: port, Username: "operator", AuthMethod: "password", CredentialID: item.ID, ProfileID: "synthetic-keyboard-profile", SSHAutoContinueNotices: test.notice, TimeoutMs: 3000}
 			response := viewTestRequest(a, a.token, http.MethodPost, "/api/terminals", request, nil)
 			if response.Code != http.StatusCreated || bytes.Contains(response.Body.Bytes(), []byte(secret)) {
 				t.Fatalf("saved-credential connection status %d, or secret in response", response.Code)
@@ -151,6 +163,9 @@ func TestCredentialKeyboardInteractiveSavedPasswordAndServerPin(t *testing.T) {
 			} else if current.State != "connected" || challenges.Load() != 1 || correctAnswers.Load() != 1 {
 				t.Fatal("saved password did not authenticate the keyboard-only peer exactly once")
 			}
+			if (notices.Load() == 1) != test.notice || current.SSHAutoContinueNotices != test.notice {
+				t.Fatal("saved-password connection lost the notice opt-in or failed to acknowledge its empty challenge")
+			}
 			if current.ProfileID != "synthetic-keyboard-profile" || current.Host != "127.0.0.1" || current.Port != port || current.Username != "operator" {
 				t.Fatal("saved credential changed the profile or connection destination")
 			}
@@ -165,10 +180,15 @@ func TestCredentialKeyboardInteractiveSavedPasswordAndServerPin(t *testing.T) {
 					if err := json.Unmarshal(result.Body.Bytes(), &batch); err != nil {
 						t.Fatal(err)
 					}
+					var noticeOutput strings.Builder
 					for _, event := range batch.Events {
 						if event.Prompt != nil || event.Session != nil && event.Session.Prompt != nil || bytes.Contains(event.Data, []byte(secret)) {
 							t.Fatal("automatic saved-password use published a prompt or secret output")
 						}
+						_, _ = noticeOutput.Write(event.Data)
+					}
+					if test.notice && (!strings.Contains(noticeOutput.String(), "Synthetic server notice") || !strings.Contains(noticeOutput.String(), "No additional answer is required.")) {
+						t.Fatal("automatic notice continuation lost the server's notice text")
 					}
 				}
 			}

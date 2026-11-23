@@ -43,24 +43,25 @@ var terminalWindowNow = time.Now
 // session always goes through the receiving Terminal page's paste path
 // (review, warnings, limits); it never carries authentication either.
 type terminalWindowPreset struct {
-	ProfileID          string `json:"profileId,omitempty"`
-	Type               string `json:"type"`
-	WorkingDirectory   string `json:"workingDirectory,omitempty"`
-	RunAsAdministrator bool   `json:"runAsAdministrator,omitempty"`
-	Host               string `json:"host"`
-	Port               int    `json:"port"`
-	Username           string `json:"username"`
-	AuthMethod         string `json:"authMethod"`
-	SSHCompatibility   string `json:"sshCompatibility"`
-	TimeoutMs          int    `json:"timeoutMs"`
-	SerialPort         string `json:"serialPort"`
-	BaudRate           int    `json:"baudRate"`
-	DataBits           int    `json:"dataBits"`
-	StopBits           string `json:"stopBits"`
-	Parity             string `json:"parity"`
-	FlowControl        string `json:"flowControl"`
-	LocalEcho          bool   `json:"localEcho"`
-	LineEnding         string `json:"lineEnding"`
+	ProfileID              string `json:"profileId,omitempty"`
+	Type                   string `json:"type"`
+	WorkingDirectory       string `json:"workingDirectory,omitempty"`
+	RunAsAdministrator     bool   `json:"runAsAdministrator,omitempty"`
+	Host                   string `json:"host"`
+	Port                   int    `json:"port"`
+	Username               string `json:"username"`
+	AuthMethod             string `json:"authMethod"`
+	SSHCompatibility       string `json:"sshCompatibility"`
+	SSHAutoContinueNotices bool   `json:"sshAutoContinueNotices,omitempty"`
+	TimeoutMs              int    `json:"timeoutMs"`
+	SerialPort             string `json:"serialPort"`
+	BaudRate               int    `json:"baudRate"`
+	DataBits               int    `json:"dataBits"`
+	StopBits               string `json:"stopBits"`
+	Parity                 string `json:"parity"`
+	FlowControl            string `json:"flowControl"`
+	LocalEcho              bool   `json:"localEcho"`
+	LineEnding             string `json:"lineEnding"`
 }
 
 type terminalWindowEnvelope struct {
@@ -133,6 +134,7 @@ func (p *terminalWindowPreset) normalize() error {
 	}
 	if p.Type != "ssh" {
 		p.SSHCompatibility = "modern"
+		p.SSHAutoContinueNotices = false
 	}
 	for _, field := range []*string{&p.Host, &p.Username, &p.SerialPort} {
 		*field = strings.TrimSpace(*field)

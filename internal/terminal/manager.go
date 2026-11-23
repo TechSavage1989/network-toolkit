@@ -149,6 +149,7 @@ func normalizeConnectionRequest(req ConnectRequest, alreadyAuthenticated bool) (
 	}
 	if req.Type != "ssh" {
 		req.SSHCompatibility = SSHCompatibilityModern
+		req.SSHAutoContinueNotices = false
 	}
 	if req.Cols == 0 {
 		req.Cols = 80
@@ -356,8 +357,8 @@ func newLiveSession(parent context.Context, id string, req ConnectRequest) *live
 	}
 	return &liveSession{automation: make(map[*AutomationSubscription]struct{}), ctx: ctx, cancel: cancel, request: reconnectSettings(req), done: make(chan struct{}), input: make(chan []byte, 64), resize: make(chan struct{}, 1), controls: make(chan ControlRequest, 16),
 		info: SessionInfo{ID: id, ProfileID: req.ProfileID, LineEnding: req.LineEnding, Type: req.Type, Label: label, ManualName: req.DisplayName, NameExplicit: req.DisplayNameExplicit, LabelSource: labelSource, Host: req.Host, Port: req.Port, Username: req.Username,
-			SSHCompatibility: req.SSHCompatibility,
-			SerialPort:       req.SerialPort, State: "connecting", CreatedAt: now, UpdatedAt: now, Cols: req.Cols, Rows: req.Rows}}
+			SSHCompatibility: req.SSHCompatibility, SSHAutoContinueNotices: req.SSHAutoContinueNotices,
+			SerialPort: req.SerialPort, State: "connecting", CreatedAt: now, UpdatedAt: now, Cols: req.Cols, Rows: req.Rows}}
 }
 
 // Reconnect replaces only the transport. The session ID, owning window and
@@ -1139,7 +1140,7 @@ func (m *Manager) Reply(id string, reply PromptReply) error {
 }
 
 func validatePrompt(prompt Prompt) error {
-	if len(prompt.Title) > 1024 || len(prompt.Message) > 16*1024 || len(prompt.Fields) > 16 || len(prompt.Actions) > 4 {
+	if len(prompt.Title) > 1024 || len(prompt.ServerName) > 1024 || len(prompt.Message) > 16*1024 || len(prompt.Fields) > 16 || len(prompt.Actions) > 4 {
 		return errors.New("remote authentication prompt exceeded its limit")
 	}
 	total := 0
@@ -1221,7 +1222,7 @@ func eventSize(e Event) int {
 	n := 256 + len(e.Data) + len(e.Message)
 	addPrompt := func(p *Prompt) {
 		if p != nil {
-			n += 256 + len(p.Title) + len(p.Message) + len(p.Host) + len(p.Fingerprint)
+			n += 256 + len(p.Title) + len(p.ServerName) + len(p.Message) + len(p.Host) + len(p.Fingerprint)
 			for _, f := range p.Fields {
 				n += 64 + len(f.Label)
 			}

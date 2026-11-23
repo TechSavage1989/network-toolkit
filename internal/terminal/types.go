@@ -9,34 +9,35 @@ import (
 
 type ConnectRequest struct {
 	// DisplayName is resolved by the authenticated application from saved metadata.
-	DisplayName         string `json:"-"`
-	DisplayNameExplicit bool   `json:"-"`
-	Type                string `json:"type"`
-	WorkingDirectory    string `json:"workingDirectory,omitempty"`
-	RunAsAdministrator  bool   `json:"runAsAdministrator,omitempty"`
-	ProfileID           string `json:"profileId,omitempty"`
-	CredentialID        string `json:"credentialId,omitempty"`
-	LineEnding          string `json:"lineEnding,omitempty"`
-	SSHCompatibility    string `json:"sshCompatibility,omitempty"`
-	Host                string `json:"host,omitempty"`
-	Port                int    `json:"port,omitempty"`
-	Username            string `json:"username,omitempty"`
-	AuthMethod          string `json:"authMethod,omitempty"`
-	Password            string `json:"password,omitempty"`
-	PrivateKey          string `json:"privateKey,omitempty"`
-	Passphrase          string `json:"passphrase,omitempty"`
-	Cols                int    `json:"cols,omitempty"`
-	Rows                int    `json:"rows,omitempty"`
-	Terminal            string `json:"terminal,omitempty"`
-	TimeoutMs           int    `json:"timeoutMs,omitempty"`
-	SerialPort          string `json:"serialPort,omitempty"`
-	BaudRate            int    `json:"baudRate,omitempty"`
-	DataBits            int    `json:"dataBits,omitempty"`
-	StopBits            string `json:"stopBits,omitempty"`
-	Parity              string `json:"parity,omitempty"`
-	FlowControl         string `json:"flowControl,omitempty"`
-	SerialDTR           *bool  `json:"dtr,omitempty"`
-	SerialRTS           *bool  `json:"rts,omitempty"`
+	DisplayName            string `json:"-"`
+	DisplayNameExplicit    bool   `json:"-"`
+	Type                   string `json:"type"`
+	WorkingDirectory       string `json:"workingDirectory,omitempty"`
+	RunAsAdministrator     bool   `json:"runAsAdministrator,omitempty"`
+	ProfileID              string `json:"profileId,omitempty"`
+	CredentialID           string `json:"credentialId,omitempty"`
+	LineEnding             string `json:"lineEnding,omitempty"`
+	SSHCompatibility       string `json:"sshCompatibility,omitempty"`
+	SSHAutoContinueNotices bool   `json:"sshAutoContinueNotices,omitempty"`
+	Host                   string `json:"host,omitempty"`
+	Port                   int    `json:"port,omitempty"`
+	Username               string `json:"username,omitempty"`
+	AuthMethod             string `json:"authMethod,omitempty"`
+	Password               string `json:"password,omitempty"`
+	PrivateKey             string `json:"privateKey,omitempty"`
+	Passphrase             string `json:"passphrase,omitempty"`
+	Cols                   int    `json:"cols,omitempty"`
+	Rows                   int    `json:"rows,omitempty"`
+	Terminal               string `json:"terminal,omitempty"`
+	TimeoutMs              int    `json:"timeoutMs,omitempty"`
+	SerialPort             string `json:"serialPort,omitempty"`
+	BaudRate               int    `json:"baudRate,omitempty"`
+	DataBits               int    `json:"dataBits,omitempty"`
+	StopBits               string `json:"stopBits,omitempty"`
+	Parity                 string `json:"parity,omitempty"`
+	FlowControl            string `json:"flowControl,omitempty"`
+	SerialDTR              *bool  `json:"dtr,omitempty"`
+	SerialRTS              *bool  `json:"rts,omitempty"`
 
 	// ExpectedHostFingerprint is an authenticated backend trust decision, never
 	// a client-supplied pin. Saved credentials use it before user authentication.
@@ -44,32 +45,33 @@ type ConnectRequest struct {
 }
 
 type SessionInfo struct {
-	ID               string  `json:"id"`
-	WorkingDirectory string  `json:"workingDirectory,omitempty"`
-	Elevated         bool    `json:"elevated,omitempty"`
-	ProfileID        string  `json:"profileId,omitempty"`
-	LineEnding       string  `json:"lineEnding,omitempty"`
-	Type             string  `json:"type"`
-	Label            string  `json:"label"`
-	ManualName       string  `json:"manualName,omitempty"`
-	NameRevision     uint64  `json:"nameRevision"`
-	NameExplicit     bool    `json:"nameExplicit"`
-	LabelSource      string  `json:"labelSource,omitempty"`
-	Host             string  `json:"host,omitempty"`
-	Port             int     `json:"port,omitempty"`
-	Username         string  `json:"username,omitempty"`
-	SSHCompatibility string  `json:"sshCompatibility,omitempty"`
-	SerialPort       string  `json:"serialPort,omitempty"`
-	State            string  `json:"state"`
-	CreatedAt        string  `json:"createdAt"`
-	UpdatedAt        string  `json:"updatedAt"`
-	Cols             int     `json:"cols"`
-	Rows             int     `json:"rows"`
-	BytesReceived    uint64  `json:"bytesReceived"`
-	BytesSent        uint64  `json:"bytesSent"`
-	Error            string  `json:"error,omitempty"`
-	ErrorCode        string  `json:"errorCode,omitempty"`
-	Prompt           *Prompt `json:"prompt,omitempty"`
+	ID                     string  `json:"id"`
+	WorkingDirectory       string  `json:"workingDirectory,omitempty"`
+	Elevated               bool    `json:"elevated,omitempty"`
+	ProfileID              string  `json:"profileId,omitempty"`
+	LineEnding             string  `json:"lineEnding,omitempty"`
+	Type                   string  `json:"type"`
+	Label                  string  `json:"label"`
+	ManualName             string  `json:"manualName,omitempty"`
+	NameRevision           uint64  `json:"nameRevision"`
+	NameExplicit           bool    `json:"nameExplicit"`
+	LabelSource            string  `json:"labelSource,omitempty"`
+	Host                   string  `json:"host,omitempty"`
+	Port                   int     `json:"port,omitempty"`
+	Username               string  `json:"username,omitempty"`
+	SSHCompatibility       string  `json:"sshCompatibility,omitempty"`
+	SSHAutoContinueNotices bool    `json:"sshAutoContinueNotices,omitempty"`
+	SerialPort             string  `json:"serialPort,omitempty"`
+	State                  string  `json:"state"`
+	CreatedAt              string  `json:"createdAt"`
+	UpdatedAt              string  `json:"updatedAt"`
+	Cols                   int     `json:"cols"`
+	Rows                   int     `json:"rows"`
+	BytesReceived          uint64  `json:"bytesReceived"`
+	BytesSent              uint64  `json:"bytesSent"`
+	Error                  string  `json:"error,omitempty"`
+	ErrorCode              string  `json:"errorCode,omitempty"`
+	Prompt                 *Prompt `json:"prompt,omitempty"`
 }
 
 type PromptField struct {
@@ -81,6 +83,7 @@ type Prompt struct {
 	ID                   string        `json:"id"`
 	Kind                 string        `json:"kind"`
 	Title                string        `json:"title"`
+	ServerName           string        `json:"serverName,omitempty"`
 	Message              string        `json:"message"`
 	Host                 string        `json:"host,omitempty"`
 	Port                 int           `json:"port,omitempty"`

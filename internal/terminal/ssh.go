@@ -288,8 +288,29 @@ func openSSHConnection(parent context.Context, req ConnectRequest, cb transportC
 		if err := validatePrompt(prompt); err != nil {
 			return nil, err
 		}
+		// Keep the raw server context for the conservative saved-password matcher.
+		// A notice is still an authentication round and closes that first-round
+		// opportunity, even when the user opted to continue notices automatically.
 		if answers, ok := passwordAuth.answerChallenge(name, instruction, questions, echo); ok {
 			return answers, nil
+		}
+		prompt.ServerName = sshAuthenticationServerName(name, req)
+		if len(questions) == 0 {
+			prompt.Title = "SSH sign-in notice"
+			if req.SSHAutoContinueNotices {
+				if err := lifetime.Err(); err != nil {
+					return nil, err
+				}
+				if cb.Output != nil {
+					if notice := sshAuthenticationNoticeOutput(name, instruction, req); len(notice) != 0 {
+						cb.Output(notice)
+					}
+				}
+				// RFC 4256 requires an empty response for a zero-question request.
+				// This acknowledges only the notice; the server still decides what
+				// authentication, if any, is required in a following round.
+				return []string{}, lifetime.Err()
+			}
 		}
 		reply, err := ask(lifetime, prompt)
 		if err != nil {
