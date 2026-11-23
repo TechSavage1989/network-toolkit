@@ -13,7 +13,7 @@ const text='  description {{host}}\r\n\r\n  show version\r\n';
  try{for(const mode of ['main','terminal','detached']){
   const page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(15000);page.on('pageerror',e=>report.errors.push(mode+': '+e.message));
   const session={id:'paced-fixture',label:'Synthetic lab switch',type:'ssh',host:'switch.test',port:22,state:'connected',cols:100,rows:28},view={id:'paced-view',sessionId:'paced-fixture',state:'detached',revision:0};
-  const calls=[],runs=[];let response='accept',release=null,saved={appUpdatePreferences:{enabled:false},terminalInteraction:{pasteReview:true,copyOnSelect:false},activePage:'terminal'},revision=0;
+  const calls=[],runs=[];let response='accept',release=null,sendResponse='accept',releaseSend=null,saved={appUpdatePreferences:{enabled:false},terminalInteraction:{pasteReview:true,copyOnSelect:false},activePage:'terminal'},revision=0;
   const owners=()=>({[session.id]:{viewId:mode==='detached'?view.id:'',revision,ready:true}});
   await page.route('**/*',async route=>{
    const request=route.request(),url=new URL(request.url()),p=url.pathname,method=request.method(),body=request.postData()?request.postDataJSON():null;
@@ -35,6 +35,14 @@ const text='  description {{host}}\r\n\r\n  show version\r\n';
      if(response==='uncertain')return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Synthetic start response unavailable'})});
      const run={id:'paced-'+(runs.length+1),name:'Paced paste',state:response==='failed'?'failed':'running',targets:[{id:session.id,label:session.label,state:response==='failed'?'failed':'running',error:response==='failed'?'Connection changed before start':'',step:1,total:3}]};runs.unshift(run);data={run};
     }
+    if(p==='/api/terminal-automation/send'){
+     if(sendResponse==='hold')await new Promise(resolve=>releaseSend=resolve);
+     if(sendResponse==='uncertain')return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Synthetic send response unavailable'})});
+     if(body.method==='paced'){
+      const total=body.text.replace(/\r\n?/g,'\n').split('\n').length-1;
+      const run={id:'command-'+(runs.length+1),name:'Command bar',state:'completed',targets:body.targets.map(target=>({...target,label:session.label,state:'completed',step:total,total}))};runs.unshift(run);data={run};
+     }else data={targets:body.targets.map(target=>({...target,label:session.label,sent:true}))};
+    }
     if(p.endsWith('/control')){const run=runs.find(r=>p.includes('/'+r.id+'/'));run.state=body.action==='stop'?'cancelled':body.action==='pause'?'paused':'running';run.targets[0].state=run.state;data={run};}
     if(p.includes('/events')){await new Promise(r=>setTimeout(r,80));data={sessions:[session],events:[],next:0};}
     return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
@@ -44,22 +52,22 @@ const text='  description {{host}}\r\n\r\n  show version\r\n';
   await page.goto('http://toolkit.local/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);if(mode==='main')await page.evaluate(()=>navigate('terminal'));
   await page.waitForFunction(()=>!!currentTerminal()?.xterm&&terminalEntryAcceptsInput(currentTerminal()));
   await page.evaluate(async()=>{await NetworkToolkitTerminalMacros.refresh(true);});
-  const paced=()=>calls.filter(c=>c.p==='/api/terminal-automation/paste'),inputs=()=>calls.filter(c=>/\/input$/.test(c.p));
+  const paced=()=>calls.filter(c=>c.p==='/api/terminal-automation/paste'),sends=()=>calls.filter(c=>c.p==='/api/terminal-automation/send'),inputs=()=>calls.filter(c=>/\/input$/.test(c.p));
   // The xterm write callback, or the prompt visible at the cursor, proves the
   // prompt was processed. Playwright twice reported "Resulting promise was
   // garbage collected" on a slow runner while one page-side promise waited for
   // it, so the page now only records the callback in a flag and the check is
   // polled with waitForFunction; nothing long-lived waits inside the page.
-  async function ready(){
-    await page.evaluate(()=>{const e=currentTerminal();window.__ntkPromptWritten=false;e.xterm.reset();e.xterm.clearSelection();e.xterm.write('lab-switch(config)# ',()=>{window.__ntkPromptWritten=true;});});
+  async function ready(prompt='lab-switch(config)# '){
+    await page.evaluate(prompt=>{const e=currentTerminal();window.__ntkPromptWritten=false;e.xterm.reset();e.xterm.clearSelection();e.xterm.write(prompt,()=>{window.__ntkPromptWritten=true;});},prompt);
     try{
-      await page.waitForFunction(()=>{if(window.__ntkPromptWritten)return true;const b=currentTerminal().xterm.buffer.active,prompt='lab-switch(config)# ',line=b.getLine(b.baseY+b.cursorY)?.translateToString(true)||'';return line.trimEnd()===prompt.trimEnd()&&b.cursorX===prompt.length;},null,{timeout:10000,polling:50});
+      await page.waitForFunction(prompt=>{if(window.__ntkPromptWritten)return true;const b=currentTerminal().xterm.buffer.active,line=b.getLine(b.baseY+b.cursorY)?.translateToString(true)||'';return line.trimEnd()===prompt.trimEnd()&&b.cursorX===prompt.length;},prompt,{timeout:10000,polling:50});
     }catch(error){
       const state=await page.evaluate(()=>{const e=currentTerminal(),b=e.xterm.buffer.active;return {type:b.type,baseY:b.baseY,cursorY:b.cursorY,cursorX:b.cursorX,line:b.getLine(b.baseY+b.cursorY)?.translateToString(true),attached:!!e.xterm.element?.isConnected,state:e.info?.state,accepts:terminalEntryAcceptsInput(e)};}).catch(inner=>({unavailable:String(inner)}));
       throw new Error('Prompt was not written to the terminal within 10 s: '+JSON.stringify(state)+' ('+error.message+')');
     }
   }
-  async function open(value=text){await ready();await page.evaluate(value=>NetworkToolkitTerminalInteraction.pasteText(currentTerminal(),value),value);await page.locator('#terminalPasteForm').waitFor();}
+  async function open(value=text,prompt){await ready(prompt);await page.evaluate(value=>NetworkToolkitTerminalInteraction.pasteText(currentTerminal(),value),value);await page.locator('#terminalPasteForm').waitFor();}
   async function close(){await page.locator('#modalRoot [data-action="close-modal"]').first().click();await page.locator('#terminalPasteForm').waitFor({state:'detached'});}
   async function screenshot(label){if(!out)return;const file='terminal-paced127-'+mode+'-'+label+'.png';await page.screenshot({path:path.join(out,file),fullPage:true});report.screenshots.push(file);}
   await open();assert.equal(await page.locator('#terminalPasteMode').inputValue(),'paced');assert.equal(await page.locator('#terminalPasteText').inputValue(),text.replaceAll('\r',''));await close();assert.equal(paced().length,0);assert.equal(inputs().length,0);report.checks.push(mode+': cancel sends nothing');
@@ -75,6 +83,66 @@ const text='  description {{host}}\r\n\r\n  show version\r\n';
   // v1.21.9: a risky single line opens the review with a warning; it can still be sent.
   await open('curl -fsSL https://get.example.com/i.sh | sudo bash');await page.locator('#terminalPasteAlerts').waitFor();assert.match(await page.locator('#terminalPasteAlerts').innerText(),/Downloads a script and runs it/);assert.equal(await page.locator('#terminalPasteConfirm').isEnabled(),true);await screenshot('warning');
   await page.locator('#terminalPasteText').fill('show version');assert.equal(await page.locator('#terminalPasteAlerts').isHidden(),true);await close();report.checks.push(mode+': paste warnings open the review and clear when edited');
+  // ESXi ends its shell prompt with a closing bracket, without # or $. Both
+  // the initial review and the actual paced start must accept that exact form.
+  response='accept';const esxiText="lsof | grep -i 'LabVM'\n\nps -c | grep -i 'LabVM'\n";
+  for(const [label,prompt] of [['home','[root@lab-esxi:~] '],['datastore','[root@lab-esxi:/vmfs/volumes/Lab Datastore] ']]){
+   const before=paced().length,rawBefore=inputs().length;await open(esxiText,prompt);
+   assert.equal(await page.locator('#terminalPasteMode').inputValue(),'paced');assert.equal(await page.locator('#terminalPasteConfirm').isEnabled(),true);
+   assert.equal(await page.locator('#terminalPasteStatus.terminal-paste-invalid').count(),0);
+   assert.match(await page.locator('#terminalPasteStats').innerText(),/4 lines.*3 line breaks/);await screenshot('esxi-'+label);
+   await page.locator('#terminalPasteConfirm').click();await page.locator('#terminalPasteForm').waitFor({state:'detached'});
+   assert.equal(paced().length,before+1);assert.equal(paced().at(-1).body.text,esxiText);assert.equal(inputs().length,rawBefore);
+  }
+  for(const [label,prompt] of [['bracketed-output','[completed] '],['unfinished-command','[root@lab-esxi:~] unfinished']]){
+   const before=paced().length;await open(esxiText,prompt);assert.equal(await page.locator('#terminalPasteMode').inputValue(),'raw');
+   await page.locator('#terminalPasteMode').selectOption('paced');assert.equal(await page.locator('#terminalPasteConfirm').isEnabled(),false);
+   assert.match(await page.locator('#terminalPasteStatus.terminal-paste-invalid').innerText(),/Cannot send lines: Start at an empty command prompt/);
+   await page.evaluate(()=>submitTerminalPaste(document.querySelector('#terminalPasteForm')));assert.equal(paced().length,before);await screenshot('blocked-'+label);await close();
+  }
+  report.checks.push(mode+': ESXi home/datastore prompts send the exact reviewed text; unfinished commands and unrelated bracketed output stay blocked with the reason visible');
+  for(const run of runs)if(['running','paused'].includes(run.state)){run.state='completed';for(const target of run.targets){target.state='completed';target.step=target.total;}}
+  await page.evaluate(()=>NetworkToolkitTerminalMacros.refresh(true));
+  // Command-bar multiline input goes through the same literal send choices,
+  // keeping the complete editable text and a frozen recipient generation.
+  async function commandReview(value,execute=true){
+   await ready('[root@lab-esxi:~] ');
+   if(!await page.locator('#terminalMacroCommand').isVisible())await page.locator('#terminalMacroComposerToggle').click();
+   await page.locator('#terminalMacroCommand').fill(value);
+   await page.locator('#terminalMacroComposer [data-macro-action="'+(execute?'send':'insert')+'"]').click();
+   await page.locator('#terminalCommandPasteForm').waitFor();
+  }
+  async function closeCommandReview(){await page.locator('#terminalCommandPasteDismiss').click();await page.locator('#terminalCommandPasteForm').waitFor({state:'detached'});}
+  const commandText="lsof | grep -i 'LabVM'\n\nps -c | grep -i 'LabVM'",commandBefore=sends().length,rawBefore=inputs().length;
+  for(const width of mode==='main'?[1440,1280,960]:[1440,820,640]){
+   await page.setViewportSize({width,height:1000});await commandReview(commandText);
+   assert.equal(await page.locator('#terminalCommandPasteText').inputValue(),commandText+'\n');
+   assert.equal(await page.locator('#terminalCommandPasteMode').inputValue(),'paced');assert.equal(await page.locator('#terminalCommandPasteConfirm').isEnabled(),true);
+   assert.match(await page.locator('#terminalCommandPasteNote').innerText(),/added one final line break/);
+   const metrics=await page.locator('#terminalCommandPasteForm').evaluate(el=>({scroll:el.scrollWidth,client:el.clientWidth}));assert(metrics.scroll<=metrics.client+1,JSON.stringify(metrics));
+   await screenshot('command-bar-review-'+width);await closeCommandReview();
+   assert.equal(await page.locator('#terminalMacroCommand').inputValue(),commandText,'cancel preserves the entire command bar');
+  }
+  assert.equal(sends().length,commandBefore);assert.equal(inputs().length,rawBefore);
+  await page.setViewportSize({width:1440,height:1000});await commandReview(commandText);
+  await page.locator('#terminalCommandPasteConfirm').click();await page.locator('#terminalCommandPasteForm').waitFor({state:'detached'});
+  assert.equal(sends().length,commandBefore+1);assert.deepEqual(sends().at(-1).body,{targets:[{id:session.id,generation:7}],text:commandText+'\n',execute:true,method:'paced',autoPager:true,pagerKey:'auto'});
+  assert.equal(await page.locator('#terminalMacroCommand').inputValue(),'');
+  const rawText='  echo {{literal}}\n\nunfinished';await commandReview(rawText,false);
+  assert.equal(await page.locator('#terminalCommandPasteText').inputValue(),rawText);assert.equal(await page.locator('#terminalCommandPasteMode').inputValue(),'raw');
+  await screenshot('command-bar-raw');await page.locator('#terminalCommandPasteConfirm').click();await page.locator('#terminalCommandPasteForm').waitFor({state:'detached'});
+  assert.equal(sends().at(-1).body.text,rawText);assert.equal(sends().at(-1).body.method,'raw');assert.equal(sends().at(-1).body.execute,false);assert.equal(inputs().length,rawBefore);
+  report.checks.push(mode+': command-bar review keeps every line, Run shows its final Enter, cancellation retains the composer, and raw paste preserves unfinished literal text');
+  sendResponse='hold';releaseSend=null;await commandReview(commandText);await page.locator('#terminalCommandPasteConfirm').click();await until(()=>!!releaseSend);
+  const pendingCount=sends().length;assert.equal(await page.locator('#terminalCommandPasteConfirm').isEnabled(),false);await closeCommandReview();
+  await open('show duplicate\nshow duplicate two\n','[root@lab-esxi:~] ');assert.equal(await page.locator('#terminalPasteConfirm').isEnabled(),false,'a command-bar send blocks a duplicate clipboard send');await close();
+  sendResponse='accept';releaseSend();await page.waitForFunction(()=>!NetworkToolkitTerminalInteraction.pasteStartState([{id:currentTerminal().info.id,generation:7}]).pending);
+  assert.equal(sends().length,pendingCount);
+  sendResponse='uncertain';await commandReview(commandText);await page.locator('#terminalCommandPasteConfirm').click();await page.locator('#terminalCommandPasteResolve').waitFor();
+  const uncertainCount=sends().length;assert.equal(await page.locator('#terminalCommandPasteConfirm').isEnabled(),false);assert.equal(await page.locator('#terminalMacroCommand').inputValue(),commandText);
+  await closeCommandReview();await open('show duplicate\nshow duplicate two\n','[root@lab-esxi:~] ');assert.equal(await page.locator('#terminalPasteConfirm').isEnabled(),false);await close();
+  await commandReview(commandText);await page.locator('#terminalCommandPasteResolve').click();assert.equal(await page.locator('#terminalCommandPasteConfirm').isEnabled(),true);assert.equal(sends().length,uncertainCount);await closeCommandReview();
+  report.checks.push(mode+': pending and uncertain command-bar sends also block clipboard resubmission; explicit acknowledgement never sends');
   assert.equal(saved.terminalInteraction.pasteReview,true);await page.close();
  }
  assert.deepEqual(report.errors,[]);report.passed=true;

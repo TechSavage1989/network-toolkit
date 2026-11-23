@@ -6,7 +6,7 @@ const BASE='/terminal-automation';
 const KEYS=['Enter','Tab','Escape','Ctrl+C','Ctrl+Z','Ctrl+D','Up','Down','Left','Right','Backspace'];
 const KINDS={command:'Command + Enter',text:'Insert text',key:'Key',wait:'Wait for text / pattern',delay:'Delay',pause:'Pause for review'};
 const BUILTINS=['host','username','session'];
-const S={mounted:false,open:false,view:'library',composerExpanded:false,library:{macros:[],bindings:[],revision:''},targets:[],runs:[],runsEpoch:0,clearing:false,mode:'current',selected:new Set(),query:'',folder:'',loaded:false,libraryCheckedAt:0,polling:false,timer:null,editor:null,folderMove:null,preview:null,output:null,recording:null,last:new Map(),menu:null,menuReturn:null,disposed:false,startup:new Map()};
+const S={mounted:false,open:false,view:'library',composerExpanded:false,commandReview:null,composerRecovery:null,library:{macros:[],bindings:[],revision:''},targets:[],runs:[],runsEpoch:0,clearing:false,mode:'current',selected:new Set(),query:'',folder:'',loaded:false,libraryCheckedAt:0,polling:false,timer:null,editor:null,folderMove:null,preview:null,output:null,recording:null,last:new Map(),menu:null,menuReturn:null,disposed:false,startup:new Map()};
 const pacedPending=new Set();
 const $=(selector,scope=document)=>scope.querySelector(selector);
 const $$=(selector,scope=document)=>Array.from(scope.querySelectorAll(selector));
@@ -25,7 +25,7 @@ const button=(action,label,extra='',classes='btn small')=>'<button type="button"
 const badge=text=>'<span class="macro-badge">'+html(text)+'</span>';
 function call(path,method,body){if(typeof api!=='function')return Promise.reject(new Error('Terminal automation is unavailable.'));return api(BASE+path,method,body);}
 function modal(title,body,footer='',wide=true){if(typeof openModal==='function')openModal(title,body,footer,wide);}
-function close(){S.editor=null;S.folderMove=null;S.preview=null;S.output=null;if(typeof closeModal==='function')closeModal();}
+function close(){S.editor=null;S.folderMove=null;S.preview=null;S.output=null;S.commandReview=null;if(typeof closeModal==='function')closeModal();}
 function error(message){const el=$('[data-macro-error]');if(el){el.textContent=message;el.classList.remove('hidden');}else notify(message,'error');}
 function chosenTargets(){if(S.mode==='all')return S.targets.slice();if(S.mode==='selected')return S.targets.filter(t=>S.selected.has(t.id));const id=current()?.info?.id;return S.targets.filter(t=>t.id===id);}
 function snapshotTargets(){return chosenTargets().map(t=>({...t}));}
@@ -46,16 +46,16 @@ function mount(){
  if(!S.mounted){document.addEventListener('click',onClick);document.addEventListener('change',onChange);document.addEventListener('input',onInputEvent);document.addEventListener('keydown',onKeyDown,true);document.addEventListener('contextmenu',onContextMenu);document.addEventListener('terminal-sidebar-tab-change',onSidebarChange);S.mounted=true;}
  render();if(!S.loaded&&!S.polling)refresh(true);else schedule();return true;
 }
-function sync(){if(!$('#terminalMacroComposer')){mount();return;}renderSidebarView();renderComposer();renderTargets();renderRecording();renderActivity();}
+function sync(){if(!$('#terminalMacroComposer')){mount();return;}renderSidebarView();renderComposer();renderTargets();renderRecording();renderActivity();updateComposerReview();}
 function toggle(force){const open=sidebarOpen(),want=force===undefined?!open:!!force;if(want){sidebar()?.activateTab?.('macros',{expand:true});sidebar()?.setCollapsed?.(false);}else if(sidebar()?.activeTab?.()==='macros')sidebar()?.setCollapsed?.(true);S.open=want;renderSidebarView();if(want&&!S.loaded)refresh(true);}
 function openView(view){S.view=view;toggle(true);renderSidebarView();}
 function onSidebarChange(event){S.open=event.detail?.tab==='macros'&&!event.detail?.collapsed;removeMenu();renderSidebarView();}
 function renderSidebarView(){S.open=sidebarOpen();for(const [view,id] of [['library','Library'],['runs','Runs']]){$('#terminalMacro'+id+'View')?.classList.toggle('hidden',S.view!==view);const tab=$('#terminalMacro'+id+'Tab');tab?.setAttribute('aria-selected',String(S.view===view?'true':'false'));tab?.setAttribute('tabindex',S.view===view?'0':'-1');}const confirmation=$('#terminalMacroConfirmation');if(confirmation)confirmation.value=['always','multiple','never'].includes(prefs().terminalMacroConfirmation)?prefs().terminalMacroConfirmation:'always';}
-function renderComposer(){const el=$('#terminalMacroComposer');if(!el)return;const visible=prefs().terminalComposerCollapsed!==true;el.classList.toggle('hidden',!visible);el.classList.toggle('is-expanded',S.composerExpanded);$('#terminalMacroComposerToggle')?.setAttribute('aria-expanded',String(visible));const send=$('[data-macro-action="send"]',el),many=($('#terminalMacroCommand')?.value||'').replace(/\r\n?/g,'\n').split('\n').filter(line=>line.trim()).length>1;if(send){send.textContent=many?'Run commands':'Run command';send.title=many?'Send and run each command in the chosen terminals (Ctrl+Enter)':'Send the command and press Enter in the chosen terminals (Ctrl+Enter)';}const expand=$('#terminalMacroExpand');if(expand){expand.setAttribute('aria-expanded',String(S.composerExpanded));expand.setAttribute('aria-label',S.composerExpanded?'Collapse command input':'Expand command input');expand.title=S.composerExpanded?'Collapse command input to one row':'Expand command input for multiple lines';}if(!visible)showTargetPicker(false);}
+function renderComposer(){const el=$('#terminalMacroComposer');if(!el)return;const visible=prefs().terminalComposerCollapsed!==true;el.classList.toggle('hidden',!visible);el.classList.toggle('is-expanded',S.composerExpanded);$('#terminalMacroComposerToggle')?.setAttribute('aria-expanded',String(visible));const send=$('[data-macro-action="send"]',el),value=$('#terminalMacroCommand')?.value||'',multiline=/[\r\n]/.test(value),many=value.replace(/\r\n?/g,'\n').split('\n').filter(line=>line.trim()).length>1;if(send){send.textContent=many?'Run commands':'Run command';send.title=multiline?'Review and run the command list in the chosen terminals (Ctrl+Enter)':'Send the command and press Enter in the chosen terminals (Ctrl+Enter)';}const insert=$('[data-macro-action="insert"]',el);if(insert){insert.textContent=multiline?'Review paste':'Insert only';insert.title=multiline?'Review multiline text before pasting; no extra Enter is added':'Type one line into the chosen terminals without pressing Enter; this does not run the command';}const expand=$('#terminalMacroExpand');if(expand){expand.setAttribute('aria-expanded',String(S.composerExpanded));expand.setAttribute('aria-label',S.composerExpanded?'Collapse command input':'Expand command input');expand.title=S.composerExpanded?'Collapse command input to one row':'Expand command input for multiple lines';}if(!visible)showTargetPicker(false);}
 function setComposerVisible(visible){prefs().terminalComposerCollapsed=!visible;if(typeof saveState==='function')saveState();renderComposer();}
 function showTargetPicker(open){const el=$('#terminalMacroTargetPicker');if(!el)return;const next=open===undefined?el.classList.contains('hidden'):!!open;el.classList.toggle('hidden',!next);$('#terminalMacroChooseTargets')?.setAttribute('aria-expanded',String(next));}
 function render(){
- if(!$('#terminalMacroPanel'))return;renderSidebarView();renderComposer();renderTargets();renderLibrary();renderRuns();renderRecording();renderActivity();
+ if(!$('#terminalMacroPanel'))return;renderSidebarView();renderComposer();renderTargets();renderLibrary();renderRuns();renderRecording();renderActivity();updateComposerReview();
 }
 function renderTargets(){
  const select=$('#terminalMacroTargetMode');if(!select)return;select.value=S.mode;
@@ -110,7 +110,7 @@ function renderEditor(){
  modal(m.name?'Edit macro: '+m.name:'New macro',body,button('close','Cancel')+button('save-editor','Save macro','','btn primary'));
 }
 function parameterHTML(parameters){return parameters.length?parameters.map((p,i)=>'<div class="macro-param-row" data-param-index="'+i+'"><code>{{'+html(p.name)+'}}</code><label><span class="sr-only">Label for '+html(p.name)+'</span><input data-macro-param="label" value="'+html(p.label||p.name)+'" placeholder="Prompt label"></label><label><span class="sr-only">Default value for '+html(p.name)+'</span><input data-macro-param="defaultValue" value="'+html(p.secret?'':p.defaultValue)+'" placeholder="'+(p.secret?'Prompted each run':'Default value')+'" '+(p.secret?'disabled':'')+'></label><label class="macro-inline-check"><input type="checkbox" data-macro-param="secret"'+checked(p.secret)+'>Secret</label><label class="macro-inline-check"><input type="checkbox" data-macro-param="required"'+checked(p.required)+'>Required</label></div>').join(''):'<p class="muted">No custom variables detected.</p>';}
-function stepHTML(s,i){const usesText=['command','text','wait'].includes(s.kind);return '<div class="macro-step" data-step-index="'+i+'"><div class="macro-step-head"><label class="macro-inline-check"><input type="checkbox" data-macro-step="enabled"'+checked(!s.disabled)+'>Step '+(i+1)+'</label><select data-macro-step="kind" aria-label="Step '+(i+1)+' type">'+Object.entries(KINDS).map(([k,v])=>'<option value="'+k+'" '+(k===s.kind?'selected':'')+'>'+v+'</option>').join('')+'</select><div class="macro-actions">'+button('step-up',ico('arrowUp'),'data-index="'+i+'" aria-label="Move step '+(i+1)+' up" '+(!i?'disabled':''),'iconbtn')+button('step-down',ico('arrowDown'),'data-index="'+i+'" aria-label="Move step '+(i+1)+' down" '+(i===S.editor.draft.steps.length-1?'disabled':''),'iconbtn')+button('step-delete',ico('trash'),'data-index="'+i+'" aria-label="Delete step '+(i+1)+'"','iconbtn')+'</div></div>'+(usesText?'<label class="sr-only" for="macroStepText'+i+'">Step '+(i+1)+' '+(s.kind==='wait'?'text or regular expression':'text')+'</label><textarea id="macroStepText'+i+'" data-macro-step="text" rows="2" spellcheck="false" placeholder="'+(s.kind==='wait'?'Text or regular expression to wait for':'Command or text')+'">'+html(s.text||'')+'</textarea>':s.kind==='key'?'<label>Key<select data-macro-step="key">'+KEYS.map(k=>'<option '+(s.key===k?'selected':'')+'>'+k+'</option>').join('')+'</select></label>':s.kind==='delay'?'<label>Delay (milliseconds)<input type="number" min="0" max="3600000" data-macro-step="delayMs" value="'+Number(s.delayMs||1000)+'"></label>':'<p class="muted">The run pauses here until you choose Resume or Step.</p>')+(s.kind==='wait'?'<label>Timeout (seconds)<input type="number" min="1" max="3600" data-macro-step="timeout" value="'+Number((s.timeoutMs||S.editor.draft.timeoutMs)/1000)+'"></label><small class="muted">Wait patterns use regular expressions. Escape punctuation to match it literally.</small>':'')+'</div>';}
+function stepHTML(s,i){const usesText=['command','text','wait'].includes(s.kind);return '<div class="macro-step" data-step-index="'+i+'"><div class="macro-step-head"><label class="macro-inline-check"><input type="checkbox" data-macro-step="enabled"'+checked(!s.disabled)+'>Step '+(i+1)+'</label><select data-macro-step="kind" aria-label="Step '+(i+1)+' type">'+Object.entries(KINDS).map(([k,v])=>'<option value="'+k+'" '+(k===s.kind?'selected':'')+'>'+v+'</option>').join('')+'</select><div class="macro-actions">'+button('step-up',ico('arrowUp'),'data-index="'+i+'" aria-label="Move step '+(i+1)+' up" '+(!i?'disabled':''),'iconbtn')+button('step-down',ico('arrowDown'),'data-index="'+i+'" aria-label="Move step '+(i+1)+' down" '+(i===S.editor.draft.steps.length-1?'disabled':''),'iconbtn')+button('step-delete',ico('trash'),'data-index="'+i+'" aria-label="Delete step '+(i+1)+'"','iconbtn')+'</div></div>'+(usesText?'<label class="sr-only" for="macroStepText'+i+'">Step '+(i+1)+' '+(s.kind==='wait'?'text or regular expression':'text')+'</label><textarea id="macroStepText'+i+'" data-macro-step="text" rows="2" spellcheck="false" placeholder="'+(s.kind==='wait'?'Text or regular expression to wait for':'Command or text')+'">'+html(s.text||'')+'</textarea>':s.kind==='key'?'<label>Key<select data-macro-step="key">'+KEYS.map(k=>'<option '+(s.key===k?'selected':'')+'>'+k+'</option>').join('')+'</select></label>':s.kind==='delay'?'<label>Delay (milliseconds)<input type="number" min="0" max="3600000" data-macro-step="delayMs" value="'+Number(s.delayMs||1000)+'"></label>':'<p class="muted">The run pauses here until you choose Resume or Step.</p>')+(s.kind==='command'?'<small class="muted">Each nonblank line becomes a separate command. Use Insert text to keep blank lines and literal text.</small>':'')+(s.kind==='wait'?'<label>Timeout (seconds)<input type="number" min="1" max="3600" data-macro-step="timeout" value="'+Number((s.timeoutMs||S.editor.draft.timeoutMs)/1000)+'"></label><small class="muted">Wait patterns use regular expressions. Escape punctuation to match it literally.</small>':'')+'</div>';}
 function readEditor(){
  const e=S.editor;if(!e)return null;const m=e.draft;
  for(const name of ['name','description','folder','shortcut','prompt']){const el=$('[data-macro-edit="'+name+'"]');if(el)m[name]=el.value;}
@@ -147,13 +147,133 @@ function previewExpansion(){const p=S.preview;return p.targets.map((t,i)=>'<deta
 async function runPreview(readValues=true){
  const p=S.preview;if(!p)return;try{if(readValues)for(const el of $$('[data-macro-value]'))p.values[el.dataset.macroValue]=el.value;for(const param of p.macro.parameters)if(param.required&&!String(p.values[param.name]||'').length)throw new Error('Enter '+(param.label||param.name)+'.');const confirmation=readValues?$('[data-macro-run-confirmation]'):null,nextPolicy=confirmation?(confirmation.checked?(p.confirmationPolicy==='multiple'?'multiple':'always'):'never'):null,pager=readValues?$('[data-macro-run-pager]'):null;if(pager)p.macro.autoPager=pager.checked;prepareRunView(p.targets);const blocks=noteRunBlocks(p.targets,macroCommands(p.macro));let result;try{result=await call('/runs','POST',{macro:p.macro,targets:targetRefs(p.targets),values:p.values});}catch(err){linkRunBlocks(blocks,null);throw err;}linkRunBlocks(blocks,result.run);if(nextPolicy&&prefs().terminalMacroConfirmation!==nextPolicy){prefs().terminalMacroConfirmation=nextPolicy;if(typeof saveState==='function')saveState();}p.values={};S.runs=[result.run,...S.runs.filter(r=>r.id!==result.run.id)];close();renderSidebarView();renderRuns();notify('Macro started on '+p.targets.length+' terminal'+(p.targets.length===1?'':'s')+'.');}catch(err){error(err.message);}
 }
-async function send(execute){
- const entry=$('#terminalMacroCommand'),text=entry?.value||'',targets=snapshotTargets();if(!text||!targets.length)return;
- if(!execute&&/[\r\n]/.test(text)){notify('Insert only accepts one line. Use Run commands to execute a command list.','error');return;}
- const buttons=$$('[data-macro-action="send"], [data-macro-action="insert"]');for(const b of buttons)b.disabled=true;
- let blocks=[];try{if(execute){prepareRunView(targets);blocks=noteRunBlocks(targets,text.replace(/\r\n?/g,'\n').split('\n'));}const result=await call('/send','POST',{targets:targetRefs(targets),text,execute}).catch(err=>{linkRunBlocks(blocks,null);throw err;});if(execute)linkRunBlocks(blocks,result.run);const statuses=result.targets||result.results||result.statuses||[],failures=statuses.filter(s=>s.error||s.ok===false||s.state==='failed');const message=failures.length?failures.map(s=>(s.label||s.id)+': '+(s.error||s.message||'Not sent')).join(' · '):(execute?'Sent to ':'Inserted in ')+targets.map(targetName).join(', ');$('#terminalMacroSendResult').innerHTML=result.run?button('output',failures.length?'!':'✓','data-run="'+html(result.run.id)+'" title="'+html(message)+' · View output" aria-label="'+html(message)+'; view output"','iconbtn'):'<span title="'+html(message)+'" aria-label="'+html(message)+'">'+(failures.length?'!':'✓')+'</span>';if(result.run){S.runs=[result.run,...S.runs.filter(r=>r.id!==result.run.id)];renderRuns();}if(failures.length)notify('Some terminals did not accept the command. Open terminal recipients or run output for details.','error');else if(execute){entry.value='';S.composerExpanded=false;renderComposer();}}
- catch(err){notify(err.message,'error');}finally{renderTargets();}
+function composerPasteTools(){
+ const tools=root.NetworkToolkitTerminalInteraction;
+ if(!tools||['pasteStats','pasteWarnings','pacedTextReason','pacedPasteReason','pasteStartState','beginPasteStart','endPasteStart','resolvePasteStart'].some(name=>typeof tools[name]!=='function'))throw new Error('Paste review is unavailable. Reopen Network Toolkit before sending this command list.');
+ return tools;
 }
+function composerEntry(target){
+ if(typeof terminalSessions!=='undefined'&&terminalSessions?.get)return terminalSessions.get(target.id)||null;
+ const entry=current();return entry?.info?.id===target.id?entry:null;
+}
+function composerTargetReason(targets){
+ for(const target of targets){const live=S.targets.find(item=>item.id===target.id);if(!live||live.generation!==target.generation)return targetName(target)+': the connection changed. Cancel and review the intended recipients again.';}
+ return '';
+}
+function composerPacedReason(targets,text,tools){
+ const reason=tools.pacedTextReason(text,1);if(reason)return reason;
+ for(const target of targets){
+  if(target.type!=='ssh')return targetName(target)+': one line at a time requires SSH. Choose raw paste for this terminal.';
+  const entry=composerEntry(target);
+  // Group commands may include a terminal shown in another window. Keep that
+  // capability without inventing its screen state; visible consoles use the
+  // same prompt/input checks as direct terminal paste.
+  if(entry?.xterm){const why=tools.pacedPasteReason({id:target.id,entry,xterm:entry.xterm},text,target,1);if(why)return targetName(target)+': '+why;}
+ }
+ return '';
+}
+function composerPagerOptions(targets){
+ const entry=targets.length===1?composerEntry(targets[0]):null,p=entry?root.NetworkToolkitTerminalExtras?.prefs?.(entry):null;
+ return {autoPager:p?.autoPager!==false,pagerKey:['space','enter'].includes(p?.pagerKey)?p.pagerKey:'auto'};
+}
+function composerReviewText(p){const field=p.form?.querySelector('#terminalCommandPasteText');return field&&field.value!==p.editorOriginal?field.value:p.text;}
+function updateComposerReview(){
+ const p=S.commandReview;if(!p)return;
+ if(!p.form?.isConnected){S.commandReview=null;return;}
+ let tools;try{tools=composerPasteTools();}catch(err){$('#terminalCommandPasteStatus',p.form).textContent=err.message;$('#terminalCommandPasteConfirm').disabled=true;return;}
+ const text=composerReviewText(p),stats=tools.pasteStats(text),mode=$('#terminalCommandPasteMode',p.form),paced=mode.value==='paced',state=tools.pasteStartState(p.targets),reason=composerPacedReason(p.targets,text,tools),invalid=composerTargetReason(p.targets);
+ p.invalid=p.invalid||invalid;p.pending=state.pending;p.uncertain=state.uncertain;
+ const blocked=!!p.invalid||state.pending||state.uncertain||!text||stats.bytes>65536||paced&&!!reason;
+ $('#terminalCommandPasteStats',p.form).textContent=stats.lines+(stats.lines===1?' line':' lines')+' · '+stats.breaks+(stats.breaks===1?' line break':' line breaks')+' · '+stats.bytes.toLocaleString()+' bytes'+(stats.trailing?' · Ends with a line break':'');
+ const status=$('#terminalCommandPasteStatus',p.form);
+ status.textContent=p.invalid|| (state.pending?'Send request pending. Closing this review does not stop commands. Do not submit again.':state.uncertain?(p.error||'Check the previous send in Runs and the recipient terminals before sending again. Some commands may already have run.'):stats.bytes>65536?'This command-bar paste exceeds 64 KiB. Reduce the text before sending.':paced&&reason?'Cannot send lines: '+reason:p.error|| (stats.breaks?'Line breaks may execute commands on the devices. Review or edit every line before sending.':'The edited text contains no line breaks. Raw paste adds no Enter.'));
+ status.classList.toggle('terminal-paste-invalid',blocked&&!!text||!!p.error);
+ const warnings=tools.pasteWarnings(text),alerts=$('#terminalCommandPasteAlerts',p.form);alerts.hidden=!warnings.length;
+ const key=JSON.stringify(warnings);if(alerts.dataset.key!==key){alerts.dataset.key=key;alerts.innerHTML=warnings.length?'<strong>Check before sending</strong><ul>'+warnings.map(w=>'<li>'+html(w.message)+(w.sample?' <code>'+html(w.sample)+'</code>':'')+'</li>').join('')+'</ul><p class="hint">Sending is still allowed. Turn warnings off in Mouse and keyboard defaults.</p>':'';}
+ const unseen=p.targets.some(target=>!composerEntry(target)?.xterm);
+ $('#terminalCommandPasteModeHint',p.form).textContent=paced?(reason||'Sends each complete line literally and waits for a fresh prompt. Blank lines are kept. '+(unseen?'Start every recipient at an empty command prompt; terminals shown elsewhere cannot be checked here. ':'')+'Pause or Stop is available in Runs.'):'Sends all reviewed text at once without waiting for prompts. No additional Enter is added; existing line breaks may run commands.';
+ mode.disabled=state.pending||state.uncertain;$('#terminalCommandPasteText',p.form).readOnly=state.pending||state.uncertain;
+ $('#terminalCommandPasteResolve',p.form).hidden=!state.uncertain;
+ const submit=$('#terminalCommandPasteConfirm');submit.disabled=!!blocked;submit.textContent=paced?'Send lines · wait for prompt':'Paste all at once';
+ $('#terminalCommandPasteDismiss').textContent=state.pending||state.uncertain?'Close':'Cancel';
+}
+function openComposerReview(source,original,targets,execute,recovery=null){
+ const tools=composerPasteTools(),text=recovery?recovery.text:execute&&!/[\r\n]$/.test(original)?original+'\n':original;
+ if($('#modalRoot .modal')){if(S.commandReview?.form?.isConnected){updateComposerReview();return;}notify('Finish or close the current dialog before reviewing the command list.','error');return;}
+ const title='Review '+(execute?'commands':'paste')+' to '+(targets.length===1?targetName(targets[0]):targets.length+' terminals');
+ modal(title,'<form id="terminalCommandPasteForm" class="terminal-paste-review"><div class="terminal-paste-destination"><strong>Recipients: '+targets.length+' terminal'+(targets.length===1?'':'s')+'</strong></div><div class="macro-preview-targets">'+targetsHTML(targets)+'</div><p class="hint">These recipients are fixed for this send. Changing the active pane or selection will not change them.</p><p id="terminalCommandPasteStatus" class="terminal-paste-warning" role="status"></p><div id="terminalCommandPasteAlerts" class="terminal-paste-alerts" role="alert" hidden></div><div class="field"><label for="terminalCommandPasteText">Text to send</label><textarea id="terminalCommandPasteText" class="mono" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="terminalCommandPasteStats terminalCommandPasteStatus"></textarea></div><div id="terminalCommandPasteStats" class="terminal-paste-stats" aria-live="polite"></div><p id="terminalCommandPasteNote" class="hint">'+(recovery?'This is the exact text from the previous send. Check Runs and terminals before allowing another send.':text!==original?'Run commands added one final line break so the last command can run. The text above includes it.':'The text above keeps every original line break. No extra Enter is added when sent.')+'</p><div class="field mt"><label for="terminalCommandPasteMode">Send method</label><select id="terminalCommandPasteMode" aria-describedby="terminalCommandPasteModeHint"><option value="paced">One line at a time · wait for prompt</option><option value="raw">Raw paste · all at once</option></select><p id="terminalCommandPasteModeHint" class="help-line" role="status"></p>'+button('resolve-send','I checked Runs and terminals · allow a new paste','id="terminalCommandPasteResolve" hidden','btn small ghost')+'</div></form>',button('close','Cancel','id="terminalCommandPasteDismiss"')+button('send-review','Send','id="terminalCommandPasteConfirm"','btn primary'));
+ const form=$('#terminalCommandPasteForm'),field=$('#terminalCommandPasteText',form);field.value=text;
+ const p={source,original,text,editorOriginal:field.value,targets,execute,form,recovery,invalid:'',error:recovery?.error||'',options:recovery?.options||composerPagerOptions(targets)};S.commandReview=p;
+ $('#terminalCommandPasteMode',form).value=recovery?(recovery.method||'raw'):composerPacedReason(targets,text,tools)?'raw':'paced';updateComposerReview();field.focus();field.setSelectionRange(0,0);
+}
+function offerComposerRecovery(p,text,method){
+ if(p.form)return;
+ S.composerRecovery={...p,text,method};
+ const status=$('#terminalMacroSendResult');if(status&&!$('[data-macro-action="review-send"]',status))status.insertAdjacentHTML('beforeend',button('review-send','Check send status','title="Review the previous send before allowing another paste"'));
+ if(!$('#modalRoot .modal'))openComposerRecovery();
+}
+function openComposerRecovery(){
+ const p=S.composerRecovery;if(!p)return;
+ try{if(!composerPasteTools().pasteStartState(p.targets).uncertain){S.composerRecovery=null;$('#terminalMacroSendResult [data-macro-action="review-send"]')?.remove();return;}openComposerReview(p.source,p.original,p.targets,p.execute,p);}catch(err){notify(err.message,'error');}
+}
+function noteComposerBlocks(targets,text){
+ const blocks=[];for(const target of targets){const entry=composerEntry(target);if(!entry)continue;const block=root.NetworkToolkitTerminalExtras?.notePaste?.(entry,text);if(block)blocks.push({entry,block,id:target.id});}return blocks;
+}
+function discardComposerBlocks(blocks){for(const {entry,block} of blocks)root.NetworkToolkitTerminalExtras?.discardPacedPaste?.(entry,block);}
+function composerResult(result,targets,method){
+ const run=result?.run,rows=run?.targets||result?.targets,expected=new Map(targets.map(t=>[t.id,t])),seen=new Set();
+ if(method==='paced'&&(!run?.id||!Array.isArray(rows)))throw new Error('The paced send was not confirmed. Check Runs and terminals before sending again.');
+ if(!Array.isArray(rows)||rows.length!==targets.length)throw new Error('The send response did not confirm every recipient. Check Runs and terminals before sending again.');
+ for(const row of rows){const target=expected.get(row.id);if(!target||seen.has(row.id)||run&&(!run.id||row.generation!==target.generation||!['running','paused','completed','failed','disconnected','stopped'].includes(row.state))||!run&&typeof row.sent!=='boolean')throw new Error('The send response did not match the reviewed connections. Check Runs and terminals before sending again.');seen.add(row.id);}
+ const failures=rows.filter(row=>row.error||(run?['failed','disconnected','stopped'].includes(row.state):!row.sent));
+ if(run?.state==='failed'&&!failures.length)throw new Error('The run failed without confirming its recipients. Check Runs before sending again.');
+ return {run,failures,accepted:rows.filter(row=>!failures.includes(row))};
+}
+async function dispatchComposer(p,text,method){
+ let tools;try{tools=composerPasteTools();}catch(err){notify(err.message,'error');return false;}
+ const invalid=composerTargetReason(p.targets),reason=method==='paced'?composerPacedReason(p.targets,text,tools):'';
+ if(invalid||reason||!text||tools.pasteStats(text).bytes>65536){p.error=invalid||reason||'Enter text no larger than 64 KiB.';updateComposerReview();if(!p.form)notify(p.error,'error');return false;}
+ const handle=tools.beginPasteStart(p.targets);if(!handle){updateComposerReview();notify('Check the pending or previous send in Runs and the recipient terminals before sending again.','error');if(!p.form&&tools.pasteStartState(p.targets).uncertain){if(S.composerRecovery&&JSON.stringify(targetRefs(S.composerRecovery.targets))===JSON.stringify(targetRefs(p.targets)))openComposerRecovery();else offerComposerRecovery(p,text,method);}return false;}
+ p.error='';updateComposerReview();
+ const blocks=p.execute||/[\r\n]/.test(text)?noteComposerBlocks(p.targets,text):[];
+ const body={targets:targetRefs(p.targets),text,execute:p.execute};
+ if(method){Object.assign(body,{method,...(p.options||composerPagerOptions(p.targets))});const bracketed={};for(const target of p.targets)if(composerEntry(target)?.xterm?.modes?.bracketedPasteMode)bracketed[target.id]=true;if(method==='raw'&&(p.form||!p.execute)&&Object.keys(bracketed).length)body.bracketed=bracketed;}
+ try{
+  if(p.execute||method==='paced')prepareRunView(p.targets);
+  const result=await call('/send','POST',body),outcome=composerResult(result,p.targets,method),failed=new Set(outcome.failures.map(row=>row.id));
+  if(outcome.run){S.runs=[outcome.run,...S.runs.filter(run=>run.id!==outcome.run.id)];renderRuns();schedule();}
+  for(const item of blocks){if(failed.has(item.id))discardComposerBlocks([item]);else if(outcome.run&&!trackPacedPaste(item.entry,item.block,outcome.run))discardComposerBlocks([item]);}
+  const partial=outcome.failures.length>0&&outcome.accepted.length>0;
+  tools.endPasteStart(handle,partial);
+  const message=outcome.failures.length?outcome.failures.map(row=>(targetName(p.targets.find(t=>t.id===row.id)||row))+': '+(row.error||'Not sent')).join(' · '):(p.execute?'Sent to ':'Pasted into ')+p.targets.map(targetName).join(', ');
+  const status=$('#terminalMacroSendResult');if(status)status.innerHTML=outcome.run?button('output',outcome.failures.length?'!':'✓','data-run="'+html(outcome.run.id)+'" title="'+html(message)+' · View output" aria-label="'+html(message)+'; view output"','iconbtn'):'<span title="'+html(message)+'" aria-label="'+html(message)+'">'+(outcome.failures.length?'!':'✓')+'</span>';
+  if(outcome.failures.length){p.error=message+(partial?' Some recipients accepted this send. Check Runs and terminals before trying again.':'');notify(p.error,'error');updateComposerReview();if(partial)offerComposerRecovery(p,text,method);return false;}
+  const reopened=S.commandReview;
+  if(reopened&&reopened!==p&&reopened.source===p.source&&reopened.original===p.original&&composerReviewText(reopened)===text&&JSON.stringify(targetRefs(reopened.targets))===JSON.stringify(targetRefs(p.targets)))reopened.invalid='This command list was already accepted. Close this review before starting another send.';
+  if(p.execute&&p.source?.isConnected&&p.source.value===p.original){p.source.value='';S.composerExpanded=false;renderComposer();}
+  if(S.commandReview===p&&p.form?.isConnected){S.commandReview=null;closeModal();}
+  updateComposerReview();return true;
+ }catch(err){
+  p.error=err.message||'Could not confirm the send.';const uncertain=!Number.isInteger(err.status)||err.status>=500;
+  tools.endPasteStart(handle,uncertain);if(!uncertain)discardComposerBlocks(blocks);
+  notify(p.error,'error');updateComposerReview();if(uncertain)offerComposerRecovery(p,text,method);return false;
+ }finally{renderTargets();}
+}
+async function send(execute){
+ const source=$('#terminalMacroCommand'),original=source?.value||'',targets=snapshotTargets();if(!original||!targets.length)return;
+ try{
+  if(/[\r\n]/.test(original)){openComposerReview(source,original,targets,execute);return;}
+  // Run explicitly presses Enter. Use a literal raw send here rather than an
+  // ordinary macro that would wait forever for an unrecognized ESXi prompt.
+  const text=execute?original+'\n':original;
+  await dispatchComposer({source,original,text,targets,execute,options:composerPagerOptions(targets)},text,execute?'raw':null);
+ }catch(err){notify(err.message,'error');}
+}
+async function sendComposerReview(){
+ const p=S.commandReview;if(!p?.form?.isConnected)return;updateComposerReview();if($('#terminalCommandPasteConfirm')?.disabled)return;
+ await dispatchComposer(p,composerReviewText(p),$('#terminalCommandPasteMode',p.form).value);
+}
+function resolveComposerSend(){const p=S.commandReview;if(!p)return;try{if(composerPasteTools().resolvePasteStart(p.targets)){p.error='';if(p.recovery===S.composerRecovery){S.composerRecovery=null;$('#terminalMacroSendResult [data-macro-action="review-send"]')?.remove();}updateComposerReview();}}catch(err){notify(err.message,'error');}}
 // The paste review captures one exact generation, independent of composer
 // recipient settings. Never refresh or substitute this target during submission.
 function pasteTarget(id){const t=S.targets.find(t=>t.id===id);return t&&Number.isSafeInteger(t.generation)?{id:t.id,generation:t.generation}:null;}
@@ -345,9 +465,10 @@ function saveLast(kind='command'){
  const entry=current(),history=S.last.get(entry?.info?.id),text=kind==='paste'?history?.paste:history?.commands.at(-1);if(!text){notify('No '+(kind==='paste'?'command batch':'command')+' has been captured in this terminal yet.','error');return;}const m=blank();m.name=kind==='paste'?'Saved command list':text.slice(0,60);m.steps=model().fromCommands(redact(text));detectParameters(m);editor(m);
 }
 function onContextMenu(event){const item=event.target?.closest?.('.macro-library-item');if(!item)return;event.preventDefault();event.stopPropagation();menu(item.dataset.macroId,item,event);}
-function onInputEvent(event){const el=event.target;if(el?.id==='terminalMacroCommand'){if(/[\r\n]/.test(el.value)&&!S.composerExpanded)S.composerExpanded=true;renderComposer();}if(el?.dataset?.macroField==='search'){S.query=el.value;renderLibrary();}if(el?.hasAttribute?.('data-macro-value')&&S.preview){S.preview.values[el.dataset.macroValue]=el.value;const expanded=$('#terminalMacroExpandedPreview');if(expanded)expanded.innerHTML=previewExpansion();}}
+function onInputEvent(event){const el=event.target;if(el?.id==='terminalCommandPasteText'){if(S.commandReview)S.commandReview.error='';updateComposerReview();}if(el?.id==='terminalMacroCommand'){if(/[\r\n]/.test(el.value)&&!S.composerExpanded)S.composerExpanded=true;renderComposer();}if(el?.dataset?.macroField==='search'){S.query=el.value;renderLibrary();}if(el?.hasAttribute?.('data-macro-value')&&S.preview){S.preview.values[el.dataset.macroValue]=el.value;const expanded=$('#terminalMacroExpandedPreview');if(expanded)expanded.innerHTML=previewExpansion();}}
 function onChange(event){
  const el=event.target;if(!el)return;const field=el.dataset?.macroField;
+ if(el.id==='terminalCommandPasteMode')updateComposerReview();
  if(field==='target-mode'){S.mode=el.value;renderTargets();showTargetPicker(S.mode==='selected');}
  if(el.hasAttribute?.('data-macro-target')){S.mode='selected';el.checked?S.selected.add(el.dataset.macroTarget):S.selected.delete(el.dataset.macroTarget);renderTargets();}
  if(field==='confirmation'){prefs().terminalMacroConfirmation=el.value;if(typeof saveState==='function')saveState();}
@@ -375,7 +496,7 @@ async function onClick(event){
  case'delete':await removeMacro(id);break;case'delete-confirm':await removeMacro(id,true);break;case'export-one':if(m)exportMacros([m]);break;case'export-all':exportMacros(S.library.macros);break;
  case'import':importDialog();break;case'import-file':await importFile();break;case'refresh':await refresh(true);break;
  case'choose-targets':showTargetPicker();break;case'select-all':S.mode='selected';S.selected=new Set(S.targets.map(t=>t.id));renderTargets();break;case'select-none':S.mode='selected';S.selected.clear();renderTargets();break;
- case'send':await send(true);break;case'insert':await send(false);break;case'save-editor':await saveEditor();break;case'run-preview':await runPreview();break;
+ case'send':await send(true);break;case'insert':await send(false);break;case'send-review':await sendComposerReview();break;case'resolve-send':resolveComposerSend();break;case'review-send':openComposerRecovery();break;case'save-editor':await saveEditor();break;case'run-preview':await runPreview();break;
  case'editor-steps':readEditor();S.editor.mode='steps';renderEditor();break;
  case'editor-commands':readEditor();if(S.editor.draft.steps.some(s=>s.kind!=='command'||s.disabled)){error('This macro contains advanced steps. Keep using Advanced steps to preserve them.');break;}S.editor.mode='commands';renderEditor();break;
  case'detect-params':readEditor();detectParameters(S.editor.draft);$('#macroParameters').innerHTML=parameterHTML(S.editor.draft.parameters);break;

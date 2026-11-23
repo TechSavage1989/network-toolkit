@@ -78,7 +78,7 @@ func TestModelRejectsMalformedDefinitions(t *testing.T) {
 		{"multiline parameter", func(d *Definition) { d.Parameters = []Parameter{{Name: "value", DefaultValue: "a\nb"}} }},
 		{"duplicate step ID", func(d *Definition) { d.Steps = append(d.Steps, d.Steps[0]) }},
 		{"all disabled", func(d *Definition) { d.Steps[0].Disabled = true }},
-		{"multiline command", func(d *Definition) { d.Steps[0].Text = "one\ntwo" }},
+		{"blank multiline command", func(d *Definition) { d.Steps[0].Text = " \n\r\n" }},
 		{"NUL command", func(d *Definition) { d.Steps[0].Text = "one\x00two" }},
 		{"long step", func(d *Definition) { d.Steps[0].Text = strings.Repeat("é", MaxStepTextBytes/2+1) }},
 		{"bad prompt", func(d *Definition) { d.Prompt = "(" }},

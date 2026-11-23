@@ -11,7 +11,8 @@
   const DEFAULT_PACING_MS = 100;
   const MAX_TIMEOUT_MS = 3600000;
   const MAX_PACING_MS = 60000;
-  const DEFAULT_PROMPT = '(?:^|[\\r\\n])[^\\r\\n]{0,160}[#>$%][ \\t]*$';
+  const LEGACY_DEFAULT_PROMPT = '(?:^|[\\r\\n])[^\\r\\n]{0,160}[#>$%][ \\t]*$';
+  const DEFAULT_PROMPT = "^(?:[^\\r\\n]{0,160}[#>$%][ \\t]*|\\[[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}@[A-Za-z0-9][A-Za-z0-9_.-]{0,99}:(?:~(?:/[A-Za-z0-9_ .+@()~/-]*)?|/[A-Za-z0-9_ .+@()~/-]*)\\][ ]*)$";
   const parameterName = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
   const identifier = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/;
   const keyValues = Object.freeze({
@@ -85,7 +86,7 @@
         return step;
       }),
       waitForPrompt: source.waitForPrompt !== false,
-      prompt: string(source.prompt).trim() || DEFAULT_PROMPT,
+      prompt: !string(source.prompt).trim() || string(source.prompt).trim() === LEGACY_DEFAULT_PROMPT ? DEFAULT_PROMPT : string(source.prompt).trim(),
       timeoutMs: source.timeoutMs === 0 ? DEFAULT_TIMEOUT_MS : number(source.timeoutMs, DEFAULT_TIMEOUT_MS),
       pacingMs: number(source.pacingMs, DEFAULT_PACING_MS), autoPager: source.autoPager === true
     };
@@ -159,7 +160,7 @@
       switch (step.kind) {
         case 'command': case 'text':
           if (!step.disabled && !step.text) fail(`Enter text for step ${index + 1}.`);
-          if (step.kind === 'command' && /[\r\n]/.test(step.text)) fail(`Step ${index + 1} command must be one line; use separate commands or a Send text step.`);
+          if (step.kind === 'command' && !step.disabled && /[\r\n]/.test(step.text) && !step.text.trim()) fail(`Enter at least one command for step ${index + 1}.`);
           break;
         case 'key': if (!own(keyValues, step.key)) fail(`Choose a supported key for step ${index + 1}.`); break;
         case 'wait':
@@ -178,6 +179,9 @@
       if (!step.disabled) active++;
     }
     if (!active) fail('Enable at least one macro step.');
+    // Validate each original field before splitting. Preview, storage and the
+    // backend then share one fully expanded list of ordinary command steps.
+    definition.steps = splitCommandSteps(definition.steps);
     // encoding/json also escapes HTML and the two JavaScript line separators.
     const stored = { ...definition, parameters: definition.parameters.map(parameter => {
       const value = { ...parameter };
@@ -193,6 +197,31 @@
     const encoded = JSON.stringify(stored).replace(/[<>&\u2028\u2029]/g, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
     if (bytes(encoded) > MAX_DEFINITION_BYTES) fail('Macro definition exceeds the 4 MiB limit.');
     return definition;
+  }
+
+  function splitCommandSteps(steps) {
+    const used = new Set(steps.map(step => step.id));
+    const result = [];
+    for (const step of steps) {
+      if (step.kind !== 'command' || !/[\r\n]/.test(step.text)) result.push(step);
+      else {
+        const lines = fromCommands(step.text);
+        if (!lines.length) result.push({ ...step, text: '' });
+        for (let index = 0; index < lines.length; index++) {
+          const next = { ...step, text: lines[index].text };
+          if (index > 0) {
+            for (let serial = 0; ; serial++) {
+              const suffix = `-line-${index + 1}` + (serial ? `-${serial + 1}` : '');
+              next.id = step.id.slice(0, 80 - suffix.length) + suffix;
+              if (!used.has(next.id)) { used.add(next.id); break; }
+            }
+          }
+          result.push(next);
+        }
+      }
+      if (result.length > MAX_STEPS) fail('A macro must have at most 1024 steps after splitting command lines.');
+    }
+    return result;
   }
 
   function detectParams(text) {

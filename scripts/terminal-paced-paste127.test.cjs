@@ -10,7 +10,7 @@ async function harness(){
  const calls=[],raw=[],notices=[];let active=entry,revision=8,delivery=async()=>({id:'run-1'});
  term.onData(s=>raw.push(s));let review=true,warningPrefs={};const root={NetworkToolkitPasteWarnings:require('../web/assets/terminal-paste-warnings.js'),NetworkToolkitTerminalExtras:{prefs:()=>({pasteReview:review}),notePaste(){}},NetworkToolkitTerminalMacros:{pasteTarget:()=>({id:'one',generation:4}),startPacedPaste:async(...args)=>{calls.push(args);return delivery(...args);}}};
  const c={document,root,window:root,TextEncoder,Number,preferences:()=>({pasteWarnings:warningPrefs}),MAX_PASTE_BYTES:1048576,pasteStarts:new Map(),review:null,approvedPaste:false,focusEpoch:0,observed:null,terminalPaneFocus:0,terminalPaneContext:'main',state:{activePage:'terminal'},online:true,terminalWorkspaceTransferBusy:false,terminalDetachedReturning:false,terminalSessions:new Map([['one',entry]]),currentTerminal:()=>active,terminalSessionRevision:()=>revision,terminalOwnerCanMutate:()=>true,terminalEntryVisible:()=>true,terminalEntryAcceptsInput:e=>e.info.state==='connected',bound:new Map([[entry,{xterm:term,nativePaste:term.paste.bind(term)}]]),closeMenu(){},setTerminalToolsOpen(){},esc:String,icon:()=>'',toast:s=>notices.push(s),requestAnimationFrame:f=>f(),closeModal:()=>{for(const child of [...document.querySelector('#modalRoot').children])child.remove();},openModal:(title,body,footer)=>{document.querySelector('#modalRoot').innerHTML='<section class="modal">'+body+footer+'</section>';}};
- vm.createContext(c);for(const name of ['currentContext','observeContext','destination','validDestination','changedDestination','byteLength','pasteStats','pasteWarnings','reviewText','pacedPasteReason','pacedPagerPrefs','pacedPagerNote','updateReview','openReview','sendPaste','acceptText','submitPaste','submitPacedPaste'])vm.runInContext(fn(interaction,name),c);
+ vm.createContext(c);for(const name of ['currentContext','observeContext','destination','validDestination','changedDestination','byteLength','pasteStats','pasteWarnings','reviewText','isPacedPastePrompt','pacedTextReason','pacedPasteReason','pacedPagerPrefs','pacedPagerNote','pasteStartState','beginPasteStart','endPasteStart','resolvePasteStart','updateReview','openReview','sendPaste','acceptText','submitPaste','submitPacedPaste'])vm.runInContext(fn(interaction,name),c);
  vm.runInContext(interaction.split('\n').find(line=>line.includes("document.addEventListener('click'")&&line.includes("terminalPasteResolve")),c);
  await new Promise(r=>term.write('lab-switch(config)# ',r));
  const open=text=>{c.acceptText(c.destination(entry),text);return c.review;};
@@ -18,6 +18,32 @@ async function harness(){
 }
 test('complete literal command list defaults paced and retains whitespace blank lines and braces',async()=>{
  const h=await harness();try{const text='  description {{host}}\r\n\r\n  show version\r\n',r=h.open(text);assert.equal(r.form.querySelector('#terminalPasteMode').value,'paced');assert.equal(h.c.reviewText(),text);assert.equal(h.submit(),true);await tick();assert.deepEqual(JSON.parse(JSON.stringify(h.calls)),[[{id:'one',generation:4},text,8,{autoPager:true,pagerKey:'auto'}]],'The session pager settings accompany the paste');assert.deepEqual(h.raw,[]);assert.equal(h.c.review,null);}finally{h.dispose();}
+});
+test('paced prompt recognition matches the engine fixture, including ESXi and rejected bracketed output',()=>{
+ const fixture=require('./fixtures/terminal-paced-prompts.json'),c={TextEncoder};vm.createContext(c);
+ for(const name of ['byteLength','isPacedPastePrompt'])vm.runInContext(fn(interaction,name),c);
+ for(const item of fixture.cases)assert.equal(c.isPacedPastePrompt(item.line),item.accepted,item.name);
+});
+test('ESXi home and datastore prompts enable the reviewed command list without changing its text',async()=>{
+ for(const prompt of ['[root@lab-esxi:~] ','[root@lab-esxi:/vmfs/volumes/Lab Datastore] ']){
+  const h=await harness();try{
+   h.term.reset();await h.write(prompt);const text="lsof | grep -i 'LabVM'\n\nps -c | grep -i 'LabVM'\n",r=h.open(text);
+   assert.equal(r.form.querySelector('#terminalPasteMode').value,'paced');assert.equal(h.document.querySelector('#terminalPasteConfirm').disabled,false);
+   assert.equal(h.document.querySelector('#terminalPasteStatus').classList.contains('terminal-paste-invalid'),false);
+   assert.equal(h.submit(),true);await tick();assert.equal(h.calls.length,1);assert.equal(h.calls[0][1],text);assert.deepEqual(h.raw,[]);
+  }finally{h.dispose();}
+ }
+});
+test('unsupported bracketed output and unfinished ESXi commands show the blocking reason and send nothing',async()=>{
+ for(const prompt of ['[completed] ','[root@lab-esxi:~] unfinished']){
+  const h=await harness();try{
+   h.term.reset();await h.write(prompt);const r=h.open('show one\nshow two\n');assert.equal(r.form.querySelector('#terminalPasteMode').value,'raw');
+   r.form.querySelector('#terminalPasteMode').value='paced';h.c.updateReview();
+   assert.equal(h.document.querySelector('#terminalPasteConfirm').disabled,true);
+   const status=h.document.querySelector('#terminalPasteStatus');assert.match(status.textContent,/Cannot send lines: Start at an empty command prompt/);assert(status.classList.contains('terminal-paste-invalid'));
+   assert.equal(h.submit(),false);assert.deepEqual(h.calls,[]);assert.deepEqual(h.raw,[]);
+  }finally{h.dispose();}
+ }
 });
 test('cancelled review and changed active session or revision send nothing',async()=>{
  for(const change of ['cancel','revision','active','closed']){const h=await harness();try{const r=h.open('show one\nshow two\n');if(change==='cancel')h.c.closeModal();if(change==='revision')h.revision();if(change==='active')h.active({info:{id:'two'}});if(change==='closed')h.entry.info.state='closed';h.c.updateReview();if(h.c.review)assert.equal(h.submit(),false);assert.deepEqual(h.calls,[]);assert.deepEqual(h.raw,[]);}finally{h.dispose();}}
@@ -47,6 +73,32 @@ test('pending start survives closing and reopening without duplicate delivery an
 });
 test('uncertainty survives reopened review; explicit acknowledgement releases only the gate, never sends',async()=>{
  const h=await harness();try{h.setDelivery(async()=>{throw new Error('Lost response');});h.open('show one\nshow two\n');h.submit();await tick();h.c.closeModal();h.c.updateReview();const reopened=h.open('show three\nshow four\n');assert(reopened.uncertain);assert.equal(h.submit(),false);assert.equal(h.calls.length,1);const button=reopened.form.querySelector('#terminalPasteResolve');assert.equal(button.hidden,false);h.document.emit('click',button);assert.equal(reopened.uncertain,false);assert.equal(h.calls.length,1);assert.equal(h.document.querySelector('#terminalPasteConfirm').disabled,false);}finally{h.dispose();}
+});
+test('command-bar delivery blocks clipboard paste until the same generation is confirmed or explicitly resolved',async()=>{
+ const h=await harness();try{
+  const targets=[{id:'one',generation:4},{id:'two',generation:9}],r=h.open('show one\nshow two\n');
+  const handle=h.c.beginPasteStart(targets);assert(handle);assert(r.pending);assert.equal(h.submit(),false);assert.equal(h.c.beginPasteStart(targets),null);
+  assert.equal(h.c.resolvePasteStart(targets),false,'an in-flight request cannot be acknowledged away');
+  h.c.closeModal();h.c.updateReview();assert.equal(h.c.acceptText(h.c.destination(h.entry),'raw attempt'),false);assert.deepEqual(h.raw,[]);
+  h.c.endPasteStart(handle,true);const reopened=h.open('show three\nshow four\n');assert(reopened.uncertain);assert.equal(h.submit(),false);
+  assert.equal(h.c.resolvePasteStart(targets),true);assert.equal(reopened.uncertain,false);assert.equal(h.calls.length,0);assert.deepEqual(h.raw,[],'acknowledgement does not send');
+  assert.equal(h.document.querySelector('#terminalPasteConfirm').disabled,false);
+ }finally{h.dispose();}
+});
+test('clipboard starts block command-bar groups and stale completion cannot unlock a new connection',async()=>{
+ const h=await harness();try{
+  for(const targets of [null,[],[null],[{id:'one'}],[{id:'one',generation:0}],[{id:'one',generation:4},{id:'two'}]])assert.equal(h.c.beginPasteStart(targets),null,'malformed groups reserve no targets');
+  assert.equal(h.c.pasteStartState([{id:'one'}]).pending,false);assert.equal(h.c.resolvePasteStart([{id:'one'}]),true);
+  let resolve;h.setDelivery(()=>new Promise(r=>resolve=r));h.open('show one\nshow two\n');h.submit();
+  assert.equal(h.c.beginPasteStart([{id:'two',generation:9},{id:'one',generation:4}]),null);
+  assert.equal(h.c.pasteStartState([{id:'two',generation:9}]).pending,false,'a rejected group reserves no earlier targets');
+  resolve({id:'run-1'});await tick();
+  assert.equal(h.c.beginPasteStart([{id:'one',generation:4},{id:'one',generation:4}]),null,'duplicate recipients reserve nothing');
+  const old=h.c.beginPasteStart([{id:'one',generation:4}]),next=h.c.beginPasteStart([{id:'one',generation:5}]);assert(old);assert(next);
+  h.c.endPasteStart(old);assert.equal(h.c.pasteStartState([{id:'one',generation:5}]).pending,true);
+  assert.equal(h.c.resolvePasteStart([{id:'one',generation:4}]),true);assert.equal(h.c.pasteStartState([{id:'one',generation:5}]).pending,true);
+  h.c.endPasteStart(next);assert.equal(h.c.pasteStartState([{id:'one',generation:5}]).pending,false);
+ }finally{h.dispose();}
 });
 test('failed run response preserves command text, reports target failure and makes no success navigation',async()=>{
  const h=await harness();try{const S={runs:[]},views=[],c={S,BASE:'/terminal-automation',api:async()=>({run:{id:'rejected',state:'failed',targets:[{error:'Connection changed before start'}]}}),renderRuns(){},schedule(){},openView:v=>views.push(v),notify(){throw Error('must not notify success');}};vm.createContext(c);vm.runInContext(fn(macros,'startPacedPaste'),c);h.setDelivery((...args)=>c.startPacedPaste(...args));const text='show one\nshow two\n',r=h.open(text);h.submit();await tick();assert.equal(r.form.querySelector('#terminalPasteText').value,text);assert.equal(r.uncertain,false);assert.equal(r.pending,false);assert.match(r.error,/Connection changed/);assert.deepEqual(views,[]);assert.equal(S.runs[0].state,'failed');assert.equal(h.calls.length,1);}finally{h.dispose();}

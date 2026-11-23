@@ -41,7 +41,7 @@ func pasteDefinition(text string) (Definition, error) {
 	if len(lines) > MaxSteps {
 		return Definition{}, errors.New("paced paste supports at most 1024 lines")
 	}
-	def := Definition{ID: "literal-paste", Name: "Prompt-paced paste", WaitForPrompt: true, Prompt: DefaultPrompt, TimeoutMs: DefaultTimeoutMs, PacingMs: DefaultPacingMs}
+	def := Definition{ID: "literal-paste", Name: "Prompt-paced paste", WaitForPrompt: true, Prompt: pastePromptPattern, TimeoutMs: DefaultTimeoutMs, PacingMs: DefaultPacingMs}
 	for index, line := range lines {
 		// Unlike FromCommands, blank lines remain literal Enter presses. The
 		// dedicated validator above allows them without relaxing macro rules.
@@ -51,16 +51,36 @@ func pasteDefinition(text string) (Definition, error) {
 }
 
 func (e *Engine) StartPaste(req PasteRequest) (Run, error) {
-	def, err := pasteDefinition(req.Text)
+	return e.startPasteTargets([]TargetRef{req.Target}, req.Text, req.AutoPager, req.PagerKey)
+}
+
+// StartPasteGroup is the command bar's explicitly reviewed literal path. The
+// HTTP caller authorizes the whole frozen recipient list before entering it;
+// startPrepared keeps the existing per-target generation and busy results.
+func (e *Engine) StartPasteGroup(req SendRequest) (Run, error) {
+	if err := validateRefs(req.Targets); err != nil {
+		return Run{}, err
+	}
+	if err := validateSendMethod(req); err != nil {
+		return Run{}, err
+	}
+	if req.Method != "paced" {
+		return Run{}, errors.New("choose paced sending for a reviewed command run")
+	}
+	return e.startPasteTargets(req.Targets, req.Text, req.AutoPager == nil || *req.AutoPager, req.PagerKey)
+}
+
+func (e *Engine) startPasteTargets(targets []TargetRef, text string, autoPager bool, pagerKey string) (Run, error) {
+	def, err := pasteDefinition(text)
 	if err != nil {
 		return Run{}, err
 	}
-	def.AutoPager = req.AutoPager
-	key := strings.ToLower(strings.TrimSpace(req.PagerKey))
+	def.AutoPager = autoPager
+	key := strings.ToLower(strings.TrimSpace(pagerKey))
 	if key != "space" && key != "enter" {
 		key = "auto"
 	}
-	return e.startPrepared(StartRequest{Targets: []TargetRef{req.Target}}, def, &pasteOptions{pagerKey: key})
+	return e.startPrepared(StartRequest{Targets: targets}, def, &pasteOptions{pagerKey: key})
 }
 
 type pasteOptions struct {
@@ -89,13 +109,29 @@ func pagerReply(key, prompt string) []byte {
 
 const pastePromptStable = 100 * time.Millisecond
 
+// Default macro prompts and literal paste both recognize ESXi's bracketed
+// shell prompt, with a bounded user, host and path. A generic line ending in
+// ']' must never authorize the next command. This grammar and byte limit are
+// shared with the browser through regression fixtures in
+// scripts/fixtures/terminal-paced-prompts.json.
+const pastePromptPattern = `^(?:[^\r\n]{0,160}[#>$%][ \t]*|\[[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}@[A-Za-z0-9][A-Za-z0-9_.-]{0,99}:(?:~(?:/[A-Za-z0-9_ .+@()~/-]*)?|/[A-Za-z0-9_ .+@()~/-]*)\][ ]*)$`
+const pastePromptMaxBytes = 164
+
+var pastePrompt = regexp.MustCompile(pastePromptPattern)
+
+func matchPastePrompt(text string) bool {
+	// As with the original default matcher, inspect only the short final line,
+	// never every line of a potentially large command or pager response.
+	line := text[strings.LastIndexAny(text, "\r\n")+1:]
+	return len(line) <= pastePromptMaxBytes && pastePrompt.MatchString(line)
+}
+
 // Prompt recognition remains a CLI heuristic, not proof that a device accepted
 // a command. For literal paste, do not let an echoed '$' or an intermediate
 // prompt-shaped packet authorize the next line: require a fresh line boundary,
 // match only the assembled final tail, then recheck after quiet output stability.
 // Ordinary macros deliberately retain their existing waitPattern contract.
 func (e *Engine) waitPastePrompt(run *execution, t *task, cursor uint64, timeout time.Duration) error {
-	re := regexp.MustCompile(DefaultPrompt)
 	remaining := timeout
 	stability := max(pastePromptStable, time.Duration(run.definition.PacingMs)*time.Millisecond)
 	index := 0
@@ -150,7 +186,7 @@ func (e *Engine) waitPastePrompt(run *execution, t *task, cursor uint64, timeout
 				candidateAt = time.Time{}
 			}
 		}
-		if !boundary || !matchOutput(re, DefaultPrompt, tail) {
+		if !boundary || !matchPastePrompt(tail) {
 			candidateAt = time.Time{}
 		} else if candidateAt.IsZero() || candidateRevision != revision {
 			candidateAt, candidateRevision = time.Now(), revision
