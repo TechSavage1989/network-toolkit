@@ -106,13 +106,16 @@ function render(panel,entry){
  paint();
  if(!m.loaded&&!m.loading)void load(m.id,m.folder);
 }
-async function editor(create=false){const m=current(active()),entry=m?.entries.find(x=>x.path===m.selected);if(!m)return;
+async function editor(create=false){const source=active(),m=current(source),entry=m?.entries.find(x=>x.path===m.selected);if(!m)return;
  if(m.readOnly){if(create||!remoteEdit())return;if(!entry||entry.directory){message('Select one text file.');return;}
   // The main window's Text Editor opens it on this SSH connection.
   const sent=await root.NetworkToolkitWindowSend.openRemote({session:m.id,path:entry.path,name:entry.name});if(!sent?.ok)message('Cannot edit: '+(sent?.error||'the main window did not open the file.'),true);return;}
  if(!create&&(!entry||entry.directory)){message('Select one text file.');return;}
- const filename=create?prompt('New UTF-8 text file name:','new-file.txt'):entry.name;if(filename===null)return;if(!safeName(filename)){message('Enter a valid file name.',true);return;}
- const path=create?join(m.folder,filename):entry.path;
+ const folder=m.folder,revision=terminalSessionRevision(m.id);
+ const filename=create?await root.NetworkToolkitDialogs.prompt({title:'New text file',message:'New UTF-8 text file name:',value:'new-file.txt',acceptLabel:'Create file'}):entry.name;if(filename===null)return;
+ if(current(active())!==m||m.folder!==folder||m.readOnly||m.busy||terminalSessionRevision(m.id)!==revision){message('The SSH session or folder changed. Open the folder again.',true);return;}
+ if(!safeName(filename)){message('Enter a valid file name.',true);return;}
+ const path=create?join(folder,filename):entry.path;
  try{await root.NetworkToolkitFileEditor.open({source:'SSH terminal',path,id:'terminal:'+m.id+':'+path,create,binding:{kind:'terminal',sessionId:m.id,revision:terminalSessionRevision(m.id)},
   read:async path=>request(m.id,'read-text',{path}),write:async data=>request(m.id,'write-text',data),afterSave:()=>load(m.id,m.folder)});
  }catch(e){message('Cannot edit: '+e.message,true);}}
@@ -192,6 +195,13 @@ async function preview(){
   openModal('Preview '+selected.name,'<pre class="tsftp-preview">'+escaped(response.content||'')+'</pre>','<button class="btn primary" data-action="close-modal">Close</button>',true);
  }catch(error){message(error.message,true);}
 }
+async function permissions(m){
+ const file=m.entries.find(x=>x.path===m.selected);if(!file||m.readOnly||m.busy)return;const folder=m.folder,path=file.path;
+ const value=await root.NetworkToolkitDialogs.prompt({title:'SFTP permissions',message:'Permissions in octal (for example, 0644 or 0755):',value:file.directory?'0755':'0644',acceptLabel:'Apply permissions'});if(value===null)return;
+ if(current(active())!==m||m.readOnly||m.busy||m.folder!==folder||m.selected!==path||m.entries.find(x=>x.path===path)!==file){message('The SSH session or selected file changed. Select the file again.',true);return;}
+ if(!/^[0-7]{3,4}$/.test(value)){message('Invalid octal permissions',true);return;}
+ try{await request(m.id,'chmod',{path,permissions:value});if(current(active())===m&&m.folder===folder)await load(m.id,folder);}catch(error){message(error.message,true);}
+}
 function command(name){
  const entry=active(),m=current(entry);if(!m||m.status!=='supported')return;
  if(m.readOnly&&!allowedReadOnly(name))return;
@@ -212,7 +222,7 @@ function command(name){
  if(name==='paste')void paste(m);
  if(name==='copyPath'){const file=m.entries.find(x=>x.path===m.selected);void copyText(file?.path||m.folder);}
  if(name==='open'){const file=m.entries.find(x=>x.path===m.selected);if(file?.directory)void load(m.id,file.path);}
- if(name==='permissions'){const file=m.entries.find(x=>x.path===m.selected);if(!file)return;const value=prompt('SFTP permissions (octal, e.g. 0644 or 0755):',file.directory?'0755':'0644');if(value===null)return;if(!/^[0-7]{3,4}$/.test(value)){message('Invalid octal permissions',true);return;}void request(m.id,'chmod',{path:file.path,permissions:value}).then(()=>load(m.id,m.folder)).catch(e=>message(e.message,true));}
+ if(name==='permissions'){void permissions(m);}
 
  if(['upload','download','new','rename','delete'].includes(name))operationDialog(name);
 }

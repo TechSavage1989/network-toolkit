@@ -97,15 +97,8 @@ func appWindowProfile(b appBrowser, dataDir, home string) string {
 
 func appWindowArgs(b appBrowser, url, profile string) []string {
 	args := append([]string{}, b.command...)
-	return append(args,
-		"--app="+url,
-		"--user-data-dir="+profile,
-		"--class=NetworkToolkit",
-		"--no-first-run",
-		"--no-default-browser-check",
-		"--disable-sync",
-		"--window-size=1280,860",
-	)
+	args = append(args, appBrowserArgs(url, profile)...)
+	return append(args, "--class=NetworkToolkit")
 }
 
 func flatpakAppInstalled(id string) bool {

@@ -90,7 +90,7 @@ func TestWindowsBrowserWindow(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 	joined := strings.Join(r.Args, " ")
-	for _, want := range []string{"--app=http://127.0.0.1:", "/launch?ticket=", "--user-data-dir=" + filepath.Join(work, "data", storageBrowserDirectory, "BrowserWindow"), "--disable-background-mode", "--no-first-run"} {
+	for _, want := range []string{"--app=http://127.0.0.1:", "/launch?ticket=", "--user-data-dir=" + filepath.Join(work, "data", storageBrowserDirectory, "BrowserWindow"), "--disable-background-mode", "--no-first-run", "--disable-extensions", "--disable-component-extensions-with-background-pages", "--disable-notifications", "--disable-features=Translate"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("window arguments lack %q: %v", want, r.Args)
 		}

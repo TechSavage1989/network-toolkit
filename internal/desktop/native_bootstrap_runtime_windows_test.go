@@ -27,6 +27,7 @@ func TestNativeBootstrapInstalledWebView2(t *testing.T) {
 		t.Run(document, func(t *testing.T) {
 			token := strings.Repeat("cd", 32)
 			var validProbe, ready, forbiddenExecuted atomic.Bool
+			var settingsError error // Written on the Run UI thread; read after Run returns.
 			var unexpectedNavigation, nativeDocumentRequests atomic.Int32
 			var requestMu sync.Mutex
 			var unexpectedRequests []string
@@ -78,12 +79,19 @@ const capability=window.__networkToolkitNativeSession;
 if(!/^[a-f0-9]{64}$/.test(capability||'')){window.__networkToolkitStartupState=-1;}else{
 fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
  if(!response.ok)throw Error('native capability unavailable');
+ alert('Synthetic browser alert must not appear');
+ if(confirm('Synthetic browser confirmation must not appear')!==false)throw Error('browser confirmation accepted');
+ const textAnswer=prompt('Synthetic browser prompt must not appear','fixture');
+ if(textAnswer!==null&&textAnswer!==false)throw Error('browser prompt accepted');
+ const appDialog=document.createElement('dialog');appDialog.textContent='Synthetic application dialog';document.body.appendChild(appDialog);
+ appDialog.showModal();if(!appDialog.open)throw Error('application dialog was blocked');appDialog.close();appDialog.remove();
+ const popup=window.open('/forbidden-popup','_blank');
  const frame=document.createElement('iframe');frame.src='/forbidden-frame';document.body.appendChild(frame);
  const exactFrame=document.createElement('iframe');exactFrame.src=location.href;document.body.appendChild(exactFrame);
  location.href='/forbidden-navigation';
  setTimeout(()=>{location.hash='same-document';},75);
  setTimeout(()=>{location.reload();},150);
- setTimeout(()=>{window.__networkToolkitStartupState=location.hash==='#same-document'?1:-1;},500);
+ setTimeout(()=>{window.__networkToolkitStartupState=location.hash==='#same-document'&&(!popup||popup.closed)?1:-1;},500);
 }).catch(()=>{window.__networkToolkitStartupState=-1;});}
 </script></body>`)
 			}))
@@ -123,7 +131,11 @@ fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
 					time.Sleep(100 * time.Millisecond)
 				}
 			})
-			err = Run(ctx, Config{Title: "Network Toolkit native security test", URL: server.URL + document, SessionToken: token, DataDir: dataDir, Stop: cancel, OnReady: func() { ready.Store(true); cancel() }, navigationObserver: func(observation nativeNavigationObservation) {
+			err = Run(ctx, Config{Title: "Network Toolkit native security test", URL: server.URL + document, SessionToken: token, DataDir: dataDir, Stop: cancel, OnReady: func() {
+				ready.Store(true)
+				settingsError = checkNativeBrowserSettings(dataDir)
+				cancel()
+			}, navigationObserver: func(observation nativeNavigationObservation) {
 				t.Logf("native navigation: kind=%s URI=%q blocked=%t cancelHRESULT=%#x readHRESULT=%#x cancelled=%t initialPermit=%t responseHRESULT=%#x runtime=%q", observation.Kind, observation.URI, observation.Blocked, observation.CancelResult, observation.CancelReadResult, observation.Cancelled, observation.InitialDocumentPermit, observation.ResponseResult, observation.RuntimeVersion)
 			}})
 			if err != nil {
@@ -131,6 +143,9 @@ fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
 			}
 			if !ready.Load() || !validProbe.Load() {
 				t.Fatal("installed WebView2 did not initialize through native-only capability")
+			}
+			if settingsError != nil {
+				t.Fatal(settingsError)
 			}
 			if nativeDocumentRequests.Load() != 1 {
 				t.Fatalf("expected exactly one native document request, got %d", nativeDocumentRequests.Load())

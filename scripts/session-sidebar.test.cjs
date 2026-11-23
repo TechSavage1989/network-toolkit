@@ -48,6 +48,20 @@ test('a stale folder dialog cannot overwrite an edited or deleted saved connecti
  assert.equal(h.state.terminalProfiles[0].folder,'MDF');assert(h.calls.some(call=>call[0]==='toast'&&call[1].includes('session changed')));
  h.api.render();h.document.emit('click',h.document.querySelector('[data-session-folder]'));h.state.terminalProfiles=[];h.document.emit('submit',h.document.getElementById('sessionLibraryFolderForm'));assert.equal(h.state.terminalProfiles.length,0);
 });
+
+test('FTP sidebar removal waits for app confirmation and preserves the captured record identity',async()=>{
+ for(const kind of ['saved','recent'])for(const change of ['cancel','changed','removed','retargeted']){
+  const h=harness(),questions=[],group=kind==='saved'?'ftpProfiles':'ftpRecent';h.state[group]=[{id:'one',name:'One',host:'one.test',port:21,username:'operator'},{id:'two',name:'Two',host:'two.test',port:21,username:'operator'}];
+  h.c.NetworkToolkitDialogs={confirm:options=>new Promise(resolve=>questions.push({options,resolve}))};h.c.confirm=()=>{throw Error('Native confirm must not be used');};h.api.render();
+  const row=h.document.querySelector('[data-transfer-session-kind="'+kind+'"][data-transfer-session-id="one"]');assert(row);
+  h.document.emit('click',row.querySelector('[data-transfer-session-remove]'));assert.equal(questions.length,1);assert.equal(h.calls.some(call=>call[0]==='save-state'),false);
+  if(change==='changed')h.state[group][0].host='changed.test';if(change==='removed')h.state[group]=h.state[group].filter(item=>item.id!=='one');
+  if(change==='retargeted'){row.dataset.transferSessionId='two';row.dataset.transferSessionKind=kind==='saved'?'recent':'saved';}
+  questions[0].resolve(change!=='cancel');await settle();
+  assert.equal(h.calls.filter(call=>call[0]==='save-state').length,change==='retargeted'?1:0,kind+' '+change);
+  assert.equal(h.state[group].some(item=>item.id==='two'),true);if(change==='retargeted')assert.equal(h.state[group].some(item=>item.id==='one'),false);
+ }
+});
 test('duplicate inherits its folder and saving a recent connection can create a folder',async()=>{
  const h=harness();h.state.terminalProfiles=[stored('a',{folder:'MDF'})];h.api.render();await h.api.run('duplicate',h.api.token('saved','a'));
  assert.equal(h.document.getElementById('sessionLibrarySaveFolder').getAttribute('value'),'MDF');h.document.getElementById('sessionLibrarySaveFolder').value='MDF';h.document.getElementById('sessionLibraryName').value='Core copy';h.document.emit('submit',h.document.getElementById('sessionLibraryNameForm'));

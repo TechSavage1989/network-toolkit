@@ -40,22 +40,32 @@ func pageStillOpen(ctx context.Context, exited time.Time, wait time.Duration) bo
 	return time.Unix(0, lastPageRequest.Load()).After(exited.Add(wait / 4))
 }
 
-// windowsBrowserArgs opens a dedicated Edge or Chrome app window with its own
-// profile: no sync, extensions, first-run pages or background mode, so the
-// browser process ends when its window closes. Browser protections stay on.
-func windowsBrowserArgs(url, profile string) []string {
+// appBrowserArgs opens the local interface in its own Chromium-family profile.
+// Keep this policy shared by the Windows fallback and the Linux app window.
+// The suppression switches are documented by GoogleChrome/chrome-launcher in
+// docs/chrome-flags-for-tools.md. They leave browser security, explicit file
+// dialogs, clipboard permission and unsaved-work close protection enabled.
+// Do not use headless-only popup switches or blanket permission denial here.
+func appBrowserArgs(url, profile string) []string {
 	return []string{
 		"--app=" + url,
 		"--user-data-dir=" + profile,
-		"--new-window",
 		"--no-first-run",
 		"--no-default-browser-check",
 		"--disable-sync",
 		"--disable-extensions",
+		"--disable-component-extensions-with-background-pages",
 		"--disable-default-apps",
 		"--disable-background-mode",
+		"--disable-notifications",
+		"--disable-features=Translate",
 		"--window-size=1280,860",
 	}
+}
+
+// windowsBrowserArgs keeps the existing Windows app-window launch and profile.
+func windowsBrowserArgs(url, profile string) []string {
+	return append(appBrowserArgs(url, profile), "--new-window")
 }
 
 // windowModeChoice reads NETWORK_TOOLKIT_WINDOW: "browser" opens a browser

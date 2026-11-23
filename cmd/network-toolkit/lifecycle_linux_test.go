@@ -60,7 +60,7 @@ func TestAppBrowserProfilesFollowSnapAndFlatpakConfinement(t *testing.T) {
 
 func TestAppWindowArgsOpenADedicatedAppWindow(t *testing.T) {
 	args := appWindowArgs(appBrowser{command: []string{"/usr/bin/flatpak", "run", "org.chromium.Chromium"}}, "http://127.0.0.1:4000/launch?ticket=x", "/p")
-	for _, want := range []string{"/usr/bin/flatpak", "run", "org.chromium.Chromium", "--app=http://127.0.0.1:4000/launch?ticket=x", "--user-data-dir=/p", "--class=NetworkToolkit", "--no-first-run"} {
+	for _, want := range []string{"/usr/bin/flatpak", "run", "org.chromium.Chromium", "--app=http://127.0.0.1:4000/launch?ticket=x", "--user-data-dir=/p", "--class=NetworkToolkit", "--no-first-run", "--disable-sync", "--disable-extensions", "--disable-component-extensions-with-background-pages", "--disable-default-apps", "--disable-background-mode", "--disable-notifications", "--disable-features=Translate"} {
 		if !slices.Contains(args, want) {
 			t.Fatalf("missing %q in %v", want, args)
 		}

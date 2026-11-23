@@ -86,6 +86,32 @@ test('sidebar editor carries only its captured terminal ownership binding',async
  assert.deepEqual(JSON.parse(JSON.stringify(opened[0].binding)),{kind:'terminal',sessionId:'ssh-one',revision:1});h.revision();assert.equal(opened[0].binding.revision,1,'A later ownership epoch must not silently retarget the captured descriptor');assert.equal(Object.hasOwn(opened[0].binding,'host'),false);assert.equal(Object.hasOwn(opened[0].binding,'password'),false);
 });
 
+test('new terminal text files wait for the app dialog and reject changed session ownership or folders',async()=>{
+ for(const change of ['cancel','revision','connection','folder','accept']){
+  const h=await ready(),opened=[],questions=[];
+  h.root.NetworkToolkitDialogs={prompt:options=>new Promise(resolve=>questions.push({options,resolve}))};
+  h.root.prompt=()=>{throw Error('Native prompt must not be used');};h.root.NetworkToolkitFileEditor={open:async value=>opened.push(value)};
+  const pending=h.api.editor(true);assert.equal(questions.length,1);assert.equal(opened.length,0);
+  if(change==='revision')h.revision();if(change==='connection')h.selected(null);if(change==='folder')await h.api.load(h.entry.info.id,'/different');
+  questions[0].resolve(change==='cancel'?null:'new.cfg');await pending;
+  assert.equal(opened.length,change==='accept'?1:0,change);
+  if(change==='accept')assert.deepEqual(JSON.parse(JSON.stringify({path:opened[0].path,create:opened[0].create,binding:opened[0].binding})),{path:'./new.cfg',create:true,binding:{kind:'terminal',sessionId:'ssh-one',revision:1}});
+ }
+});
+
+test('terminal permission dialogs cannot change a different session or selection after approval',async()=>{
+ for(const change of ['cancel','revision','connection','folder','selection','invalid','accept']){
+  const h=await ready(),questions=[];h.root.NetworkToolkitDialogs={prompt:options=>new Promise(resolve=>questions.push({options,resolve}))};h.root.prompt=()=>{throw Error('Native prompt must not be used');};
+  h.document.emit('contextmenu',h.row,{clientX:40,clientY:60});h.document.emit('click',h.document.querySelector('[data-tsftp-menu="permissions"]'));
+  assert.equal(questions.length,1);assert.equal(h.calls.some(call=>call[2]?.action==='chmod'),false);
+  if(change==='revision')h.revision();if(change==='connection')h.selected(null);if(change==='folder')await h.api.load(h.entry.info.id,'/different');
+  if(change==='selection')h.document.emit('click',h.panel.querySelector('[data-tsftp-item="./configs"]'));
+  questions[0].resolve(change==='cancel'?null:change==='invalid'?'9999':'0600');await settle();
+  const calls=h.calls.filter(call=>call[2]?.action==='chmod');assert.equal(calls.length,change==='accept'?1:0,change);
+  if(change==='accept')assert.deepEqual(calls[0],['/remote-browser','POST',{protocol:'ssh',sessionId:'ssh-one',action:'chmod',path:'./startup.cfg',permissions:'0600'}]);
+ }
+});
+
 test('terminal file and folder native snapshots carry only the exact owned session revision and path',async()=>{
  const h=await ready();for(const row of [h.row,h.folder]){const before=h.calls.length,s=h.api.capturePointerFileDrag(h.pointer('pointerdown',row));assert(s);assert.equal(h.api.validPointerFileDrag(s),true);assert.deepEqual(JSON.parse(JSON.stringify(h.api.pointerFileDragPayload(s))),{binding:{kind:'terminal',sessionId:'ssh-one',revision:1},paths:[row.dataset.tsftpItem]});assert.equal(s.files[0].directory,row===h.folder);assert.equal(row.getAttribute('aria-pressed'),'true');assert.equal(h.calls.length,before,'snapshot does not read, prepare, or connect');}
 });

@@ -2,6 +2,14 @@
 
 Settings currently appear in the main application and in individual tools. The Phase 1 audit will identify their exact locations and recommend a unified Settings experience.
 
+## Selection, right-click menus and dialogs
+
+Ordinary labels, buttons, tabs and menu items do not become selected when you drag across them. You can still select and copy text in fields, editor documents, terminal output, result tables, logs and displayed result values. Network Toolkit's own right-click menus provide the commands for terminals, files, documents and results; the browser's right-click menu is suppressed.
+
+Profile names, file permissions and connection-removal questions use dialogs inside Network Toolkit. Cancel or Escape leaves the action unapplied. A question opened from another dialog preserves its fields and returns focus there when it closes.
+
+The embedded Windows window disables browser dialogs, password suggestions, developer tools and new browser windows. When Windows uses Edge or Chrome because WebView2 is unavailable, or Linux uses a Chromium-family app window, Network Toolkit starts a separate app profile with extensions, translation prompts and web notifications disabled. Operating-system file pickers and authorization prompts remain available. An external browser still owns the close warning that protects unsaved work or live sessions. The Linux default-browser fallback follows that browser's own settings.
+
 ## Saved data
 Network Toolkit retains preferences, saved profiles, credentials in the credential vault and macros. Updates must preserve all of these and migrate older settings without silently resetting them.
 

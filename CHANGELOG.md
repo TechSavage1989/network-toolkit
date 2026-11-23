@@ -1,3 +1,13 @@
+## 1.21.76 Stable - App controls, selection and dialogs
+
+- Ordinary interface labels and controls no longer create browser text selections. Shared CSS retains selection in editable and read-only text fields, both editor engines, terminal output, result tables, logs and explicit copyable values. Controls inside selectable results remain nonselectable.
+- A shared context-menu guard cancels the browser's default menu without stopping event propagation, so the app's Terminal, Text Editor, saved-session, file and result menus continue to work. Keyboard editing and clipboard events are untouched.
+- Replaced the remaining browser prompt and confirmation calls in FTP/SFTP/TFTP profiles, file creation, permissions and connection removal with app-owned asynchronous dialogs. Previous dialog nodes, field drafts and focus are restored; replacement, dismissal and concurrent requests never approve an action. Callers recheck the selected item and connection before applying an answer.
+- Windows browser fallback and Linux Chromium-family app windows share a launch policy that disables user and background component extensions, default apps, browser sync, first-run/default-browser prompts, translation prompts and web notifications while retaining the existing private profile, launch gate and security controls.
+- Added actual WebView2 setting readbacks and native checks for suppressed browser dialogs/popups plus working app dialogs. Added browser behavior checks for selection, copying, custom menus and dialog lifecycle across the supported app windows.
+- Promoted the v1.21.74 multiline command/paste/macro fixes and v1.21.75 ESXi output cleanup to the stable channel. No published beta tag, release or asset is modified; saved update-channel preferences remain intact.
+- External-browser window-close warnings remain when needed to protect unsaved work or live sessions. A Linux default-browser tab remains subject to its browser settings, and physical Windows/live-device acceptance is not claimed.
+
 ## 1.21.75 Beta 1 - Clean ESXi command output
 
 - Select output and Copy output recognize standard bracket-only ESXi shell prompts and remove recognized prompt boundaries and echoed command lines from raw, paced, macro and archived command output when Include commands is off.
