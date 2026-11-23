@@ -1,3 +1,15 @@
+# v1.21.74 Beta 1 - Complete terminal command lists
+
+Baseline: main and tag v1.21.73 at 442da923d6e9af7a8e77d0404e90b56b8e684f72. GitHub currently marks v1.21.73 stable/latest, although its source channel is beta and the older handoff below still names v1.21.34 as stable. This change keeps the source beta channel; verify that publishing v1.21.74 leaves stable/latest on v1.21.73.
+
+Owner reports: Send lines was disabled in paste review for ESXi and the generic warning turned red; multiline command-bar input sent only the first command; saved macros also stopped after the first command. The prompt matcher did not recognize the standard bracketed ESXi shell prompt. The command bar sent its complete text through the ordinary macro runner, then stalled at Run 1/2. Advanced macro command steps exposed a multiline field but rejected line breaks.
+
+Changed: bounded ESXi prompt recognition in paste review, the literal runner and macro defaults, with compatibility for existing saved defaults and custom expressions retained. The prominent red status names the blocked-send reason. Multiline command-bar input opens an editable review with frozen recipients and raw/paced methods. Raw sending preserves literal text and endings; Run shows the final line break it adds before review. Pending and uncertain starts are shared across both input surfaces. Cancellation, rejection and partial delivery retain the composer. Multiline Command + Enter macro steps normalize into ordered nonblank command steps, retaining metadata and limits.
+
+Local validation: all 1,861 JavaScript checks, all 77 Python checks, version/resource validation and whitespace checks pass. Review also fixed single-line send recovery after partial or uncertain delivery, malformed recipient-state handling, and preservation of explicit legacy Wait-pattern semantics. Local Go is unavailable and local Chromium is blocked by socket permissions, so Go execution, actual browser captures and native checks must pass in hosted CI. Review actual hosted screenshots; the chat's generated visual mockup is not test evidence. The browser fixture covers the main, standalone Terminal and detached Terminal with fictional sessions only.
+
+Known limits: prompt recognition is a bounded heuristic. Unusual prompt customizations or paths outside the supported grammar require a custom macro prompt, raw paste or individual commands. Macro command lists ignore blank lines; a Text step preserves literal multiline text. No live-device or physical Windows acceptance was performed.
+
 # v1.21.73 Beta 1 - Windows without WebView2 opens in Edge or Chrome
 
 v1.21.72 was published and verified: tag at merge commit 05fef55 (PR #203), release run 44063089032 green, all seven assets matching GitHub's digests and SHA256SUMS, `github_release.py verify` passing, stable channel still v1.21.34. The comparison gutter check of `editor-workflows108` failed twice on that branch (numbers visible a moment later in both screenshots); it now records 30 frames of the gutter when it fails.

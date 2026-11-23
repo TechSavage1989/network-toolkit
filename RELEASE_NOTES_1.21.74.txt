@@ -1,0 +1,16 @@
+Network Toolkit 1.21.74 Beta
+
+## What's New
+
+- Fixed the disabled Send lines button when pasting commands at a standard VMware ESXi shell prompt. Commands can now run one line at a time and wait for each new prompt.
+- When sending is blocked, the message at the top of paste review now explains the reason.
+- Multiline command-bar input now opens an editable review with the chosen recipients and a choice of raw paste or one line at a time. All command lines, blank lines and literal text are retained.
+- Fixed saved macros stopping after their first command at an ESXi prompt. Multiline Command + Enter steps are expanded into ordered command steps, as in the Commands editor.
+
+## Additional Details
+
+- ESXi prompt recognition includes home and datastore paths. Existing macros using the old default prompt work without being recreated; custom prompt expressions remain supported.
+- Run commands shows any final line break it adds before sending. Review paste keeps the original ending, so raw paste can leave the final line unfinished. Cancelling or failing a send retains the command-bar text.
+- Command-bar recipients are fixed during review. Pending or unconfirmed sends also block a duplicate send through terminal paste.
+- Macro command lists ignore blank lines. Use a Text step when literal multiline text is needed. Paced paste retains blank lines and still checks the destination, unfinished input, fresh output and prompt stability.
+- This is an opt-in beta. Existing saved connections, credentials, macros and preferences are retained.

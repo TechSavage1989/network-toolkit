@@ -32,6 +32,12 @@ type SendRequest struct {
 	Targets []TargetRef `json:"targets"`
 	Text    string      `json:"text"`
 	Execute bool        `json:"execute"`
+	// Method is explicit only for a reviewed command-bar paste. An empty
+	// method retains the original Insert/Run commands contract.
+	Method    string          `json:"method,omitempty"`
+	AutoPager *bool           `json:"autoPager,omitempty"`
+	PagerKey  string          `json:"pagerKey,omitempty"`
+	Bracketed map[string]bool `json:"bracketed,omitempty"`
 }
 type SendTargetResult struct {
 	ID    string `json:"id"`
@@ -567,14 +573,48 @@ func (e *Engine) ManualInput(sessionID string, data []byte) {
 		e.notifyLocked(t)
 	}
 }
+
+// Validate the complete reviewed framing map before any target can receive
+// input. The old API ignores these new options unless a method was selected.
+func validateSendMethod(req SendRequest) error {
+	if req.Method == "" {
+		return nil
+	}
+	if req.Method != "raw" && req.Method != "paced" {
+		return errors.New("send method must be raw or paced")
+	}
+	selected := make(map[string]bool, len(req.Targets))
+	for _, target := range req.Targets {
+		selected[target.ID] = true
+	}
+	for id, bracketed := range req.Bracketed {
+		if !selected[id] {
+			return errors.New("bracketed paste settings must name only the reviewed destinations")
+		}
+		if bracketed && req.Method == "paced" {
+			return errors.New("use raw paste for terminals in bracketed paste mode")
+		}
+	}
+	return nil
+}
+
 func (e *Engine) Send(req SendRequest) (SendResult, error) {
 	if err := validateRefs(req.Targets); err != nil {
 		return SendResult{}, err
 	}
+	if err := validateSendMethod(req); err != nil {
+		return SendResult{}, err
+	}
+	if req.Method == "paced" {
+		return SendResult{}, errors.New("paced input must start a reviewed paste run")
+	}
 	if len(req.Text) > MaxStepTextBytes || !utf8.ValidString(req.Text) || strings.ContainsRune(req.Text, 0) {
 		return SendResult{}, errors.New("send text must be valid text of at most 64 KiB without NUL")
 	}
-	if !req.Execute && strings.ContainsAny(req.Text, "\r\n") {
+	if req.Method == "raw" && len(req.Text) == 0 {
+		return SendResult{}, errors.New("enter text to paste")
+	}
+	if req.Method == "" && !req.Execute && strings.ContainsAny(req.Text, "\r\n") {
 		return SendResult{}, errors.New("Insert accepts one line without Enter; use Send and run for multiple lines")
 	}
 	available := map[string]Target{}
@@ -597,8 +637,11 @@ func (e *Engine) Send(req SendRequest) (SendResult, error) {
 			out.Error = "stop the running macro before sending input"
 		default:
 			text := normalizeLines(req.Text, lineEnding(target))
-			if req.Execute {
+			if req.Method == "" && req.Execute {
 				text = strings.TrimRight(text, "\r\n") + lineEnding(target)
+			}
+			if req.Method == "raw" && req.Bracketed[ref.ID] {
+				text = "\x1b[200~" + text + "\x1b[201~"
 			}
 			_, err := e.backend.write(ref.ID, ref.Generation, []byte(text))
 			if err != nil {
@@ -1133,11 +1176,14 @@ func (e *Engine) waitPattern(run *execution, t *task, pattern string, cursor uin
 // large pager response for every read when a device emits one very long line.
 func matchOutput(re *regexp.Regexp, pattern, text string) bool {
 	if pattern == DefaultPrompt {
+		return matchPastePrompt(text)
+	}
+	if pattern == legacyDefaultPrompt {
+		// Validate migrates definition.Prompt, but an explicit Wait step may
+		// deliberately use the old expression. Keep its original grammar and
+		// bounded final-line behavior rather than granting it ESXi matching.
 		line := text[strings.LastIndexAny(text, "\r\n")+1:]
-		if len(line) > 164 {
-			return false
-		}
-		return re.MatchString(line)
+		return len(line) <= 164 && re.MatchString(line)
 	}
 	return re.MatchString(text)
 }

@@ -50,6 +50,26 @@ Settings → **Features** sets:
 ## Paste warnings
 Before text is pasted, the terminal checks it for commands that download and run a script (`curl … | sh`), changes to shell startup files, archives unpacked into system folders, look-alike, hidden or typographic characters, and plain-HTTP or shortened links. If any are found, the paste review opens, even for one line, and lists them. You can edit the text or send it anyway. Turn each kind off in Settings → Mouse & keyboard → **Warn before pasting**.
 
+## Review and send multiple commands
+
+With **Review multi-line paste** on, text containing line breaks opens a review before anything is sent. **One line at a time - wait for prompt** sends each complete command to an SSH session and waits for its next prompt. This includes standard VMware ESXi shell prompts such as "[root@lab-esxi:~]" and datastore paths. Blank lines are kept, and the last command must end with a line break.
+
+If **Send lines** is disabled, the message at the top explains why. Finish any current command, return to an empty prompt and paste again. **Raw paste - all at once** sends the reviewed text without waiting between commands; you can also cancel and run the commands separately. The normal connection and destination checks still apply.
+
+### Multiline input in the command bar
+
+Enter or paste commands on separate lines in the command bar. **Run commands** opens an editable review with the selected terminals and the same two send methods. It adds a final line break only if needed to run the last command, and shows that addition in the review. Recipients remain fixed until you send or cancel, even if the active pane changes.
+
+For multiline input, **Insert only** becomes **Review paste**. This keeps the original ending and adds no Enter. Choose raw paste when you want to keep the final line unfinished or send literal multiline text. Both methods keep blank lines and literal text such as double braces; command-bar text is not a macro template.
+
+Cancelling, a failed send or an unconfirmed response keeps the command-bar text. If some recipients accepted a send, check those terminals before trying again. A pending or unconfirmed command-bar send also blocks another paste to the same connection until its status is resolved.
+
+### Multiple commands in a macro
+
+The macro **Commands** editor makes one command step per nonblank line. Entering several lines in an advanced **Command + Enter** step does the same: each command remains in order, with that step's enabled state and timeout. The run preview shows the separate commands. Use a **Text** step for literal multiline text where blank lines and the final ending matter.
+
+With **Wait for prompt** enabled, the default prompt setting recognizes standard ESXi shell prompts as well as common prompts ending in #, >, $ or %. Existing saved macros using the previous default work without being recreated. Custom prompt patterns remain available for other device prompts.
+
 ## Open SSH, Telnet and serial links
 With the Windows setup installed, Network Toolkit Terminal can open `ssh://`, `telnet://` and `serial:` links, for example from a browser, a wiki or an inventory page. Windows asks you to choose the app for each kind of link; setup never changes your choice for you.
 

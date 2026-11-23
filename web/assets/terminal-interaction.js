@@ -95,25 +95,58 @@
     const breaks = text.match(/\r\n|\r|\n/g) || [];
     return {bytes:byteLength(text),breaks:breaks.length,lines:breaks.length + 1,trailing:/[\r\n]$/.test(text)};
   }
+  // Terminal paste and the command bar share delivery uncertainty. Closing a
+  // dialog or using the other input surface must not submit an unknown start twice.
+  function pasteStartState(targets) {
+    let pending=false, uncertain=false;
+    for(const target of targets||[]){const start=target&&pasteStarts.get(target.id);if(start&&start.generation===target.generation){pending=pending||!!start.pending;uncertain=uncertain||!!start.uncertain;}}
+    return {pending,uncertain};
+  }
+  function beginPasteStart(targets) {
+    const seen=new Set();
+    if(!Array.isArray(targets)||!targets.length)return null;
+    for(const target of targets){if(!target?.id||!Number.isSafeInteger(target.generation)||target.generation<=0||seen.has(target.id))return null;seen.add(target.id);}
+    const state=pasteStartState(targets);if(state.pending||state.uncertain)return null;
+    const handle=targets.map(target=>({id:target.id,state:{generation:target.generation,pending:true,uncertain:false}}));
+    for(const item of handle)pasteStarts.set(item.id,item.state);
+    updateReview();return handle;
+  }
+  function endPasteStart(handle,uncertain=false) {
+    for(const item of handle||[]){item.state.pending=false;item.state.uncertain=uncertain;if(!uncertain&&pasteStarts.get(item.id)===item.state)pasteStarts.delete(item.id);}
+    updateReview();
+  }
+  function resolvePasteStart(targets) {
+    if(pasteStartState(targets).pending)return false;
+    for(const target of targets||[]){const start=target&&pasteStarts.get(target.id);if(start&&start.generation===target.generation&&start.uncertain)pasteStarts.delete(target.id);}
+    updateReview();return true;
+  }
   function reviewText() {
     const field = review?.form.querySelector('#terminalPasteText');
     return field ? field.value === review.editorOriginal ? review.original : field.value : '';
   }
   // Paced paste is an explicit command-list operation, never a replacement for
   // bracketed/raw paste into editors, shells or an unfinished command.
-  function pacedPasteReason(token, text, target) {
+  // Keep this grammar and byte bound aligned with internal/macros/paste.go.
+  // A closing bracket alone is not a prompt: ESXi requires user@host and a path.
+  function isPacedPastePrompt(text) {
+    return byteLength(text)<=164 && /^(?:[^\r\n]{0,160}[#>$%][ \t]*|\[[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}@[A-Za-z0-9][A-Za-z0-9_.-]{0,99}:(?:~(?:\/[A-Za-z0-9_ .+@()~/-]*)?|\/[A-Za-z0-9_ .+@()~/-]*)\][ ]*)$/.test(text);
+  }
+  function pacedTextReason(text, minimumLines=2) {
+    if (byteLength(text)>65536) return 'Paced paste supports up to 64 KiB; use raw paste or a smaller list.';
+    if (/[\x00-\x09\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(text)) return 'Control characters need raw paste; no commands have been changed.';
+    const lines=text.replace(/\r\n?/g,'\n').split('\n');
+    if (lines.pop()!=='') return 'End the last command with a line break, or use raw paste without adding Enter.';
+    if (lines.length<minimumLines || lines.length>1024) return 'Paced paste needs '+minimumLines+'–1,024 complete lines.';
+    return '';
+  }
+  function pacedPasteReason(token, text, target, minimumLines=2) {
     const entry=token?.entry, term=token?.xterm;
     if (!target || target.id!==token?.id || !Number.isSafeInteger(target.generation)) return 'Waiting for this connection. Reopen paste review when it is ready.';
     if (entry?.info.type!=='ssh' || !term || term.buffer.active!==term.buffer.normal || term.modes?.bracketedPasteMode) return 'Use raw paste for this terminal mode.';
     if (entry.inputSending || entry.inputBytes || entry.inputError || entry.renderPendingBytes || term.hasSelection?.()) return 'Finish pending input/output and clear the selection first, or use raw paste.';
     const b=term.buffer.active, line=b.getLine(b.baseY+b.cursorY)?.translateToString(false)||'';
-    if (!/^[^\r\n]{0,160}[#>$%][ \t]*$/.test(line.slice(0,b.cursorX)) || line.slice(b.cursorX).trim()) return 'Start at an empty command prompt, or use raw paste.';
-    if (byteLength(text)>65536) return 'Paced paste supports up to 64 KiB; use raw paste or a smaller list.';
-    if (/[\x00-\x09\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(text)) return 'Control characters need raw paste; no commands have been changed.';
-    const lines=text.replace(/\r\n?/g,'\n').split('\n');
-    if (lines.pop()!=='') return 'End the last command with a line break, or use raw paste without adding Enter.';
-    if (lines.length<2 || lines.length>1024) return 'Paced paste needs 2–1,024 complete lines.';
-    return '';
+    if (!isPacedPastePrompt(line.slice(0,b.cursorX)) || line.slice(b.cursorX).trim()) return 'Start at an empty command prompt, or use raw paste.';
+    return pacedTextReason(text,minimumLines);
   }
   function pacedPagerPrefs(entry) {
     const p = root.NetworkToolkitTerminalExtras?.prefs?.(entry) || preferences();
@@ -135,7 +168,7 @@
     const count = review.form.querySelector('#terminalPasteStats');
     const submit = document.querySelector('#terminalPasteConfirm');
     count.textContent = stats.lines + (stats.lines === 1 ? ' line' : ' lines') + ' · ' + stats.breaks + (stats.breaks === 1 ? ' line break' : ' line breaks') + ' · ' + stats.bytes.toLocaleString() + ' bytes' + (stats.trailing ? ' · Ends with a line break' : '');
-    status.textContent = review.invalid ? 'This destination is no longer ready or the focused pane changed. Nothing has been sent. Cancel and paste again in the intended console.' : stats.bytes > MAX_PASTE_BYTES ? 'This paste exceeds the 1 MiB limit. Reduce the text before sending.' : stats.breaks ? 'Line breaks may execute commands on the device. Review or edit every line before sending.' : 'The edited text contains no line breaks. It will be pasted without pressing Enter.';
+    status.textContent = review.invalid ? 'This destination is no longer ready or the focused pane changed. Nothing has been sent. Cancel and paste again in the intended console.' : stats.bytes > MAX_PASTE_BYTES ? 'This paste exceeds the 1 MiB limit. Reduce the text before sending.' : paced && reason ? 'Cannot send lines: ' + reason : stats.breaks ? 'Line breaks may execute commands on the device. Review or edit every line before sending.' : 'The edited text contains no line breaks. It will be pasted without pressing Enter.';
     status.classList.toggle('terminal-paste-invalid', blocked && !!value);
     const hint=review.form.querySelector('#terminalPasteModeHint');
     if(hint)hint.textContent=review.error || (paced ? reason || 'Sends each complete line literally, then waits for a fresh prompt (30-second timeout, 100 ms stable output). Blank lines are kept. '+(pacedPagerNote(review.destination.entry))+' Stop or pause in Runs; stopping cannot undo commands already sent.' : 'Sends all text at once using the original paste behavior. Large command lists may overwhelm a device’s command echo.');
@@ -583,5 +616,5 @@
     }
   }
   function noteInput(entry,data){if(!approvedPaste)root.NetworkToolkitTerminalExtras?.noteManualInput?.(entry,data);}
-  root.NetworkToolkitTerminalInteraction = Object.freeze({init,bind,sync,preferences,safePreferences,paste,pasteText,submitPaste,suppressesInput,copy,copyValue,cancelSelectionCopy,settingsHTML,pasteStats,noteInput});
+  root.NetworkToolkitTerminalInteraction = Object.freeze({init,bind,sync,preferences,safePreferences,paste,pasteText,submitPaste,suppressesInput,copy,copyValue,cancelSelectionCopy,settingsHTML,pasteStats,pasteWarnings,isPacedPastePrompt,pacedTextReason,pacedPasteReason,pasteStartState,beginPasteStart,endPasteStart,resolvePasteStart,noteInput});
 })(window);

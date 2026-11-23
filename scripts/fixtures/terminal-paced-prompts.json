@@ -1,0 +1,191 @@
+{
+  "maxBytes": 164,
+  "pattern": "^(?:[^\\r\\n]{0,160}[#>$%][ \\t]*|\\[[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}@[A-Za-z0-9][A-Za-z0-9_.-]{0,99}:(?:~(?:/[A-Za-z0-9_ .+@()~/-]*)?|/[A-Za-z0-9_ .+@()~/-]*)\\][ ]*)$",
+  "cases": [
+    {
+      "name": "standard switch",
+      "line": "lab-switch(config)# ",
+      "accepted": true
+    },
+    {
+      "name": "standard greater than",
+      "line": "lab-switch> ",
+      "accepted": true
+    },
+    {
+      "name": "standard shell dollar",
+      "line": "user@lab:~$ ",
+      "accepted": true
+    },
+    {
+      "name": "standard shell percent",
+      "line": "lab% ",
+      "accepted": true
+    },
+    {
+      "name": "legacy trailing tab",
+      "line": "lab#\t",
+      "accepted": true
+    },
+    {
+      "name": "standard prefix boundary",
+      "line": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx#   ",
+      "accepted": true
+    },
+    {
+      "name": "standard byte limit",
+      "line": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx#    ",
+      "accepted": false
+    },
+    {
+      "name": "standard prefix over limit",
+      "line": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx#",
+      "accepted": false
+    },
+    {
+      "name": "ESXi home no space",
+      "line": "[root@esxi-lab:~]",
+      "accepted": true
+    },
+    {
+      "name": "ESXi home with space",
+      "line": "[root@esxi-lab:~] ",
+      "accepted": true
+    },
+    {
+      "name": "ESXi absolute root",
+      "line": "[root@esxi-lab:/] ",
+      "accepted": true
+    },
+    {
+      "name": "ESXi datastore path",
+      "line": "[root@esxi-lab:/vmfs/volumes/Fixture-Store/Fixture_VM] ",
+      "accepted": true
+    },
+    {
+      "name": "ESXi path with spaces",
+      "line": "[root@esxi-lab:/vmfs/volumes/Fixture Store/Fixture VM (Copy)] ",
+      "accepted": true
+    },
+    {
+      "name": "ESXi home subdirectory",
+      "line": "[admin@esxi-lab:~/fixture dir] ",
+      "accepted": true
+    },
+    {
+      "name": "ESXi FQDN and username",
+      "line": "[_admin-1@esxi-lab.example.com:/tmp/fixture+1/@archive] ",
+      "accepted": true
+    },
+    {
+      "name": "ESXi with existing hash suffix",
+      "line": "[root@esxi-lab:~]# ",
+      "accepted": true
+    },
+    {
+      "name": "ESXi maximum bytes",
+      "line": "[root@lab:/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]  ",
+      "accepted": true
+    },
+    {
+      "name": "ESXi excessive bytes",
+      "line": "[root@lab:/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]  ",
+      "accepted": false
+    },
+    {
+      "name": "empty",
+      "line": "",
+      "accepted": false
+    },
+    {
+      "name": "arbitrary brackets",
+      "line": "[OK]",
+      "accepted": false
+    },
+    {
+      "name": "bracketed output",
+      "line": "[operation completed]",
+      "accepted": false
+    },
+    {
+      "name": "bracketed user host without path",
+      "line": "[root@esxi-lab]",
+      "accepted": false
+    },
+    {
+      "name": "numeric context not ESXi path",
+      "line": "[root@esxi-lab:0]",
+      "accepted": false
+    },
+    {
+      "name": "relative path not ESXi prompt",
+      "line": "[root@esxi-lab:vmfs/volumes]",
+      "accepted": false
+    },
+    {
+      "name": "text before ESXi prompt",
+      "line": "output [root@esxi-lab:~]",
+      "accepted": false
+    },
+    {
+      "name": "incomplete ESXi prompt",
+      "line": "[root@esxi-lab:/vmfs/volumes/Fixture",
+      "accepted": false
+    },
+    {
+      "name": "ESXi unfinished command",
+      "line": "[root@esxi-lab:~] lsof",
+      "accepted": false
+    },
+    {
+      "name": "ESXi tab in path",
+      "line": "[root@esxi-lab:/fixture\tdir]",
+      "accepted": false
+    },
+    {
+      "name": "ESXi trailing tab",
+      "line": "[root@esxi-lab:~]\t",
+      "accepted": false
+    },
+    {
+      "name": "ESXi C0 control in path",
+      "line": "[root@esxi-lab:/fixture\u0007dir]",
+      "accepted": false
+    },
+    {
+      "name": "ESXi C1 control in path",
+      "line": "[root@esxi-lab:/fixture\u0085dir]",
+      "accepted": false
+    },
+    {
+      "name": "ESXi escape in path",
+      "line": "[root@esxi-lab:/fixture\u001bdir]",
+      "accepted": false
+    },
+    {
+      "name": "ESXi nested bracket in path",
+      "line": "[root@esxi-lab:/fixture[1]]",
+      "accepted": false
+    },
+    {
+      "name": "ESXi semicolon in path",
+      "line": "[root@esxi-lab:/fixture;dir]",
+      "accepted": false
+    },
+    {
+      "name": "ESXi shell substitution in path",
+      "line": "[root@esxi-lab:/$(id)]",
+      "accepted": false
+    },
+    {
+      "name": "ESXi overlong username",
+      "line": "[uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu@lab:~]",
+      "accepted": false
+    },
+    {
+      "name": "ESXi overlong hostname",
+      "line": "[root@hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh:~]",
+      "accepted": false
+    }
+  ]
+}

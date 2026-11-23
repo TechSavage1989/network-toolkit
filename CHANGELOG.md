@@ -1,3 +1,13 @@
+## 1.21.74 Beta 1 - Complete command lists in paste, the command bar and macros
+
+- Fixed paced paste rejecting standard ESXi shell prompts ending in a closing bracket. Both the browser readiness check and backend wait now recognize a bounded user, hostname and home or absolute path, including common datastore names with spaces.
+- Default macro prompt recognition also accepts ESXi. Existing saved macros with the old default remain compatible; custom prompt expressions are retained. Prompt recognition stays bounded to the final short line. Paced paste keeps its fresh-output boundary and quiet-output checks, and rejects unrelated bracketed output and unfinished commands.
+- The red status message now shows the reason Send lines is disabled instead of leaving that explanation only below the send-method dropdown.
+- Multiline command-bar input opens an editable review with frozen recipients and raw or prompt-paced sending. Run adds one visible final line break only when needed; Review paste adds none. Raw text preserves blank lines and literal braces without macro expansion, and paced sending uses the literal paste runner rather than the ordinary macro runner.
+- Pending and unconfirmed command-bar sends share their duplicate-send guard with terminal paste. Failed or partial sends retain the composer; a partial send requires checking the accepted recipients before retrying.
+- Multiline Command + Enter macro steps normalize into separate nonblank commands, preserving their text, order, enabled state and timeout. The expanded step limit and existing parameter checks still apply, and the run preview includes every command.
+- Added shared prompt cases, full synthetic ESXi paste and macro runs, command-bar group and scope tests, and actual-application browser checks for the main, standalone Terminal and detached Terminal windows. No real device acceptance is claimed.
+
 ## 1.21.73 Beta 1 - Windows without WebView2 opens in Edge or Chrome
 
 - Owner report on v1.21.72: Windows Server 2022 Datacenter with Edge installed showed "The application window is unavailable … A usable installed Microsoft Edge WebView2 Runtime was not found". Windows Server never gets the Evergreen WebView2 Runtime, whatever Edge is installed. Owner decisions: open in Edge or Chrome as the Linux edition (and Server Inventory Configuration Manager) does, and target Windows 10 / Server 2016 or later (Go 1.21+ does not run on Server 2012).

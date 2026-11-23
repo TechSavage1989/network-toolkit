@@ -66,7 +66,7 @@ test('invalid macro structure, actions, patterns and unknown parameters are reje
     value => { value.parameters = [{ name: 'value', defaultValue: 'a\nb' }]; },
     value => { value.steps.push({ ...value.steps[0] }); },
     value => { value.steps[0].disabled = true; },
-    value => { value.steps[0].text = 'one\ntwo'; },
+    value => { value.steps[0].text = ' \n\r\n'; },
     value => { value.steps[0].text = 'one\x00two'; },
     value => { value.prompt = '('; },
     value => { value.steps[0] = { kind: 'wait', text: '(?=ready)' }; },
@@ -145,4 +145,67 @@ test('command splitting preserves text; supported remote keys map to input bytes
   ]);
   for (const [name, value] of Object.entries({ Enter: '\r', Tab: '\t', Escape: '\x1b', 'Ctrl+C': '\x03', 'Ctrl+Z': '\x1a', 'Ctrl+D': '\x04', Up: '\x1b[A', Down: '\x1b[B', Left: '\x1b[D', Right: '\x1b[C', Backspace: '\x7f' })) assert.equal(model.keyBytes(name), value);
   assert.equal(model.keyBytes('unknown'), undefined);
+});
+
+test('new and saved default prompt settings recognize ESXi while custom patterns remain exact', () => {
+  const legacy = '(?:^|[\\r\\n])[^\\r\\n]{0,160}[#>$%][ \\t]*$';
+  const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/terminal-paced-prompts.json'), 'utf8'));
+  assert.equal(model.DEFAULT_PROMPT, fixture.pattern);
+  for (const prompt of ['', legacy, model.DEFAULT_PROMPT]) {
+    const source = { ...definition(), prompt };
+    assert.equal(model.validate(source).prompt, model.DEFAULT_PROMPT);
+    assert.equal(source.prompt, prompt);
+  }
+  assert.match('[root@VMHOST002:~] ', new RegExp(model.DEFAULT_PROMPT));
+  assert.doesNotMatch('[completed]', new RegExp(model.DEFAULT_PROMPT));
+  for (const prompt of ['READY$', '(?:^|[\\r\\n])router[#>]$', '(?m)^\\[waiting\\]$']) {
+    assert.equal(model.validate({ ...definition(), prompt }).prompt, prompt);
+  }
+});
+
+test('multiline Command + Enter steps preserve all commands, options, ordering and collision-safe IDs', () => {
+  const longId = 'x'.repeat(80);
+  const source = { ...definition(), steps: [
+    { id: 'batch', kind: 'command', text: '  show {{host}}  \r\n\r\nshow two\rshow three\n', timeoutMs: 1200 },
+    { id: 'batch-line-2', kind: 'wait', text: 'READY', timeoutMs: 600 },
+    { id: longId, kind: 'command', text: 'disabled one\n disabled two ', timeoutMs: 500, disabled: true },
+    { id: 'tail', kind: 'text', text: 'one\ntwo' }
+  ] };
+  const before = JSON.stringify(source);
+  const clean = model.validate(source);
+  assert.deepEqual(plain(clean.steps.map(({ id, kind, text, timeoutMs, disabled }) => ({ id, kind, text, timeoutMs, disabled }))), [
+    { id: 'batch', kind: 'command', text: '  show {{host}}  ', timeoutMs: 1200, disabled: false },
+    { id: 'batch-line-2-2', kind: 'command', text: 'show two', timeoutMs: 1200, disabled: false },
+    { id: 'batch-line-3', kind: 'command', text: 'show three', timeoutMs: 1200, disabled: false },
+    { id: 'batch-line-2', kind: 'wait', text: 'READY', timeoutMs: 600, disabled: false },
+    { id: longId, kind: 'command', text: 'disabled one', timeoutMs: 500, disabled: true },
+    { id: 'x'.repeat(73) + '-line-2', kind: 'command', text: ' disabled two ', timeoutMs: 500, disabled: true },
+    { id: 'tail', kind: 'text', text: 'one\ntwo', timeoutMs: 0, disabled: false }
+  ]);
+  assert.equal(JSON.stringify(source), before);
+  assert.deepEqual(plain(model.validate(clean)), plain(clean));
+});
+
+test('multiline command expansion retains original text, expanded-step and variable validation limits', () => {
+  const value = definition();
+  value.steps[0].text = 'show clock\n'.repeat(model.MAX_STEPS);
+  assert.equal(model.validate(value).steps.length, model.MAX_STEPS);
+  value.steps[0].text += 'show version';
+  assert.throws(() => model.validate(value), /1024/);
+  value.steps[0].text = 'x\n'.repeat(model.MAX_STEP_TEXT_BYTES / 2 + 1);
+  assert.throws(() => model.validate(value), /64 KiB/);
+  for (const text of ['one\nshow {{missing}}', 'one\nshow {{bad-name}}', 'one\n\x00two']) {
+    value.steps[0].text = text;
+    assert.throws(() => model.validate(value));
+  }
+  value.steps = [
+    { id: 'keep', kind: 'command', text: 'show version' },
+    { id: 'inactive', kind: 'command', text: ' \r\n\n', disabled: true, timeoutMs: 500 }
+  ];
+  const clean = model.validate(value);
+  assert.equal(clean.steps.length, 2);
+  assert.equal(clean.steps[1].id, 'inactive');
+  assert.equal(clean.steps[1].disabled, true);
+  assert.equal(clean.steps[1].timeoutMs, 500);
+  assert.equal(clean.steps[1].text, '');
 });

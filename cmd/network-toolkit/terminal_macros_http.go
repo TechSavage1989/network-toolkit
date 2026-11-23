@@ -298,12 +298,35 @@ func (a *application) handleTerminalAutomation(w http.ResponseWriter, r *http.Re
 			return
 		}
 		var request macros.SendRequest
-		if err := decodeTerminalBody(w, r, 128<<10, &request); err != nil {
+		// A 64 KiB literal payload can expand substantially when JSON escapes
+		// quotes or control bytes. The engine still bounds the decoded text.
+		if err := decodeTerminalBody(w, r, 512<<10, &request); err != nil {
 			jsonError(w, 400, err.Error())
 			return
 		}
 		if !terminalMacroRefsAllowed(request.Targets, scope) {
 			jsonError(w, 403, "A destination is not assigned to this terminal window.")
+			return
+		}
+		if request.Method == "paced" {
+			run, err := engine.StartPasteGroup(request)
+			if err != nil {
+				jsonError(w, 409, err.Error())
+				return
+			}
+			jsonResponse(w, 201, map[string]any{"run": run, "targets": []macros.SendTargetResult{}})
+			return
+		}
+		if request.Method != "" {
+			// Raw is literal and generation-fenced; an unknown method is
+			// rejected by Send before any target is queued. Execute never
+			// adds an Enter to text already approved in the paste review.
+			result, err := engine.Send(request)
+			if err != nil {
+				jsonError(w, 409, err.Error())
+				return
+			}
+			jsonResponse(w, 200, result)
 			return
 		}
 		if request.Execute {

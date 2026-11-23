@@ -21,8 +21,10 @@ const (
 	DefaultPacingMs    = 100
 	MaxTimeoutMs       = 3600000
 	MaxPacingMs        = 60000
-	DefaultPrompt      = `(?:^|[\r\n])[^\r\n]{0,160}[#>$%][ \t]*$`
+	DefaultPrompt      = pastePromptPattern
 )
+
+const legacyDefaultPrompt = `(?:^|[\r\n])[^\r\n]{0,160}[#>$%][ \t]*$`
 
 type Definition struct {
 	ID            string      `json:"id"`
@@ -169,7 +171,9 @@ func Validate(definition Definition) (Definition, error) {
 		return Definition{}, errors.New("macro timeout must be 100 ms to 1 hour and pacing must be 0 to 60 seconds")
 	}
 	clean.Prompt = strings.TrimSpace(clean.Prompt)
-	if clean.Prompt == "" {
+	// The exact shipped default migrates with the recognizer. User-written
+	// patterns remain unchanged, including deliberately restrictive ones.
+	if clean.Prompt == "" || clean.Prompt == legacyDefaultPrompt {
 		clean.Prompt = DefaultPrompt
 	}
 	if len(clean.Prompt) > 4096 {
@@ -249,8 +253,8 @@ func Validate(definition Definition) (Definition, error) {
 			if !step.Disabled && step.Text == "" {
 				return Definition{}, fmt.Errorf("enter text for step %d", index+1)
 			}
-			if step.Kind == "command" && strings.ContainsAny(step.Text, "\r\n") {
-				return Definition{}, fmt.Errorf("step %d command must be one line; use separate commands or a Send text step", index+1)
+			if step.Kind == "command" && !step.Disabled && strings.ContainsAny(step.Text, "\r\n") && strings.TrimSpace(step.Text) == "" {
+				return Definition{}, fmt.Errorf("enter at least one command for step %d", index+1)
 			}
 		case "key":
 			step.Text, step.DelayMs, step.TimeoutMs = "", 0, 0
@@ -292,11 +296,63 @@ func Validate(definition Definition) (Definition, error) {
 	if active == 0 {
 		return Definition{}, errors.New("enable at least one macro step")
 	}
+	// Split only after validating each original step, so a large multiline
+	// field cannot bypass its text bound or discard invalid parameters.
+	clean.Steps, err = splitCommandSteps(clean.Steps)
+	if err != nil {
+		return Definition{}, err
+	}
 	encoded, err := json.Marshal(clean)
 	if err != nil || len(encoded) > MaxDefinitionBytes {
 		return Definition{}, errors.New("macro definition exceeds the 4 MiB limit")
 	}
 	return clean, nil
+}
+
+// A Command + Enter field uses the same nonblank-line rule as FromCommands.
+// Each resulting command remains a normal step with its own prompt wait. The
+// first ID and all step options survive; generated IDs cannot replace later
+// steps or collide with a user's IDs. Insert text is intentionally untouched.
+func splitCommandSteps(steps []Step) ([]Step, error) {
+	used := make(map[string]bool, len(steps))
+	for _, step := range steps {
+		used[step.ID] = true
+	}
+	out := make([]Step, 0, len(steps))
+	for _, step := range steps {
+		if step.Kind != "command" || !strings.ContainsAny(step.Text, "\r\n") {
+			out = append(out, step)
+		} else {
+			lines := FromCommands(step.Text)
+			if len(lines) == 0 {
+				// An inactive blank step stays available for later editing.
+				step.Text = ""
+				out = append(out, step)
+			}
+			for index, line := range lines {
+				next := step
+				next.Text = line.Text
+				if index > 0 {
+					for serial := 0; ; serial++ {
+						suffix := fmt.Sprintf("-line-%d", index+1)
+						if serial > 0 {
+							suffix += fmt.Sprintf("-%d", serial+1)
+						}
+						next.ID = step.ID[:min(len(step.ID), 80-len(suffix))] + suffix
+						if !used[next.ID] {
+							used[next.ID] = true
+							break
+						}
+					}
+				}
+				out = append(out, next)
+			}
+		}
+		if len(out) > MaxSteps {
+			return nil, errors.New("a macro must have at most 1024 steps after splitting command lines")
+		}
+	}
+	return out, nil
 }
 
 func isBuiltin(name string) bool {
