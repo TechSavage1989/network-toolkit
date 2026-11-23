@@ -3,7 +3,7 @@
 (function(root){'use strict';
 const TYPES=new Set(['ssh','ftp']);
 const configurations={
- ssh:{host:'',port:22,username:'',authMode:'password',password:'',keyPath:'',passphrase:'',fingerprint:'',security:'ssh',sshCompatibility:'modern',credentialId:'',profileName:''},
+ ssh:{host:'',port:22,username:'',authMode:'password',password:'',keyPath:'',passphrase:'',fingerprint:'',security:'ssh',sshCompatibility:'modern',sshAutoContinueNotices:false,credentialId:'',profileName:''},
  ftp:{host:'',port:21,username:'',authMode:'password',password:'',fingerprint:'',security:'explicit',credentialId:'',profileName:''}
 };
 const model={};
@@ -20,12 +20,12 @@ function newPane(){return {path:'',parent:'',home:'',entries:[],loading:false,hi
 function get(k){if(!model[k])model[k]={local:newPane(),remote:newPane(),connected:false,connecting:false,connectionId:'',borrowedConnection:false,connectionOptions:[],connectionEpoch:0,sessionId:'',terminalCandidate:'',sessionOptions:[],autoTerminal:'',sourceChoice:'manual',showSettings:false,profileId:'',editingProfileId:'',libraryOpen:false,libraryTab:'saved',libraryFilter:'',busy:false,cancelPending:false,queue:[],lastError:'',split:50,activity:[],active:'remote',saved:false};return model[k]}
 function loadSaved(k){const m=get(k);if(m.saved)return;m.saved=true;const saved=state.remoteBrowserSettings?.[k];if(!saved||typeof saved!=='object')return;
  for(const key of ['host','port','username','authMode','keyPath','fingerprint','security','sshCompatibility','credentialId','profileName'])if(Object.hasOwn(saved,key))configurations[k][key]=saved[key];
- if(k==='ssh'&&configurations.ssh.sshCompatibility!=='legacy')configurations.ssh.sshCompatibility='modern';
+ if(k==='ssh'){if(configurations.ssh.sshCompatibility!=='legacy')configurations.ssh.sshCompatibility='modern';configurations.ssh.sshAutoContinueNotices=saved.sshAutoContinueNotices===true;}
  if(typeof saved.localPath==='string')m.local.path=saved.localPath;
  if(typeof saved.remotePath==='string')m.remote.path=saved.remotePath;
  if(typeof saved.split==='number')m.split=Math.max(26,Math.min(74,saved.split));
 }
-function remember(k){state.remoteBrowserSettings=state.remoteBrowserSettings||{};const c=configurations[k],m=get(k);state.remoteBrowserSettings[k]={host:c.host,port:c.port,username:c.username,authMode:c.authMode,keyPath:c.keyPath,fingerprint:c.fingerprint,sshCompatibility:c.sshCompatibility,security:c.security,credentialId:c.credentialId||'',profileName:c.profileName||'',localPath:m.local.path,remotePath:m.remote.path,split:m.split};saveState()}
+function remember(k){state.remoteBrowserSettings=state.remoteBrowserSettings||{};const c=configurations[k],m=get(k);state.remoteBrowserSettings[k]={host:c.host,port:c.port,username:c.username,authMode:c.authMode,keyPath:c.keyPath,fingerprint:c.fingerprint,sshCompatibility:c.sshCompatibility,...(k==='ssh'?{sshAutoContinueNotices:c.sshAutoContinueNotices===true}:{}),security:c.security,credentialId:c.credentialId||'',profileName:c.profileName||'',localPath:m.local.path,remotePath:m.remote.path,split:m.split};saveState()}
 function pageActive(k){return !!sidebarMount(k)||(state.activePage===k||state.activePage==='sftp'&&k==='ssh')&&window.NetworkToolkitTransfers?.mode(state.activePage)==='client'}
 const sidebarMounts=new Map();
 function sidebarMount(k){const value=sidebarMounts.get(k),editor=value?.host?.closest?.('#networkToolkitFileEditor');return value?.host?.isConnected&&!value.host.closest('[data-ed-files-sidebar]')?.hidden&&editor&&!editor.hidden?value:null;}
@@ -38,7 +38,7 @@ async function requestPayload(k,action,extra={}){const c=configurations[k],m=get
  if(k==='ssh'&&!['connect','fingerprint'].includes(action)&&m.sessionId)return {protocol:'ssh',action,sessionId:m.sessionId,...extra};
  if(k==='ssh'&&!['connect','fingerprint'].includes(action))throw new Error('Connect to an SSH/SFTP session before using remote files.');
  editorCheck?.();
- const details={protocol:k,action,host:c.host.trim(),port:Number(c.port),username:c.username.trim(),password:c.password,keyPath:c.keyPath,privateKey:c.privateKey||'',passphrase:c.passphrase,authMode:c.authMode,fingerprint:c.fingerprint.trim(),sshCompatibility:c.sshCompatibility,security:c.security,...extra};
+ const details={protocol:k,action,host:c.host.trim(),port:Number(c.port),username:c.username.trim(),password:c.password,keyPath:c.keyPath,privateKey:c.privateKey||'',passphrase:c.passphrase,authMode:c.authMode,fingerprint:c.fingerprint.trim(),sshCompatibility:c.sshCompatibility,...(k==='ssh'?{sshAutoContinueNotices:c.sshAutoContinueNotices===true}:{}),security:c.security,...extra};
  if(k==='ssh'&&action==='connect'&&(state.terminalProfiles||[]).some(row=>row.id===m.profileId&&row.type==='ssh'))details.profileId=m.profileId;
  // Only credential references enter the browser request. The engine resolves
  // saved secrets after destination authorization and host verification.
@@ -87,7 +87,7 @@ function sshRecord(id){return sshKnownRecords().find(x=>x.id===id)||null;}
 function sftpRecent(){return Array.isArray(state.sftpRecent)?state.sftpRecent:[];}
 function rememberSFTPRecent(){const c=configurations.ssh,m=get('ssh');if(!c.host||!c.username||!m.connected||m.sessionId)return;
  const prior=sftpRecent().find(x=>x.host===c.host&&Number(x.port)===Number(c.port)&&x.username===c.username);
- const current=sshRecord(m.profileId);const profile={id:prior?.id||'sftp-recent-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),name:current?.name||c.host,type:'ssh',host:c.host,port:Number(c.port),username:c.username,authMethod:c.authMode==='key'?'key':'password',credentialId:c.credentialId||current?.credentialId||'',fingerprint:c.fingerprint,sshCompatibility:c.sshCompatibility,lastUsed:Date.now()};
+ const current=sshRecord(m.profileId);const profile={id:prior?.id||'sftp-recent-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),name:current?.name||c.host,type:'ssh',host:c.host,port:Number(c.port),username:c.username,authMethod:c.authMode==='key'?'key':'password',credentialId:c.credentialId||current?.credentialId||'',fingerprint:c.fingerprint,sshCompatibility:c.sshCompatibility,sshAutoContinueNotices:c.sshAutoContinueNotices===true,lastUsed:Date.now()};
  state.sftpRecent=[profile,...sftpRecent().filter(x=>x.id!==profile.id)].slice(0,50);
  const recent=Array.isArray(state.terminalRecent)?state.terminalRecent:[];
  const matched=recent.find(x=>x.type==='ssh'&&x.host===profile.host&&Number(x.port)===profile.port&&x.username===profile.username);
@@ -148,7 +148,7 @@ async function loadProfile(k,id){
  invalidateConnection(k);const c=configurations.ssh,changed=c.host!==profile.host||Number(c.port)!==Number(profile.port);
  m.profileId=id;m.terminalKnownHost=false;m.profileManualAuth=false;m.sessionId='';m.connected=false;m.terminalCandidate='';m.sourceChoice=((state.terminalRecent||[]).some(x=>x.id===id)||(state.sftpRecent||[]).some(x=>x.id===id)?'recent:':'profile:')+id;m.showSettings=false;m.remote.entries=[];
  c.credentialId=profile.credentialId||'';c.profileName=profile.name||'';m.editingProfileId='';c.host=profile.host;c.port=Number(profile.port)||22;c.username=profile.username||'';
- c.authMode=profile.authMethod==='key'?'key':'password';c.sshCompatibility=profile.sshCompatibility==='legacy'?'legacy':'modern';c.password='';c.privateKey='';c.passphrase='';c.keyPath='';
+ c.authMode=profile.authMethod==='key'?'key':'password';c.sshCompatibility=profile.sshCompatibility==='legacy'?'legacy':'modern';c.sshAutoContinueNotices=profile.sshAutoContinueNotices===true;c.password='';c.privateKey='';c.passphrase='';c.keyPath='';
  if(changed)c.fingerprint='';
  // Reuse a host key that was previously confirmed by the terminal's trusted
  // known-hosts store. Unknown hosts still require manual independent verification.
@@ -233,7 +233,7 @@ async function useSavedSSHProfile(id,check=null){
  }catch(error){m.showSettings=true;render('ssh');note('ssh','Cannot use SSH profile: '+error.message,'error');}
  finally{m.profileSelectionPending=false;}
 }
-function resetSSHConnectionProfile(){configurations.ssh.credentialId='';configurations.ssh.profileName='';}
+function resetSSHConnectionProfile(){configurations.ssh.credentialId='';configurations.ssh.profileName='';configurations.ssh.sshAutoContinueNotices=false;}
 function resetSSHProfileAuth(){const m=get('ssh'),c=configurations.ssh;m.profileManualAuth=false;m.pendingFingerprint=null;c.password='';c.privateKey='';c.passphrase='';c.keyPath='';}
 // Connection settings is a toggle (owner rule): it opens the client sidebar on its settings and closes it again.
 function clientSettingsShown(k){const pref=root.NetworkToolkitTransferClientLayout?.preferences?.(k==='ssh'?'sftp':k);return !!pref&&!pref.collapsed&&pref.tab==='settings';}
@@ -353,7 +353,7 @@ function removeLibraryEntry(k,kind,id){const collection=kind==='saved'?(k==='ssh
 async function libraryCommand(k,command,kind='',id=''){
  const m=get(k);
  if(command==='close'){m.libraryOpen=false;render(k);return;}
- if(command==='new'){invalidateConnection(k);configurations[k].credentialId='';configurations[k].profileName='';m.editingProfileId='';m.libraryOpen=false;m.showSettings=true;m.sourceChoice='manual';m.profileId='';m.sessionId='';m.connected=false;if(k==='ssh')resetSSHProfileAuth();else{configurations[k].credentialId='';configurations[k].password='';}render(k);rootNode(k)?.clientSidebarSelect?.('settings');return;}
+ if(command==='new'){invalidateConnection(k);configurations[k].credentialId='';configurations[k].profileName='';m.editingProfileId='';m.libraryOpen=false;m.showSettings=true;m.sourceChoice='manual';m.profileId='';m.sessionId='';m.connected=false;if(k==='ssh'){resetSSHProfileAuth();configurations.ssh.sshAutoContinueNotices=false;}else{configurations[k].credentialId='';configurations[k].password='';}render(k);rootNode(k)?.clientSidebarSelect?.('settings');return;}
  if(command==='save'){saveConnectionDialog(k);return;}
  if(command==='clear'){const collections=k==='ssh'?['sftpRecent','terminalRecent']:['ftpRecent'],reviewed=new Map(collections.map(name=>[name,new Map((state[name]||[]).filter(x=>name!=='terminalRecent'||x.type==='ssh').map(x=>[x.id,JSON.stringify(x)]))]));
   if(!await root.NetworkToolkitDialogs.confirm({title:'Clear recent connections',message:'Clear recent '+(k==='ssh'?'SSH/SFTP':'FTP/FTPS')+' connections? Saved profiles will remain.',acceptLabel:'Clear recent',danger:true}))return;
@@ -394,7 +394,7 @@ function render(k){if(!TYPES.has(k))return;loadSaved(k);const mount=sidebarMount
  for(const side of ['local','remote']){const pane=m[side];if(side==='remote'&&!m.connected){paint(k,side,m.connecting?'Connecting...':'Connect to a server to browse its files.');continue;}if(pane.loading)paint(k,side,'Loading...');else if(pane.initialized)paint(k,side);else void load(k,side,pane.path, true);}
  drawActivity(k);restoreConnectionControls(k);note(k,m.lastError,m.lastError?'error':'info');void ftpCredentialsRefresh(k);if(k==='ssh'){void refreshTerminalChoices(k);if(m.autoTerminal){const id=m.autoTerminal;m.autoTerminal='';void connectTerminal(k,id,{preserveFolder:true})}}}
 function connectionIdentity(k){const m=get(k),c=configurations[k];return [m.connectionEpoch,c.host,c.port,c.username,c.security].join('|');}
-function profileSaveIdentity(k){const m=get(k),c=configurations[k];return JSON.stringify([dragIdentity(k),m.profileId,m.editingProfileId,m.sourceChoice,c.host,c.port,c.username,c.security,c.fingerprint,c.credentialId,c.authMode,c.sshCompatibility,c.profileName]);}
+function profileSaveIdentity(k){const m=get(k),c=configurations[k];return JSON.stringify([dragIdentity(k),m.profileId,m.editingProfileId,m.sourceChoice,c.host,c.port,c.username,c.security,c.fingerprint,c.credentialId,c.authMode,c.sshCompatibility,c.sshAutoContinueNotices===true,c.profileName]);}
 function canNativeDrag(k,side){if(side==='local')return true;const c=configurations[k],m=get(k);return k==='ssh'?!!(m.connectionId||m.sessionId):!!c.credentialId&&!c.password&&c.security!=='plain';}
 function dragIdentity(k){const m=get(k);return connectionIdentity(k)+'|'+(m.connectionId||m.sessionId||'');}
 function acceptListing(k,side,data,skipHistory=false){const p=get(k)[side];
@@ -498,7 +498,7 @@ async function openTerminal(k){if(k!=='ssh')return;const m=get(k);if(!m.connecte
   if(epoch!==m.connectionEpoch)throw new Error('The browser connection changed while opening Terminal.');
   if(response.viewState&&typeof receiveTerminalViewState==='function')receiveTerminalViewState(response.viewState);
   id=response.session.id;const entry=typeof upsertTerminalSession==='function'?upsertTerminalSession(response.session):null;
-  if(entry){const c=configurations[k],config={type:'ssh',host:c.host,port:c.port,username:c.username,authMethod:c.authMode,credentialId:c.credentialId||'',sshCompatibility:c.sshCompatibility,timeoutMs:Number(sshRecord(m.profileId)?.timeoutMs)||10000};entry.config=typeof safeTerminalConfig==='function'?safeTerminalConfig(config):config;root.NetworkToolkitSessionSidebar?.record?.(entry,c.profileName||c.host);}
+  if(entry){const c=configurations[k],config={type:'ssh',host:c.host,port:c.port,username:c.username,authMethod:c.authMode,credentialId:c.credentialId||'',sshCompatibility:c.sshCompatibility,sshAutoContinueNotices:c.sshAutoContinueNotices===true,timeoutMs:Number(sshRecord(m.profileId)?.timeoutMs)||10000};entry.config=typeof safeTerminalConfig==='function'?safeTerminalConfig(config):config;root.NetworkToolkitSessionSidebar?.record?.(entry,c.profileName||c.host);}
   m.connectionId='';m.sessionId=id;m.sourceChoice='session:'+id;m.sessionOptions=[{id,host:configurations[k].host,port:configurations[k].port,username:configurations[k].username,label:configurations[k].profileName||configurations[k].host},...m.sessionOptions.filter(x=>x.id!==id)];actionLog(k,'Opened Terminal over the existing authenticated SSH connection.','success');
  }catch(error){note(k,'Cannot open Terminal: '+error.message,'error');return;}finally{m.connecting=false;restoreConnectionControls(k);}}
  if(typeof navigate==='function')navigate('terminal');if(typeof selectTerminal==='function')selectTerminal(id);if(typeof startTerminalFeed==='function')startTerminalFeed();if(typeof scheduleTerminalFit==='function')scheduleTerminalFit();
@@ -670,7 +670,7 @@ async function saveSharedSSHProfile(nameOverride){const c=configurations.ssh,m=g
  if(!name.trim()){note('ssh','Enter a profile name.','error');return;}
  const full=!existing&&root.NetworkToolkitSharedData?.full('terminalProfiles',(state.terminalProfiles||[]).length);if(full){note('ssh',full,'error');return;}
  const id=existing?.id||'terminal-profile-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
- const profile={id,name:name.trim().slice(0,100),folder:root.NetworkToolkitSessionFolders.normalize(existing?.folder),type:'ssh',host:host.slice(0,512),port,username:username.slice(0,256),authMethod:c.authMode==='key'?'key':'password',sshCompatibility:c.sshCompatibility==='legacy'?'legacy':'modern',timeoutMs:10000,credentialId:c.credentialId||''};
+ const profile={id,name:name.trim().slice(0,100),folder:root.NetworkToolkitSessionFolders.normalize(existing?.folder),type:'ssh',host:host.slice(0,512),port,username:username.slice(0,256),authMethod:c.authMode==='key'?'key':'password',sshCompatibility:c.sshCompatibility==='legacy'?'legacy':'modern',sshAutoContinueNotices:c.sshAutoContinueNotices===true,timeoutMs:10000,credentialId:c.credentialId||''};
  state.terminalProfiles=[profile,...(state.terminalProfiles||[]).filter(x=>x.id!==id)];m.profileId=id;m.editingProfileId='';c.profileName=name.trim();m.sourceChoice='profile:'+id;remember('ssh');root.NetworkToolkitSessionSidebar?.render?.();render('ssh');
  note('ssh','SSH profile saved and available in both Terminal and SFTP. Passwords and private keys are not stored in the profile. Manage credentials through the protected credential manager.','success');}
 async function permissions(k){
@@ -828,7 +828,7 @@ function prepareDeviceConnection(protocol,host,port){
  if(!k||!target||!Number.isInteger(number)||number<1||number>65535)throw new Error('Choose a valid device host and TCP port.');
  const m=get(k);
  if(m.connected||m.connecting||m.busy||m.profileSelectionPending||m.pendingProfileLoad||m.pendingCredentialSave||m.pendingClose||m.pendingKeyRead||m.connectionId||m.sessionId||m.remote.loading)throw new Error('The '+(k==='ssh'?'SFTP':'FTP / FTPS')+' client already has an active connection or operation. Wait for the operation to finish or disconnect the existing session first; the existing session has not changed.');
- Object.assign(configurations[k],{host:target,port:number,username:'',authMode:'password',password:'',privateKey:'',keyPath:'',passphrase:'',fingerprint:'',security:k==='ssh'?'ssh':protocol==='ftps'?'implicit':'explicit',sshCompatibility:'modern',credentialId:'',profileName:''});
+ Object.assign(configurations[k],{host:target,port:number,username:'',authMode:'password',password:'',privateKey:'',keyPath:'',passphrase:'',fingerprint:'',security:k==='ssh'?'ssh':protocol==='ftps'?'implicit':'explicit',sshCompatibility:'modern',sshAutoContinueNotices:false,credentialId:'',profileName:''});
  Object.assign(m,{saved:true,profileId:'',editingProfileId:'',sourceChoice:'manual',autoTerminal:'',terminalCandidate:'',profileManualAuth:false,pendingFingerprint:null,showSettings:true,lastError:'',remote:newPane()});
  state.transferModes=state.transferModes||{};state.transferModes[k==='ssh'?'sftp':'ftp']='client';state.fileTransferProtocol=k==='ssh'?'sftp':'ftp';
  remember(k);navigate(k==='ssh'?'sftp':'ftp');rootNode(k)?.clientSidebarSelect?.('settings');

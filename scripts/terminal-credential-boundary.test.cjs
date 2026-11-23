@@ -3,9 +3,9 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const html=fs.readFileSync(require.resolve('../web/index.html'),'utf8');
 function context(){const root={};root.window=root;vm.createContext(root);vm.runInContext(html.match(/^const TERMINAL_SAFE_FIELDS=.*$/m)[0],root);for(const name of ['safeTerminalConfig','terminalConnectPayload'])vm.runInContext(html.split('\n').find(line=>line.startsWith('function '+name+'(')),root);return root;}
 test('saved SSH authentication payload contains an ID and no plaintext secret fields',()=>{
- const c=context(),config={type:'ssh',host:'router.test',username:'operator',credentialId:'saved-id',authMethod:'key'};
+ const c=context(),config={type:'ssh',host:'router.test',username:'operator',credentialId:'saved-id',authMethod:'key',sshAutoContinueNotices:true};
  const body=c.terminalConnectPayload(config,{password:'password-canary',privateKey:'key-canary',passphrase:'passphrase-canary'});
- assert.equal(body.credentialId,'saved-id');for(const field of ['password','privateKey','passphrase','secret'])assert.equal(Object.hasOwn(body,field),false);
+ assert.equal(body.credentialId,'saved-id');assert.equal(body.sshAutoContinueNotices,true);for(const field of ['password','privateKey','passphrase','secret'])assert.equal(Object.hasOwn(body,field),false);
  assert(!JSON.stringify(body).includes('canary'));
 });
 test('manual password and private-key authentication remain transient request inputs',()=>{
@@ -15,7 +15,7 @@ test('manual password and private-key authentication remain transient request in
  assert(!JSON.stringify(c.safeTerminalConfig({...config,password:'manual-canary'})).includes('manual-canary'));
 });
 test('non-SSH payloads discard saved credential references and all remote secrets',()=>{
- const c=context();for(const type of ['telnet','serial','cmd','powershell']){const body=c.terminalConnectPayload({type,host:'test',credentialId:'saved-id',username:'operator'},{password:'secret'});for(const field of ['password','privateKey','passphrase','credentialId'])assert.equal(Object.hasOwn(body,field),false);}
+ const c=context();for(const type of ['telnet','serial','cmd','powershell']){const body=c.terminalConnectPayload({type,host:'test',credentialId:'saved-id',username:'operator',sshAutoContinueNotices:true},{password:'secret'});for(const field of ['password','privateKey','passphrase','credentialId','sshAutoContinueNotices'])assert.equal(Object.hasOwn(body,field),false);}
 });
 test('native session bootstrap accepts only a 64-character lowercase hex capability',()=>{
  const line=html.match(/^const SESSION=.*$/m)[0];

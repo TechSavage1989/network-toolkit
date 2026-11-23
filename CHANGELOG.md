@@ -1,3 +1,11 @@
+## 1.21.78 Stable - Optional automatic continuation through SSH notices
+
+- Added **Automatically continue through SSH notices** to SSH connection profiles. It is off by default and can acknowledge keyboard-interactive steps that contain no questions with the required empty response.
+- The manual notice panel explains why no input fields are present and what Continue does. Server-supplied headings are displayed alongside the message instead of being dropped; automatically continued notice text remains available as safe terminal output.
+- The option is preserved through supported saved-profile, recent, reconnect and separate-window paths and ignored for other transports. Existing profiles retain manual notice handling until the option is selected.
+- Password and MFA questions, password changes and host-key approval retain their existing handling. A zero-question notice still closes the first-password automatic-answer opportunity, and the one-use saved-password rule is unchanged.
+- Retained authentication bounds, cancellation, host identity verification, saved credentials and profile storage. No live-device or physical ESXi acceptance is claimed.
+
 ## 1.21.77 Stable - Saved passwords for SSH sign-in challenges
 
 - Terminal and direct SFTP connections using Password authentication can answer an initial password-only keyboard-interactive challenge with the supplied or backend-resolved saved login password, including standard ESXi password challenges. The rule applies to qualifying SSH servers without a device-specific exception.

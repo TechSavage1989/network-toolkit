@@ -35,7 +35,7 @@ func (a *application) browserHomeAvailable(r *http.Request) bool {
 }
 
 func browserRequestHasLogin(r remoteBrowserRequest) bool {
-	return r.CredentialID != "" || r.Host != "" || r.Port != 0 || r.Username != "" || r.Password != "" || r.PrivateKey != "" || r.KeyPath != "" || r.Passphrase != "" || r.Fingerprint != "" || r.AuthMode != "" || r.Security != "" || r.SSHCompatibility != "" || r.ProfileID != "" || r.TimeoutMs != 0
+	return r.CredentialID != "" || r.Host != "" || r.Port != 0 || r.Username != "" || r.Password != "" || r.PrivateKey != "" || r.KeyPath != "" || r.Passphrase != "" || r.Fingerprint != "" || r.AuthMode != "" || r.Security != "" || r.SSHCompatibility != "" || r.SSHAutoContinueNotices || r.ProfileID != "" || r.TimeoutMs != 0
 }
 
 func (a *application) browserConnection(id string) (*browserFileConnection, error) {
@@ -77,7 +77,7 @@ func (a *application) openBrowserConnection(request *http.Request, r remoteBrows
 	lifetime, cancel := context.WithCancel(parent)
 	stop := context.AfterFunc(request.Context(), cancel)
 	defer stop()
-	req := terminal.ConnectRequest{Type: "ssh", ProfileID: r.ProfileID, CredentialID: r.CredentialID, Host: r.Host, Port: r.Port, Username: r.Username, AuthMethod: r.AuthMode, Password: r.Password, PrivateKey: r.PrivateKey, Passphrase: r.Passphrase, SSHCompatibility: r.SSHCompatibility, Cols: 80, Rows: 24, TimeoutMs: r.TimeoutMs}
+	req := terminal.ConnectRequest{Type: "ssh", ProfileID: r.ProfileID, CredentialID: r.CredentialID, Host: r.Host, Port: r.Port, Username: r.Username, AuthMethod: r.AuthMode, Password: r.Password, PrivateKey: r.PrivateKey, Passphrase: r.Passphrase, SSHCompatibility: r.SSHCompatibility, SSHAutoContinueNotices: r.SSHAutoContinueNotices, Cols: 80, Rows: 24, TimeoutMs: r.TimeoutMs}
 	if r.CredentialID != "" {
 		req.ExpectedHostFingerprint = r.Fingerprint
 	}

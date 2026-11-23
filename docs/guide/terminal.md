@@ -8,9 +8,17 @@ Saved and recent connections, saved credentials, trusted SSH host keys, macros a
 
 Choose **Password** authentication and select a saved credential or enter the login password. If the SSH server uses a standard interactive password prompt, including on ESXi, Network Toolkit can use that same password without asking you to type it again.
 
-Only the first clear, hidden password-only challenge is eligible. The password is supplied automatically at most once during the connection attempt, across ordinary password authentication and interactive challenges. If the server then sends another interactive challenge, the existing prompt lets you respond manually. MFA codes, password changes, unfamiliar instructions, multiple questions and later challenges stay manual; an earlier notice or other challenge also leaves subsequent questions for you to answer.
+Only the first clear, hidden password-only challenge is eligible. The password is supplied automatically at most once during the connection attempt, across ordinary password authentication and interactive challenges. If the server then asks another question, the existing prompt lets you respond manually. MFA codes, password changes, unfamiliar instructions, multiple questions and later questions stay manual; an earlier notice or other challenge also leaves subsequent questions for you to answer.
 
 **Keyboard-interactive** connections without a linked saved password keep questions manual. When a saved password is linked, the connection uses Password authentication as before. SSH host-key verification still applies, and the saved password is used without displaying it.
+
+## SSH sign-in notices
+
+An SSH server can send a sign-in step with no questions or input fields. **Continue** acknowledges that step with an empty response so the server can proceed. The panel shows the server's heading and message when supplied and explains what Continue does even when the server sent no visible text.
+
+To continue through these steps automatically, open or edit the SSH connection and select **Automatically continue through SSH notices**. Save the profile to keep that choice for future connections. The option is off by default and applies only to that SSH connection. Server notice text is retained in the terminal output as safe text.
+
+This option acknowledges only steps that ask for no answer. It does not answer password, MFA or password-change questions, approve an SSH host key, or change the saved-password rules above. To use that connection for SFTP, connect the Terminal profile first and open SFTP from its active session.
 
 ## Sessions and panes
 You can work with multiple tabs and split panes. Open another tab with the **+** at the end of the tab strip (or "Open a new terminal tab" in command search). The sidebar contains Saved, Recent, Files and Macros tabs; click the selected tab to hide the sidebar and any tab to show it again, and use ⇄ at the bottom of its icon strip to move it to the other side; tabs and panes may have context menus and drag interactions. Keep sessions open while you navigate other tools.

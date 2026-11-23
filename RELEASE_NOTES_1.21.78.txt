@@ -1,0 +1,13 @@
+Network Toolkit 1.21.78
+
+## What's New
+
+- SSH profiles can automatically continue through sign-in notices that ask for no answer. The notice panel now explains what Continue does and shows the server's heading when supplied.
+
+## Additional Details
+
+- Open or edit an SSH connection and select Automatically continue through SSH notices. The option is off by default and is kept when you save the profile.
+- Only SSH keyboard-interactive steps with no questions receive an automatic empty acknowledgment. Server notice text remains available as safe terminal output.
+- Password and MFA questions, password changes, SSH host-key approval and the saved-password limits keep their existing behavior. An earlier notice still leaves later password questions for manual input.
+- The option follows supported saved, recent, reconnect and separate-window connection paths. Other connection types ignore it.
+- Stable channel. Existing saved connections, credentials, settings and update-consent requirements are preserved.
