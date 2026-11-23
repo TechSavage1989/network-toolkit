@@ -69,7 +69,9 @@ async function make(mode){
  await page.goto(origin+'/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);
  await page.evaluate(()=>{
   window.interactionContextEvents=[];
-  window.addEventListener('contextmenu',event=>queueMicrotask(()=>interactionContextEvents.push({prevented:event.defaultPrevented,target:event.target.id||event.target.tagName})),true);
+  // Native dispatch may run a microtask checkpoint between event listeners.
+  // Observe in the next task, after the document guard and app menus have run.
+  window.addEventListener('contextmenu',event=>setTimeout(()=>interactionContextEvents.push({prevented:event.defaultPrevented,target:event.target.id||event.target.tagName}),0),true);
  });
  return context;
 }

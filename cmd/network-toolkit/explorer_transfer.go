@@ -246,6 +246,7 @@ func (a *application) handleExplorerTransfer(w http.ResponseWriter, r *http.Requ
 		case "copied":
 			j.note = "Windows reported the copy completed. Original files are unchanged."
 		case "cancelled":
+			j.state = "cancelled"
 			j.note = "Windows copy cancelled. Original files are unchanged."
 		default:
 			j.state = "failed"

@@ -12,9 +12,8 @@ var iidWebResourceRequested = guid("ab00b74c-15f1-4646-80e8-e76341d25d71")
 var iidCoreWebView22 = guid("db75dfc7-a857-4632-a398-6969dde26c0a")
 
 // NavigationStarting can cancel document execution after the browser has already
-// issued a request. Intercept requests before network dispatch and apply the
-// document policy to their reported resource context. Non-document requests
-// retain their existing behavior and never consume the native startup permit.
+// issued a request. Intercept document resources themselves, before network
+// dispatch. Script/style/image/API requests are not included in this filter.
 // Slots and the handler IID are from Microsoft.Web.WebView2 SDK WebView2.h.
 func (w *WebView) installDocumentRequestPolicy() error {
 	if w.cfg.navigationObserver != nil {
@@ -41,11 +40,8 @@ func (w *WebView) installDocumentRequestPolicy() error {
 	}
 	pattern := utf16String("*")
 	// The deprecated two-argument filter does not reliably cover iframes.
-	// DIAGNOSTIC CANDIDATE: observe all contexts to distinguish changed request
-	// classification from missing document events on the installed Runtime.
-	// Retain the document-only decision below until the hosted A/B evidence is
-	// reviewed; a broader filter alone is not a proven boundary correction.
-	hr = comCall(core22, 123, uintptr(unsafe.Pointer(pattern)), 0, 0xffffffff)
+	// DOCUMENT resource context; all request sources, including nested frames.
+	hr = comCall(core22, 123, uintptr(unsafe.Pointer(pattern)), 1, 0xffffffff)
 	runtime.KeepAlive(pattern)
 	if err := hresultError("Install native document resource filter", hr); err != nil {
 		return err
@@ -59,9 +55,6 @@ func (w *WebView) installDocumentRequestPolicy() error {
 }
 
 func (w *WebView) documentResourceRequested(_ uintptr, args uintptr) uintptr {
-	resourceContext := int32(-1)
-	contextResult := comCall(args, 7, uintptr(unsafe.Pointer(&resourceContext)))
-	readableContext := !failed(contextResult) && resourceContext >= 0
 	var request uintptr
 	uri := ""
 	if !failed(comCall(args, 3, uintptr(unsafe.Pointer(&request)))) && request != 0 {
@@ -72,15 +65,15 @@ func (w *WebView) documentResourceRequested(_ uintptr, args uintptr) uintptr {
 	// A single-use native startup permit distinguishes the initial trusted page
 	// without relying on renderer-controlled headers or same-URL frame guesses.
 	pending := w.documentRequestPermit.pending
-	blocked := w.closed || !readableContext
-	if !blocked && resourceContext == 1 { // COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT
-		blocked = !w.documentRequestPermit.consume(w.cfg.AppURL, uri)
-	}
+	allowed := w.documentRequestPermit.consume(w.cfg.AppURL, uri)
+	blocked := w.closed || !allowed
 	hr := hresultOK
 	if blocked {
 		hr = comCall(args, 5, w.blockedDocumentResponse)
 	}
 	if w.cfg.navigationObserver != nil {
+		resourceContext := int32(-1)
+		contextResult := comCall(args, 7, uintptr(unsafe.Pointer(&resourceContext)))
 		w.cfg.navigationObserver(nativeNavigationObservation{Kind: "resource", URI: uri, Blocked: blocked, InitialDocumentPermit: pending, ResourceContext: resourceContext, ResourceContextResult: uint32(contextResult), ResponseResult: uint32(hr)})
 	}
 	if failed(hr) {

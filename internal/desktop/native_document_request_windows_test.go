@@ -3,7 +3,6 @@
 package desktop
 
 import (
-	"fmt"
 	"runtime"
 	"syscall"
 	"testing"
@@ -53,8 +52,8 @@ func TestNativeBootstrapDocumentFilterRegistrationFailsClosed(t *testing.T) {
 			})
 			coreTable[123] = syscall.NewCallback(func(this, pattern, context, sources uintptr) uintptr {
 				filters++
-				if *(*uint16)(unsafe.Pointer(pattern)) != '*' || context != 0 || uint32(sources) != 0xffffffff {
-					t.Error("diagnostic filter does not cover all resource contexts and sources")
+				if *(*uint16)(unsafe.Pointer(pattern)) != '*' || context != 1 || uint32(sources) != 0xffffffff {
+					t.Error("filter does not cover all document sources only")
 				}
 				if scenario == "filter-failure" {
 					return hresultFail
@@ -109,105 +108,6 @@ func TestNativeBootstrapDocumentFilterRegistrationFailsClosed(t *testing.T) {
 			runtime.KeepAlive(core)
 			runtime.KeepAlive(environment)
 			runtime.KeepAlive(response)
-		})
-	}
-}
-
-// The diagnostic filter sees assets and API fetches too. They must not consume
-// the one-use document permit or be blocked simply because startup completed.
-func TestNativeBootstrapDocumentContextDispatch(t *testing.T) {
-	const appURL = "http://127.0.0.1:4000/"
-	type contextCase struct {
-		name        string
-		context     int32
-		contextHR   uintptr
-		uri         string
-		spent       bool
-		closed      bool
-		wantBlocked bool
-		wantPending bool
-	}
-	cases := []contextCase{
-		{name: "initial-document", context: 1, uri: appURL},
-		{name: "repeated-document", context: 1, uri: appURL, spent: true, wantBlocked: true},
-		{name: "other-document", context: 1, uri: appURL + "other", wantBlocked: true},
-		{name: "api-after-startup", context: 7, uri: appURL + "api", spent: true},
-		{name: "unreadable-context", context: -1, contextHR: hresultFail, uri: appURL, wantBlocked: true, wantPending: true},
-		{name: "missing-context-value", context: -1, uri: appURL, wantBlocked: true, wantPending: true},
-		{name: "closed-host", context: 8, uri: appURL + "api", closed: true, wantBlocked: true, wantPending: true},
-	}
-	// Include ALL, Other and an unrecognized positive future value. This probe
-	// deliberately preserves readable non-document contexts until CI identifies
-	// whether unexpected navigation was classified outside Document.
-	for _, resourceContext := range []int32{0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 99} {
-		cases = append(cases, contextCase{name: fmt.Sprintf("non-document-%d", resourceContext), context: resourceContext, uri: appURL + "resource", wantPending: true})
-	}
-	for _, test := range cases {
-		t.Run(test.name, func(t *testing.T) {
-			type fakeObject struct{ vtable *[8]uintptr }
-			argsTable, requestTable := [8]uintptr{}, [8]uintptr{}
-			args, request := &fakeObject{vtable: &argsTable}, &fakeObject{vtable: &requestTable}
-			var pinned runtime.Pinner
-			for _, value := range []any{&argsTable, &requestTable, args, request} {
-				pinned.Pin(value)
-			}
-			defer pinned.Unpin()
-			responses, releases, observations := 0, 0, 0
-			var observed nativeNavigationObservation
-			requestTable[2] = syscall.NewCallback(func(this uintptr) uintptr { releases++; return 0 })
-			requestTable[3] = syscall.NewCallback(func(this, result uintptr) uintptr {
-				encoded, err := syscall.UTF16FromString(test.uri)
-				if err != nil {
-					return hresultFail
-				}
-				buffer, _, _ := runtimeCoTaskMemAlloc.Call(uintptr(len(encoded) * 2))
-				if buffer == 0 {
-					return hresultFail
-				}
-				copy(unsafe.Slice((*uint16)(unsafe.Pointer(buffer)), len(encoded)), encoded)
-				*(*uintptr)(unsafe.Pointer(result)) = buffer
-				return hresultOK
-			})
-			argsTable[3] = syscall.NewCallback(func(this, result uintptr) uintptr {
-				*(*uintptr)(unsafe.Pointer(result)) = uintptr(unsafe.Pointer(request))
-				return hresultOK
-			})
-			argsTable[5] = syscall.NewCallback(func(this, response uintptr) uintptr {
-				responses++
-				if response != 1 {
-					t.Error("request did not receive the prepared deny response")
-				}
-				return hresultOK
-			})
-			argsTable[7] = syscall.NewCallback(func(this, result uintptr) uintptr {
-				*(*int32)(unsafe.Pointer(result)) = test.context
-				return test.contextHR
-			})
-			w := &WebView{cfg: WebViewConfig{AppURL: appURL, navigationObserver: func(value nativeNavigationObservation) {
-				observations++
-				observed = value
-			}}, closed: test.closed, blockedDocumentResponse: 1}
-			w.documentRequestPermit.begin()
-			if test.spent {
-				w.documentRequestPermit.consume(appURL, appURL)
-			}
-			if hr := w.documentResourceRequested(0, uintptr(unsafe.Pointer(args))); failed(hr) {
-				t.Fatalf("request handler failed: %#x", hr)
-			}
-			if (responses != 0) != test.wantBlocked || responses > 1 || observed.Blocked != test.wantBlocked {
-				t.Fatalf("blocked=%t response count=%d, want blocked=%t", observed.Blocked, responses, test.wantBlocked)
-			}
-			if w.documentRequestPermit.pending != test.wantPending {
-				t.Fatalf("startup permit pending=%t, want %t", w.documentRequestPermit.pending, test.wantPending)
-			}
-			if observations != 1 || observed.ResourceContext != test.context || observed.ResourceContextResult != uint32(test.contextHR) || observed.URI != test.uri {
-				t.Fatalf("request context was not observed accurately: %+v", observed)
-			}
-			if releases != 1 {
-				t.Fatalf("request reference releases=%d, want 1", releases)
-			}
-			runtime.KeepAlive(args)
-			runtime.KeepAlive(request)
 		})
 	}
 }

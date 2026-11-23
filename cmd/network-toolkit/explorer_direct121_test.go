@@ -162,6 +162,74 @@ func TestExplorerDirect121ExplicitCancelWinsInterruptedReadError(t *testing.T) {
 	}
 }
 
+func TestExplorerDirect121CancelledFinishOrderAndCleanup(t *testing.T) {
+	for _, order := range []string{"native-only", "cancel-before-finish", "cancel-after-finish"} {
+		t.Run(order, func(t *testing.T) {
+			root := t.TempDir()
+			source := filepath.Join(root, "source.txt")
+			const original = "SYNTHETIC_CANCELLED_COPY\r\n"
+			if err := os.WriteFile(source, []byte(original), 0600); err != nil {
+				t.Fatal(err)
+			}
+			stage := filepath.Join(root, "stage")
+			if err := os.Mkdir(stage, 0700); err != nil {
+				t.Fatal(err)
+			}
+			staged := filepath.Join(stage, "source.txt")
+			if err := os.WriteFile(staged, []byte(original), 0600); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			id := strings.Repeat("a", 32)
+			j := &explorerTransferJob{id: id, direct: true, state: "dragging", gesture: 1, stage: stage, paths: []string{staged}, cancel: cancel, valid: func() bool { return true }}
+			a := &application{}
+			a.explorerTransfers.jobs = map[string]*explorerTransferJob{id: j}
+			if order == "cancel-before-finish" {
+				if w := directAction121(a, id, "cancel"); w.Code != 200 {
+					t.Fatal(w.Code, w.Body.String())
+				}
+				if j.state != "dragging" || !j.cancelRequested {
+					t.Fatal("page cancellation ended the active native drag")
+				}
+				if _, err := os.Stat(staged); err != nil {
+					t.Fatal("page cancellation removed bytes still owned by the native drag", err)
+				}
+			}
+			finish := func() {
+				t.Helper()
+				w := exportRequest(a, "", "POST", "/api/explorer-transfer", explorerTransferRequest{Action: "finish", ID: id, Outcome: "cancelled"})
+				var status struct {
+					State string `json:"state"`
+				}
+				if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &status) != nil || status.State != "cancelled" {
+					t.Fatal("native cancellation reported the wrong terminal state", w.Code, w.Body.String())
+				}
+				if ctx.Err() != context.Canceled || j.stage != "" || len(j.paths) != 0 {
+					t.Fatal("native cancellation retained its context or staged paths")
+				}
+				if _, err := os.Stat(stage); !os.IsNotExist(err) {
+					t.Fatal("native cancellation retained staged bytes", err)
+				}
+			}
+			finish()
+			if order == "cancel-after-finish" {
+				if w := directAction121(a, id, "cancel"); w.Code != 200 {
+					t.Fatal(w.Code, w.Body.String())
+				}
+			}
+			note := j.note
+			finish()
+			if j.note != note || !strings.Contains(j.note, "cancelled") && !strings.Contains(j.note, "Cancelled") {
+				t.Fatal("repeated finish changed the cancellation outcome", j.note)
+			}
+			if got, err := os.ReadFile(source); err != nil || string(got) != original {
+				t.Fatal("cancellation changed source bytes", err)
+			}
+		})
+	}
+}
+
 func TestExplorerDirect122NeverArmedMetadataRetiresWithoutCapacityLeak(t *testing.T) {
 	a := &application{}
 	defer a.finishExplorerOwner("")
