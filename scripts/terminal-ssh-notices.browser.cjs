@@ -4,7 +4,7 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(__dirname,'..'),version=require('../package.json').version,out=process.env.TOOLKIT_TEST_OUTPUT;
-const report={passed:false,cases:[],screenshots:[],errors:[]};
+const report={passed:false,cases:[],screenshots:[],layouts:[],profileVisibility:[],errors:[]};
 let browser,page;
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});
@@ -73,7 +73,19 @@ let browser,page;
    assert.match(await checkbox.locator('..').innerText(),/server asks for no answer.*Password and verification-code requests keep their normal handling/s);
    await checkbox.check();await page.locator('[data-terminal-action="save-profile"]').click();await page.evaluate(()=>flushState());
    const profile=saved.terminalProfiles.find(row=>row.id==='notice-profile');assert.equal(profile.sshAutoContinueNotices,true);assert.equal(profile.folder,'Lab');assert.equal(profile.credentialId,'synthetic-credential');
-   await screenshot('profile-option');
+   // A click scrolls the checkbox itself into view, while its explanatory text
+   // can remain below the pinned footer. Capture and verify the entire row.
+   const optionRow=checkbox.locator('..');await optionRow.scrollIntoViewIfNeeded();
+   const optionVisibility=await optionRow.evaluate(label=>{
+    const row=label.getBoundingClientRect(),body=label.closest('.modal-body').getBoundingClientRect(),footer=label.closest('.modal').querySelector('.modal-foot').getBoundingClientRect();
+    const controls=[label.querySelector('input'),label.querySelector('strong'),label.querySelector('p')].map(element=>{
+     const r=element.getBoundingClientRect(),x=r.left+Math.min(4,r.width/2),y=r.top+r.height/2,hit=document.elementFromPoint(x,y);
+     return {tag:element.tagName,top:r.top,bottom:r.bottom,unobscured:hit===element||element.contains(hit)};
+    });
+    return {top:row.top,bottom:row.bottom,bodyTop:body.top,bodyBottom:body.bottom,footerTop:footer.top,controls};
+   });
+   assert(optionVisibility.top>=optionVisibility.bodyTop&&optionVisibility.bottom<=Math.min(optionVisibility.bodyBottom,optionVisibility.footerTop),JSON.stringify(optionVisibility));
+   assert(optionVisibility.controls.every(control=>control.unobscured),JSON.stringify(optionVisibility));report.profileVisibility.push({mode,...optionVisibility});await screenshot('profile-option');
    if(mode==='main'){
     await page.locator('[data-terminal-action="connection-window"]').click();
     const request=calls.find(call=>call.p==='/api/terminal-window'&&call.method==='POST');assert(request);assert.equal(request.body.config.sshAutoContinueNotices,true);assert.equal(request.body.config.profileId,'notice-profile');assert.equal(Object.hasOwn(request.body.config,'credentialId'),false);await page.waitForFunction(()=>!terminalWindowLaunchBusy);assert.equal(await page.locator('[data-terminal-action="separate-window"]:disabled').count(),0);
@@ -95,8 +107,20 @@ let browser,page;
   assert.equal(await page.locator('#terminalPrompt input').count(),0);
   for(const [width,theme] of [[1440,'dark'],[mode==='main'?960:820,'light']]){
    await page.setViewportSize({width,height:900});await page.evaluate(theme=>setTheme(theme),theme);
-   const layout=await page.locator('#terminalPrompt').evaluate(element=>{const bounds=element.getBoundingClientRect();return {left:bounds.left,right:bounds.right,overflow:element.scrollWidth-element.clientWidth,buttons:[...element.querySelectorAll('button')].map(button=>{const r=button.getBoundingClientRect();return {left:r.left,right:r.right,bottom:r.bottom};})};});
+   // Crossing the main-window navigation breakpoint animates the drawer out
+   // while the workspace immediately expands. Wait for the observed geometry,
+   // then check hitpoints so a temporary overlay cannot pass a box-only check.
+   if(mode==='main')await page.waitForFunction(()=>{
+    const sidebar=document.getElementById('sidebar'),prompt=document.getElementById('terminalPrompt');if(!sidebar||!prompt)return false;
+    const bounds=sidebar.getBoundingClientRect();return matchMedia('(max-width:1100px)').matches?sidebar.inert&&bounds.right<=0.5:bounds.right<=prompt.getBoundingClientRect().left+1;
+   });
+   const layout=await page.locator('#terminalPrompt').evaluate(element=>{
+    const bounds=element.getBoundingClientRect(),targets=[element.querySelector('.prompt-title'),...element.querySelectorAll('.help-line,button')].filter(node=>node&&node.textContent.trim());
+    const visibility=targets.map(node=>{const r=node.getBoundingClientRect();return {name:node.className||node.tagName,left:r.left,right:r.right,top:r.top,bottom:r.bottom,unobscured:[r.left+Math.min(4,r.width/2),(r.left+r.right)/2,r.right-Math.min(4,r.width/2)].every(x=>{const hit=document.elementFromPoint(x,r.top+r.height/2);return hit===node||node.contains(hit);})};});
+    return {left:bounds.left,right:bounds.right,overflow:element.scrollWidth-element.clientWidth,scrollX,documentOverflow:document.documentElement.scrollWidth-innerWidth,sidebarRight:document.getElementById('sidebar')?.getBoundingClientRect().right,visibility,buttons:[...element.querySelectorAll('button')].map(button=>{const r=button.getBoundingClientRect();return {left:r.left,right:r.right,bottom:r.bottom};})};
+   });
    assert(layout.left>=0&&layout.right<=width+1&&layout.overflow<=1,JSON.stringify(layout));for(const button of layout.buttons)assert(button.left>=0&&button.right<=width+1&&button.bottom<=900,JSON.stringify(button));
+   assert(Math.abs(layout.scrollX)<=1&&layout.documentOverflow<=1,JSON.stringify(layout));assert(layout.visibility.every(element=>element.unobscured&&element.left>=0&&element.right<=width+1&&element.top>=0&&element.bottom<=900),JSON.stringify(layout));report.layouts.push({mode,width,theme,...layout});
    await screenshot('empty-'+theme+'-'+width);
   }
   const firstNoticeId=initial.prompt.id;await page.locator('[data-terminal-prompt-action="submit"]').click();await page.locator('#terminalPromptForm').waitFor({state:'detached'});
