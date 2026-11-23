@@ -15,7 +15,7 @@ let browser,page;
   const initial={id:'notice-session',label:'Synthetic SSH lab',type:'ssh',host:'lab.test',port:22,username:'operator',state:'connected',cols:100,rows:28,sshAutoContinueNotices:true};
   const sessions=[initial],view={id:'notice-view',sessionId:initial.id,state:'detached',revision:0};
   const calls=[];let ownerView=mode==='detached'?view.id:'',promptSequence=0;
-  let saved={activePage:'terminal',theme:'dark',appUpdatePreferences:{enabled:false},terminalConnection:{type:'ssh',host:'previous.test',sshAutoContinueNotices:true},terminalProfiles:[
+  let saved={activePage:'terminal',theme:'dark',appUpdatePreferences:{enabled:false},terminalConnection:{type:'ssh',host:'previous.test',sshAutoContinueNotices:false},terminalProfiles:[
    {id:'notice-profile',name:'Lab SSH profile',folder:'Lab',type:'ssh',host:'lab.test',port:22,username:'operator',credentialId:'synthetic-credential'},
    {id:'serial-profile',name:'Lab console',type:'serial',serialPort:'COM4',baudRate:115200}
   ]};
@@ -67,11 +67,11 @@ let browser,page;
   await page.goto('http://toolkit.local/');await ready();
   assert.equal(await page.evaluate(()=>terminalSessions.get('notice-session').config.sshAutoContinueNotices),true,'Session info and detached snapshots retain the preference');
   if(mode!=='detached'){
-   await page.evaluate(()=>openTerminalConnect());assert.equal(await page.locator('#con-sshAutoContinueNotices').isChecked(),false,'New connections do not inherit another server opt-in');await cancelDialog();
+   await page.evaluate(()=>openTerminalConnect());assert.equal(await page.locator('#con-sshAutoContinueNotices').isChecked(),true,'New connections default on instead of inheriting another server opt-out');await cancelDialog();
    await page.evaluate(()=>openTerminalConnect(state.terminalProfiles.find(profile=>profile.id==='notice-profile'),'notice-profile'));
-   const checkbox=page.locator('#con-sshAutoContinueNotices');assert.equal(await checkbox.isChecked(),false,'Existing profiles default off');
+   const checkbox=page.locator('#con-sshAutoContinueNotices');assert.equal(await checkbox.isChecked(),true,'Existing profiles without a notice setting default on');
    assert.match(await checkbox.locator('..').innerText(),/server asks for no answer.*Password and verification-code requests keep their normal handling/s);
-   await checkbox.check();await page.locator('[data-terminal-action="save-profile"]').click();await page.evaluate(()=>flushState());
+   await page.locator('[data-terminal-action="save-profile"]').click();await page.evaluate(()=>flushState());
    const profile=saved.terminalProfiles.find(row=>row.id==='notice-profile');assert.equal(profile.sshAutoContinueNotices,true);assert.equal(profile.folder,'Lab');assert.equal(profile.credentialId,'synthetic-credential');
    // A click scrolls the checkbox itself into view, while its explanatory text
    // can remain below the pinned footer. Capture and verify the entire row.
@@ -86,20 +86,23 @@ let browser,page;
    });
    assert(optionVisibility.top>=optionVisibility.bodyTop&&optionVisibility.bottom<=Math.min(optionVisibility.bodyBottom,optionVisibility.footerTop),JSON.stringify(optionVisibility));
    assert(optionVisibility.controls.every(control=>control.unobscured),JSON.stringify(optionVisibility));report.profileVisibility.push({mode,...optionVisibility});await screenshot('profile-option');
+   await checkbox.uncheck();await page.locator('[data-terminal-action="save-profile"]').click();await page.evaluate(()=>flushState());
+   const disabledProfile=saved.terminalProfiles.find(row=>row.id==='notice-profile');assert.equal(disabledProfile.sshAutoContinueNotices,false);assert.equal(disabledProfile.folder,'Lab');assert.equal(disabledProfile.credentialId,'synthetic-credential');
    if(mode==='main'){
     await page.locator('[data-terminal-action="connection-window"]').click();
-    const request=calls.find(call=>call.p==='/api/terminal-window'&&call.method==='POST');assert(request);assert.equal(request.body.config.sshAutoContinueNotices,true);assert.equal(request.body.config.profileId,'notice-profile');assert.equal(Object.hasOwn(request.body.config,'credentialId'),false);await page.waitForFunction(()=>!terminalWindowLaunchBusy);assert.equal(await page.locator('[data-terminal-action="separate-window"]:disabled').count(),0);
+    const request=calls.find(call=>call.p==='/api/terminal-window'&&call.method==='POST');assert(request);assert.equal(request.body.config.sshAutoContinueNotices,false);assert.equal(request.body.config.profileId,'notice-profile');assert.equal(Object.hasOwn(request.body.config,'credentialId'),false);await page.waitForFunction(()=>!terminalWindowLaunchBusy);assert.equal(await page.locator('[data-terminal-action="separate-window"]:disabled').count(),0);
    }
    await page.locator('#terminalConnectButton').click();await page.waitForFunction(()=>terminalSessions.has('profile-session')&&!document.querySelector('#terminalConnectForm'));
-   const connection=calls.find(call=>call.p==='/api/terminals'&&call.method==='POST');assert.equal(connection.body.sshAutoContinueNotices,true);assert.equal(connection.body.credentialId,'synthetic-credential');assert.equal(Object.hasOwn(connection.body,'password'),false);
+   const connection=calls.find(call=>call.p==='/api/terminals'&&call.method==='POST');assert.equal(connection.body.sshAutoContinueNotices,false);assert.equal(connection.body.credentialId,'synthetic-credential');assert.equal(Object.hasOwn(connection.body,'password'),false);
    const captured=await page.evaluate(async()=>({snapshot:(await captureTerminalSnapshot(terminalSessions.get('profile-session'))).config,recent:state.terminalRecent.find(entry=>entry.host==='lab.test')}));
-   assert.equal(captured.snapshot.sshAutoContinueNotices,true);assert.equal(captured.recent.sshAutoContinueNotices,true);
-   await page.evaluate(()=>reconnectTerminal(terminalSessions.get('profile-session')));assert.equal(await page.evaluate(()=>terminalSessions.get('profile-session').config.sshAutoContinueNotices),true);
+   assert.equal(captured.snapshot.sshAutoContinueNotices,false);assert.equal(captured.recent.sshAutoContinueNotices,false);
+   await page.evaluate(()=>reconnectTerminal(terminalSessions.get('profile-session')));assert.equal(await page.evaluate(()=>terminalSessions.get('profile-session').config.sshAutoContinueNotices),false);
    await page.evaluate(()=>flushState());await page.reload();await ready();
-   await page.evaluate(()=>openTerminalConnect(state.terminalProfiles.find(profile=>profile.id==='notice-profile'),'notice-profile'));assert.equal(await checkbox.isChecked(),true,'Saved preference survives reload');
+   await page.evaluate(()=>openTerminalConnect(state.terminalProfiles.find(profile=>profile.id==='notice-profile'),'notice-profile'));assert.equal(await checkbox.isChecked(),false,'Saved opt-out survives reload');
    await page.locator('#terminalConnectProfileSelect').selectOption('serial-profile');assert.equal(await checkbox.count(),0,'No notice setting is offered for serial');
-   await page.locator('#terminalConnectProfileSelect').selectOption('');assert.equal(await checkbox.isChecked(),false,'A new profile returns to the default');await cancelDialog();
-   report.cases.push(mode+': per-profile opt-in, credential link, recent, snapshot, reconnect, reload and new-profile default');
+   await page.locator('#con-type').selectOption('ssh');assert.equal(await checkbox.isChecked(),true,'Changing a non-SSH connection to SSH applies the enabled default');
+   await page.locator('#terminalConnectProfileSelect').selectOption('');assert.equal(await checkbox.isChecked(),true,'A new profile returns to the enabled default');await cancelDialog();
+   report.cases.push(mode+': enabled new and missing-setting defaults; explicit opt-out, credential link, recent, snapshot, reconnect, reload and new-profile default');
   }
   await showPrompt({});
   assert.equal(await page.locator('#terminalPrompt .prompt-title').innerText(),'SSH sign-in notice');

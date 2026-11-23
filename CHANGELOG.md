@@ -1,3 +1,10 @@
+## 1.21.79 Stable - Automatic SSH notices enabled by default
+
+- Enabled **Automatically continue through SSH notices** by default for fresh SSH connections and saved profiles without a notice preference. Existing literal false values remain disabled, including choices saved under the earlier default.
+- Preserve disabled choices explicitly when serializing session, connection and separate-window data, so saving, reconnecting and moving between windows cannot accidentally restore the enabled default.
+- Apply the default to fresh SSH and direct SFTP connection requests while preserving strict request validation and the boundary for operations using an existing authenticated session.
+- Retain manual handling for malformed settings, other transports, password and MFA questions, password changes and host-key approval. No changes to saved-password limits, cancellation or host identity checks.
+
 ## 1.21.78 Stable - Optional automatic continuation through SSH notices
 
 - Added **Automatically continue through SSH notices** to SSH connection profiles. It is off by default and can acknowledge keyboard-interactive steps that contain no questions with the required empty response.

@@ -149,7 +149,7 @@ func parseTerminalNetworkLink(scheme, rest string) (terminalLink, error) {
 			port = 23
 		}
 	}
-	out.Preset = terminalWindowPreset{Type: scheme, Host: host, Port: port}
+	out.Preset = terminalWindowPreset{Type: scheme, Host: host, Port: port, SSHAutoContinueNotices: scheme == "ssh"}
 	if scheme == "ssh" {
 		out.Preset.Username = username
 	}

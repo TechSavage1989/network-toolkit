@@ -118,8 +118,10 @@ test('successful manual saved-profile SSH sign-in clears secrets and reconnect o
 });
 
 test('successful SFTP connection preserves explicit SSH notice handling in both recent lists',async()=>{
- const h=harness({profile:{...saved('notices'),sshAutoContinueNotices:true}});h.browser.get('ssh').sourceChoice='profile:notices';
- await h.browser.useSavedSSHProfile('notices');assert.equal(h.browser.get('ssh').connected,true);
- assert.equal(h.events.find(x=>x.path==='/remote-browser'&&x.body?.action==='connect').body.sshAutoContinueNotices,true);
- assert.equal(h.state.sftpRecent[0].sshAutoContinueNotices,true);assert.equal(h.state.terminalRecent[0].sshAutoContinueNotices,true);
+ for(const enabled of [true,false]){
+  const h=harness({profile:{...saved('notices'),sshAutoContinueNotices:enabled}});h.browser.get('ssh').sourceChoice='profile:notices';
+  await h.browser.useSavedSSHProfile('notices');assert.equal(h.browser.get('ssh').connected,true);
+  assert.equal(h.events.find(x=>x.path==='/remote-browser'&&x.body?.action==='connect').body.sshAutoContinueNotices,enabled);
+  assert.equal(h.state.sftpRecent[0].sshAutoContinueNotices,enabled);assert.equal(h.state.terminalRecent[0].sshAutoContinueNotices,enabled);
+ }
 });

@@ -16,7 +16,9 @@ Only the first clear, hidden password-only challenge is eligible. The password i
 
 An SSH server can send a sign-in step with no questions or input fields. **Continue** acknowledges that step with an empty response so the server can proceed. The panel shows the server's heading and message when supplied and explains what Continue does even when the server sent no visible text.
 
-To continue through these steps automatically, open or edit the SSH connection and select **Automatically continue through SSH notices**. Save the profile to keep that choice for future connections. The option is off by default and applies only to that SSH connection. Server notice text is retained in the terminal output as safe text.
+**Automatically continue through SSH notices** is enabled by default for new SSH connections and profiles that have no saved choice. Open or edit the connection to turn it off, then select **Save profile** to keep that choice. An existing saved off setting stays off, including profiles saved with the earlier default. Server notice text is shown as safe terminal output when continued automatically.
+
+After changing a saved profile, open a new connection from that profile. Existing tabs, including their Reconnect action, retain the settings they started with.
 
 This option acknowledges only steps that ask for no answer. It does not answer password, MFA or password-change questions, approve an SSH host key, or change the saved-password rules above. To use that connection for SFTP, connect the Terminal profile first and open SFTP from its active session.
 

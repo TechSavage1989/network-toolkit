@@ -12,7 +12,7 @@ The connection sidebar (Client) and the server settings sidebar (Server) can be 
 ## Before transferring
 Direct SFTP connections using **Password** authentication can reuse the supplied or saved login password for the first standard hidden password-only SSH challenge. The password is supplied automatically at most once during that connection attempt. If the server needs MFA, a password change or another manual answer, connect through Terminal and use that authenticated session for SFTP. Verify the SSH host fingerprint before connecting.
 
-For SSH sign-in notices that ask for no answer, the Terminal profile can save **Automatically continue through SSH notices**. Connect that profile, then use its authenticated session for SFTP. Questions requiring a password, verification code or another answer keep their normal authentication flow. See [SSH sign-in notices](terminal.md#ssh-sign-in-notices).
+SSH sign-in notices that ask for no answer continue automatically by default for new SFTP connections and SSH profiles without a saved choice. A saved off choice is preserved. To change that choice, edit **Automatically continue through SSH notices** in the Terminal profile, connect that profile, then use its authenticated session for SFTP. Questions requiring a password, verification code or another answer keep their normal authentication flow. See [SSH sign-in notices](terminal.md#ssh-sign-in-notices).
 
 Review the remote host, protocol, local and remote paths, overwrite confirmation and permissions. Do not assume files are safe to replace without checking their destination and the consequence of overwriting.
 

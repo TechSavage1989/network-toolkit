@@ -50,6 +50,7 @@ func TestTerminalLinkParsesSupportedLinks(t *testing.T) {
 			t.Fatalf("%s (%s): %v", tc.raw, tc.goos, err)
 		}
 		want := tc.want
+		want.SSHAutoContinueNotices = want.Type == "ssh"
 		if err := want.normalize(); err != nil {
 			t.Fatal(err)
 		}

@@ -30,7 +30,7 @@ func openSSHNoticeFixture(t *testing.T, req ConnectRequest, callbacks transportC
 	return connection, err
 }
 
-func TestSSHNoticeRequiresExplicitOptIn(t *testing.T) {
+func TestSSHNoticeRespectsConnectionPreference(t *testing.T) {
 	for _, test := range []struct{ label, name, instruction string }{
 		{label: "blank"},
 		{label: "name only", name: "Fixture sign-in notice"},
@@ -38,7 +38,7 @@ func TestSSHNoticeRequiresExplicitOptIn(t *testing.T) {
 		{label: "name and instruction", name: "Fixture sign-in notice", instruction: "This connection is a synthetic test."},
 	} {
 		for _, automatic := range []bool{false, true} {
-			mode := "manual by default"
+			mode := "manual when disabled"
 			if automatic {
 				mode = "automatic when enabled"
 			}

@@ -95,7 +95,7 @@ func sanitizeTransferClientSettings(state map[string]any) {
 							return "legacy"
 						}
 						return "modern"
-					}(), "sshAutoContinueNotices": entry["sshAutoContinueNotices"] == true, "lastUsed": lastUsed,
+					}(), "sshAutoContinueNotices": savedSSHNoticePreference(entry), "lastUsed": lastUsed,
 				})
 			}
 		}
