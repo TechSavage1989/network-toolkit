@@ -70,6 +70,8 @@ type nativeNavigationObservation struct {
 	CancelReadResult      uint32
 	Cancelled             bool
 	InitialDocumentPermit bool
+	ResourceContext       int32
+	ResourceContextResult uint32
 	ResponseResult        uint32
 	RuntimeVersion        string
 }
