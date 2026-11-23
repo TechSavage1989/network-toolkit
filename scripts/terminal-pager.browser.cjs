@@ -12,14 +12,14 @@ const report={passed:false,checks:[],errors:[],screenshots:[],scope:'Synthetic t
 let server,browser,page;
 const prompt='-- MORE --, next page: Space, next line: Enter, quit: q';
 function pass(name){report.checks.push(name);console.log('PASS '+name);}
-const fixture=`<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="/assets/xterm.css"><style>body{margin:0;padding:18px;background:#18202c;color:#eee;font:14px sans-serif}h1{font-size:18px}#terminal{background:#202020;padding:8px;width:max-content;max-width:100%}.modal{margin-top:15px;background:#253046;padding:10px}textarea{width:95vw;height:300px}</style><h1>Network Toolkit — synthetic pager acceptance</h1><div id="terminal"></div><div id="fixtureModal"></div><script>
+const fixture=`<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="/assets/xterm.css"><style>body{margin:0;padding:18px;background:#18202c;color:#eee;font:14px sans-serif}h1{font-size:18px}#terminal{background:#202020;padding:8px;width:max-content;max-width:100%}.modal{margin-top:15px;background:#253046;padding:10px}textarea{width:95vw;height:300px}</style><h1>Network Toolkit - synthetic terminal output</h1><div id="terminal"></div><div id="fixtureModal"></div><script>
 window.state={activePage:'terminal',terminalFontSize:13,terminalInteraction:{autoPager:true,pagerKey:'auto',pasteReview:false,copyOnSelect:false,copyOnClick:false,ctrlC:'send',rightClick:'paste'}};
 window.terminalPaneFocus=0;window.terminalPaneContext='main';window.terminalWorkspaceTransferBusy=false;window.terminalDetachedReturning=false;window.online=true;window.terminalSessions=new Map();window.messages=[];window.sent=[];
 window.currentTerminal=()=>window.entry;window.terminalSessionRevision=()=>1;window.terminalOwnerCanMutate=()=>true;window.terminalEntryVisible=()=>true;window.terminalEntryAcceptsInput=e=>e?.info.state==='connected';window.terminalPaneShortcut=()=>false;window.selectTerminal=()=>{};window.saveState=()=>{};window.setTerminalToolsOpen=()=>{};window.icon=()=>'';window.esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');window.toast=s=>messages.push(s);
 window.openModal=(title,body)=>{document.querySelector('#fixtureModal').innerHTML='<section class="modal"><h2>'+esc(title)+'</h2>'+body+'</section>';};window.closeModal=()=>{document.querySelector('#fixtureModal').textContent='';};
 window.drainTerminalInput=e=>{for(const bytes of e.inputChunks)sent.push({data:new TextDecoder().decode(bytes),origin:bytes.terminalInputOrigin||'user'});e.inputChunks=[];e.inputBytes=0;};
 ${enqueue}
-</script><script src="/assets/xterm.js"></script><script src="/assets/terminal-output-archive.js"></script><script src="/assets/terminal-extras.js"></script><script src="/assets/terminal-input.js"></script><script src="/assets/terminal-interaction.js"></script><script>
+</script><script src="/assets/xterm.js"></script><script src="/assets/terminal-output-archive.js"></script><script src="/assets/terminal-extras.js"></script><script src="/assets/terminal-input.js"></script><script src="/assets/terminal-interaction.js"></script><script src="/assets/terminal-macros.js"></script><script>
 window.setup=({cols=84,rows=12,scrollback=24,autoPager=true}={})=>{
 const term=new Terminal({cols,rows,scrollback,allowProposedApi:true,fontSize:13,theme:{background:'#202020',foreground:'#dce4ef'}});term.open(document.querySelector('#terminal'));
 window.entry={info:{id:'synthetic',state:'connected',type:'ssh'},config:{},xterm:term,element:document.querySelector('#terminal'),disposables:[],inputChunks:[],inputBytes:0,_ntSessionPrefs:{autoPager,autoScroll:true}};terminalSessions.set(entry.info.id,entry);
@@ -28,14 +28,14 @@ term.onData(data=>enqueueTerminalInput(entry,data));NetworkToolkitTerminalIntera
 window.receive=async text=>{const e=entry,api=NetworkToolkitTerminalExtras,position=api.beforeOutput(e);api.observeOutput(e,text);await new Promise(resolve=>e.xterm.write(text,resolve));api.afterOutput(e,position);await api.flush(e);};
 window.captured=(choice='last-command',include=false)=>{const api=NetworkToolkitTerminalExtras;return api.output(entry,api.current(entry,choice),include)?.text;};
 </script>`;
-async function fresh(options){await page.goto('http://127.0.0.1:'+server.address().port+'/',{waitUntil:'load'});await page.evaluate(options=>setup(options),options||{});await receive('switch# ');}
+async function fresh(options,initialPrompt='switch# '){await page.goto('http://127.0.0.1:'+server.address().port+'/',{waitUntil:'load'});await page.evaluate(options=>setup(options),options||{});await receive(initialPrompt);}
 async function receive(text){await page.evaluate(text=>receive(text),text);}
 async function settle(){await page.waitForTimeout(90);}
 async function command(text,{echo=true}={}){await page.keyboard.type(text);if(echo)await receive(text);await page.keyboard.press('Enter');}
 async function keys(){await settle();return page.evaluate(()=>sent.filter(x=>x.origin==='pager').map(x=>x.data));}
 async function capture(choice='last-command',include=false){return page.evaluate(({choice,include})=>captured(choice,include),{choice,include});}
 async function count(){return page.evaluate(()=>entry._ntOutputHistory?.length||0);}
-async function shot(name){if(!out)return;const file=path.join(out,'terminal-pager-'+name+'.png');await page.screenshot({path:file});report.screenshots.push(path.basename(file));}
+async function shot(name,fullPage=false){if(!out)return;const file=path.join(out,'terminal-pager-'+name+'.png');await page.screenshot({path:file,fullPage});report.screenshots.push(path.basename(file));}
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});
  server=http.createServer((req,res)=>{if(req.url==='/'){res.setHeader('Content-Type','text/html');res.end(fixture);return;}const match=req.url.match(/^\/assets\/([a-z0-9.-]+)$/);if(!match){res.writeHead(404).end();return;}const file=path.join(root,'web/assets',match[1]);if(!fs.existsSync(file)){res.writeHead(404).end();return;}res.setHeader('Content-Type',file.endsWith('.css')?'text/css':'text/javascript');res.end(fs.readFileSync(file));});
@@ -98,6 +98,111 @@ async function shot(name){if(!out)return;const file=path.join(out,'terminal-page
   assert.match(await capture('last-paste',true),/switch# show one\nFIRST PASTED OUTPUT/);
  }
  pass('Native Ctrl+V and right-click multiline paste retain ordered echoes and all manually paged output');
+
+
+ // ESXi's prompt ends with ']', not a traditional shell terminator. Exercise
+ // the real parsed screen/archive and the macro adapter's verified captures;
+ // neither the synthetic transport nor the capture endpoint runs a command.
+ const esxiHome='[root@lab-esxi:~] ',esxiStore='[root@lab-esxi:/vmfs/volumes/Lab Store] ';
+ const esxiCommands=["lsof | grep -i 'LabVM'","ps -c | grep -i 'LabVM'"];
+ const esxiResponses=['/vmfs/volumes/Lab Store/LabVM/LabVM.vmdk\n[completed]','72516 72516 vmx LabVM'];
+ const outputOnly=esxiResponses.join('\n');
+ const rawWithCommands=esxiHome+esxiCommands[0]+'\n'+esxiResponses[0]+'\n'+esxiStore+esxiCommands[1]+'\n'+esxiResponses[1];
+ const capturedWithCommands=esxiCommands[0]+'\n'+esxiResponses[0]+'\n'+esxiCommands[1]+'\n'+esxiResponses[1];
+ const esxiTranscript=esxiCommands[0]+'\r\n'+esxiResponses[0].replaceAll('\n','\r\n')+'\r\n'+esxiStore+esxiCommands[1]+'\r\n'+esxiResponses[1]+'\r\n'+esxiHome;
+ const labels={off:'Output with recognized command echoes excluded',on:'Output with command lines included'};
+ const gapHint='The output is separated by other terminal lines. Select it here without including those lines.';
+ const captureHint='The captured output differs from the text still in the terminal. Select or copy it here.';
+ const clipboardText=text=>text.replace(/\n/g,process.platform==='win32'?'\r\n':'\n');
+ async function selectAndCopyESXi({include=false,choice='last-paste',expected,modal,label,hint,name}){
+  const before=await page.evaluate(()=>sent.length);
+  assert.equal(await page.evaluate(({include,choice,name})=>{
+   closeModal();entry.xterm.clearSelection();entry._ntSessionPrefs.pasteIncludeCommands=include;entry._ntOutputChoice=choice;
+   document.querySelector('h1').textContent='Network Toolkit - '+name.replaceAll('-',' ');
+   return NetworkToolkitTerminalExtras.select(entry);
+  },{include,choice,name}),true);
+  if(modal){
+   await page.locator('#terminalSelectedOutput').waitFor();
+   assert.equal(await page.locator('#terminalSelectedOutput').inputValue(),expected);
+   assert.deepEqual(await page.locator('#terminalSelectedOutput').evaluate(el=>[el.selectionStart,el.selectionEnd]),[0,expected.length]);
+   if(label)assert.equal(await page.locator('label[for="terminalSelectedOutput"]').innerText(),label);
+   if(hint)assert((await page.locator('#fixtureModal').innerText()).includes(hint),'The selection explains why it uses a separate text window');
+  }else{
+   assert.equal(await page.locator('#terminalSelectedOutput').count(),0,'Contiguous matching output stays selected in the terminal');
+   await page.waitForFunction(()=>entry.xterm.hasSelection());
+   // Native complete-line selection may include its last newline. All other
+   // characters, command echoes and output boundaries must match exactly.
+   assert.equal((await page.evaluate(()=>entry.xterm.getSelection())).replace(/\r\n?/g,'\n').replace(/\n$/,''),expected);
+  }
+  assert.equal(await page.evaluate(()=>NetworkToolkitTerminalExtras.copy(entry)),true);
+  assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),clipboardText(expected));
+  assert.equal(await page.evaluate(()=>sent.length),before,'Selecting and copying output never sends terminal input');
+  await shot(name,true);
+ }
+
+ await fresh({autoPager:false},esxiHome);
+ await page.evaluate(async text=>navigator.clipboard.writeText(text),esxiCommands.join('\n')+'\n');
+ await page.keyboard.press('Control+v');
+ await page.waitForFunction(()=>entry._ntOutputHistory?.length===1&&entry._ntOutputHistory[0].kind==='paste');
+ await receive(esxiTranscript);
+ assert.equal(await capture('last-paste'),outputOnly);
+ assert.equal(await capture('last-paste',true),rawWithCommands);
+ await selectAndCopyESXi({expected:outputOnly,modal:true,label:labels.off,hint:gapHint,name:'esxi-raw-output-only'});
+ await selectAndCopyESXi({include:true,expected:rawWithCommands,modal:false,name:'esxi-raw-include-commands'});
+ pass('ESXi raw two-command paste excludes both bracketed echoes and final prompt; Include commands restores displayed echoes, unrelated bracketed output remains, and matching output selects directly when contiguous');
+
+ for(const source of ['paced','macro']){
+  await fresh({autoPager:false},esxiHome);
+  await page.evaluate(text=>{window.fixtureBatch=NetworkToolkitTerminalExtras.notePaste(entry,text);},esxiCommands.join('\n')+'\n');
+  await receive(esxiTranscript);
+  const runId='esxi-'+source,steps=[
+   {index:1,command:esxiCommands[0],output:esxiCommands[0]+'\r\n'+esxiResponses[0].replaceAll('\n','\r\n')+'\r\n'+esxiStore},
+   {index:2,command:esxiCommands[1],output:esxiStore+esxiCommands[1]+'\r\n'+esxiResponses[1]+'\r\n'+esxiHome}
+  ];
+  assert.equal(await page.evaluate(({source,runId,steps})=>{
+   const run={id:runId,macroId:source==='paced'?'literal-paste':'saved-esxi-macro',state:'completed',targets:[{id:entry.info.id,generation:7,state:'completed',step:2,total:2}]};
+   const capture={runId,sessionId:entry.info.id,state:'completed',steps};window.captureCalls=[];
+   window.api=async path=>{captureCalls.push(path);if(path!=='/terminal-automation/runs/'+runId+'/capture?sessionId='+entry.info.id)throw Error('Unexpected fixture request '+path);return {capture};};
+   return NetworkToolkitTerminalMacros.trackPacedPaste(entry,fixtureBatch,run);
+  },{source,runId,steps}),true);
+  await page.waitForFunction(()=>fixtureBatch.pacedCapture?.steps.length===2);
+  assert.deepEqual(await page.evaluate(()=>captureCalls),['/terminal-automation/runs/'+runId+'/capture?sessionId=synthetic']);
+  assert.equal(await capture('last-paste'),outputOnly);
+  assert.equal(await capture('last-paste',true),capturedWithCommands);
+  assert.equal(await capture('last-command'),esxiResponses[1]);
+  assert.equal(await capture('last-command',true),esxiCommands[1]+'\n'+esxiResponses[1]);
+  await selectAndCopyESXi({expected:outputOnly,modal:true,label:labels.off,hint:gapHint,name:'esxi-'+source+'-output-only'});
+  await selectAndCopyESXi({include:true,expected:capturedWithCommands,modal:true,label:labels.on,hint:captureHint,name:'esxi-'+source+'-include-commands'});
+  await selectAndCopyESXi({choice:'last-command',expected:esxiResponses[1],modal:true,label:labels.off,hint:'This output is retained separately from the console scrollback.',name:'esxi-'+source+'-last-command'});
+  await selectAndCopyESXi({include:true,choice:'last-command',expected:esxiCommands[1]+'\n'+esxiResponses[1],modal:true,label:labels.on,hint:'This output is retained separately from the console scrollback.',name:'esxi-'+source+'-last-command-included'});
+ }
+ pass('Verified paced and saved-macro ESXi captures preserve every output block, include each submitted command once, copy the selected preference, and explain noncontiguous or captured-text selection without falsely labeling included commands as excluded');
+
+ await fresh({autoPager:false},esxiHome);await command(esxiCommands[0]);
+ await receive('\r\n'+esxiResponses[0].replaceAll('\n','\r\n')+'\r\n'+esxiHome);
+ await selectAndCopyESXi({choice:'last-command',expected:esxiResponses[0],modal:false,name:'esxi-contiguous-output-only'});
+ pass('A contiguous ESXi command response selects directly in xterm and copies only the output, without opening a separate selection window');
+
+
+ // A prompt that already wraps before typing has its boundary on the first
+ // logical row, not on the cursor's final physical row. Starting the next
+ // command must close the earlier block before that entire wrapped prompt.
+ const wrappedStart='[root@lab-esxi:/vmfs/volumes/Engineering Test Store/Initial VM] ';
+ const wrappedNext='[root@lab-esxi:/vmfs/volumes/Engineering Test Store/Second VM Folder] ';
+ const priorResponse='FIRST RESPONSE\nKEEP FIRST DETAIL',nextResponse='SECOND RESPONSE\nKEEP SECOND DETAIL';
+ await fresh({cols:36,rows:12,scrollback:24,autoPager:false},wrappedStart);
+ assert(await page.evaluate(()=>entry.xterm.buffer.normal.cursorY>0),'The initial ESXi prompt must already wrap before command input');
+ await command('echo FIRST');await receive('\r\n'+priorResponse.replaceAll('\n','\r\n')+'\r\n'+wrappedNext);
+ const priorBlock=await page.evaluate(()=>NetworkToolkitTerminalExtras.current(entry,'last-command').id);
+ assert.equal(await capture(priorBlock),priorResponse,'The first response is clean before another command starts');
+ await command('echo SECOND');await receive('\r\n'+nextResponse.replaceAll('\n','\r\n')+'\r\n'+esxiHome);
+ assert.equal(await page.evaluate(id=>NetworkToolkitTerminalExtras.current(entry,id).closed,priorBlock),true);
+ assert.equal(await capture(priorBlock),priorResponse,'Closing the first block keeps every response line and excludes the entire next wrapped prompt');
+ assert.equal(await capture(priorBlock,true),wrappedStart+'echo FIRST\n'+priorResponse);
+ assert.equal(await capture('last-command'),nextResponse,'The final response excludes the wrapped echo and final idle prompt');
+ assert.equal(await capture('last-command',true),wrappedNext+'echo SECOND\n'+nextResponse);
+ await selectAndCopyESXi({choice:'last-command',expected:nextResponse,modal:false,name:'esxi-wrapped-datastore-output'});
+ pass('Wrapped initial and changed ESXi datastore prompts preserve both command responses across block finalization, remove complete prompt boundaries, and retain direct output selection');
 
  await fresh({cols:46,rows:8,scrollback:12,autoPager:false});await command('show archive');
  const lines=Array.from({length:420},(_,i)=>'line '+String(i).padStart(3,'0')+' '+('wide 界 '.repeat(i%3+1)).trimEnd());

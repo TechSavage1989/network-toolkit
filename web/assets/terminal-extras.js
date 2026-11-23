@@ -10,15 +10,20 @@ function withoutInput(entry,callback){return root.NetworkToolkitTerminalCopy?.wi
 function prefs(entry){return {...(root.NetworkToolkitTerminalInteraction?.preferences?.()||{}),autoScroll:true,...entry?._ntSessionPrefs};}
 function history(entry){return entry?(entry._ntOutputHistory||(entry._ntOutputHistory=[])):[];}
 function marker(entry,line){try{const b=entry.xterm.buffer.active;return entry.xterm.registerMarker(line===undefined?0:line-b.baseY-b.cursorY)||null}catch{return null}}
-function idlePrompt(text){return /^[\w.@:/()~\[\] -]{0,150}[#>$%]\s*$/.test(text);}
+function boundaryMarker(entry){try{return normal(entry)?marker(entry,promptBoundary(entry)):marker(entry);}catch{return marker(entry);}}
+// Cleanup keeps its narrower conventional prompt rule. Only the bracket-only
+// ESXi form reuses the execution grammar and byte bound; ordinary bracketed
+// output must never become a prompt just because it ends with ']'.
+function esxiPrompt(text){return typeof text==='string'&&text.startsWith('[')&&/\][ ]*$/.test(text)&&!/[\r\n]/.test(text)&&root.NetworkToolkitTerminalInteraction?.isPacedPastePrompt?.(text)===true;}
+function idlePrompt(text){return /^[\w.@:/()~\[\] -]{0,150}[#>$%]\s*$/.test(text)||esxiPrompt(text);}
 function echoMatches(line,echo){return echo.text===undefined||line.text.trimEnd()===echo.text.trimEnd()||echo.prefix&&line.text.startsWith(echo.text);}
 function live(m){return !!m&&!m.isDisposed&&m.line>=0;}
 function normal(entry){return !!entry?.xterm&&entry.xterm.buffer.active===entry.xterm.buffer.normal;}
 function disposeItem(item){for(const m of [item.start,item.end,...(item.echo||[]).flatMap(e=>[e.start,e.end])])try{m?.dispose()}catch{}}
 function touch(entry){entry.outputRevision=(entry.outputRevision||0)+1;}
-function finalize(entry){const item=history(entry).at(-1);if(item&&!item.closed){item.end=marker(entry);item.closed=true;root.NetworkToolkitTerminalOutputArchive?.close(entry,item);}}
+function finalize(entry){const item=history(entry).at(-1);if(item&&!item.closed){item.end=boundaryMarker(entry);item.closed=true;root.NetworkToolkitTerminalOutputArchive?.close(entry,item);}}
 function add(entry,kind,start,expected=[]){const list=history(entry);const item={id:'block-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),kind,start,end:null,closed:false,at:Date.now(),echo:[],expected,submitted:kind==='command'};list.push(item);while(list.length>MAX_HISTORY){const old=list.shift();root.NetworkToolkitTerminalOutputArchive?.dispose(entry,old);disposeItem(old);}entry._ntOutputChoice=kind==='paste'?'last-paste':'last-command';touch(entry);sync();return item;}
-function notePaste(entry,text){if(!normal(entry)||!text)return;if(pagerInput(entry,text)&&/^[ \r\nqQ\x03]+$/.test(text)){consumePagerInput(entry);return;}entry._ntInputDraft?.start?.dispose();entry._ntInputDraft=null;finalize(entry);const expected=String(text).replace(/\r\n?/g,'\n').split('\n').map(s=>s.trim()).filter(Boolean);const item=add(entry,'paste',marker(entry),expected);root.NetworkToolkitTerminalOutputArchive?.begin(entry,item,inputLine(entry,entry.xterm.buffer.normal.baseY+entry.xterm.buffer.normal.cursorY).text,expected);item.submitted=/[\r\n]/.test(text);entry._ntPendingPaste=item.submitted?null:item;return item;}
+function notePaste(entry,text){if(!normal(entry)||!text)return;if(pagerInput(entry,text)&&/^[ \r\nqQ\x03]+$/.test(text)){consumePagerInput(entry);return;}entry._ntInputDraft?.start?.dispose();entry._ntInputDraft=null;finalize(entry);const expected=String(text).replace(/\r\n?/g,'\n').split('\n').map(s=>s.trim()).filter(Boolean);const item=add(entry,'paste',boundaryMarker(entry),expected);root.NetworkToolkitTerminalOutputArchive?.begin(entry,item,inputLine(entry,entry.xterm.buffer.normal.baseY+entry.xterm.buffer.normal.cursorY).text,expected);item.submitted=/[\r\n]/.test(text);entry._ntPendingPaste=item.submitted?null:item;return item;}
 function lineText(buffer,row){
  const line=buffer.getLine(row),next=buffer.getLine(row+1);if(!line)return '';
  const wrapped=next?.isWrapped,last=line.getCell(line.length-1);
@@ -28,6 +33,9 @@ function lineText(buffer,row){
  return line.translateToString(!wrapped,0,line.length-(padding?1:0));
 }
 function logicalLine(entry,row){const b=entry.xterm.buffer.normal;let start=row,end=row;while(start>0&&b.getLine(start)?.isWrapped)start--;while(end+1<b.length&&b.getLine(end+1)?.isWrapped)end++;let text='';for(let y=start;y<=end;y++)text+=lineText(b,y);return{start,end,text};}
+// A datastore prompt can wrap before any input is entered. Keep that complete
+// prompt on the input side of a boundary; never rewind over unrelated output.
+function promptBoundary(entry){const b=entry.xterm.buffer.normal,row=b.baseY+b.cursorY;if(!normal(entry))return row;const line=logicalLine(entry,row);return idlePrompt(line.text)?line.start:row;}
 function inputLine(entry,row){
  const line=logicalLine(entry,row),b=entry.xterm.buffer.normal;
  if(line.end===row){const beforeCursor=b.getLine(row)?.translateToString(false,0,b.cursorX)||'',tail=lineText(b,row);if(beforeCursor.length>tail.length)line.text+=' '.repeat(beforeCursor.length-tail.length);}
@@ -48,7 +56,7 @@ function noteManualInput(entry,data){
  let draft=entry._ntInputDraft;
  if(!draft){
    if(/^[\x08\x7f]$/.test(data))return;
-   finalize(entry);draft=entry._ntInputDraft={start:marker(entry),row:b.baseY+b.cursorY};
+   finalize(entry);draft=entry._ntInputDraft={start:boundaryMarker(entry),row:b.baseY+b.cursorY};
  }
  if(enter){
    const line=logicalLine(entry,b.baseY+b.cursorY),item=add(entry,'command',draft.start);root.NetworkToolkitTerminalOutputArchive?.begin(entry,item,inputLine(entry,b.baseY+b.cursorY).text,[],true);
@@ -96,7 +104,7 @@ function pacedOutput(item,includeCommands){
     const printed=line.trimEnd(),candidate=printed.trim();
     const at=printed.length-cmd.length,prefix=at>=0?printed.slice(0,at):'';
     const echoed=!!cmd&&(candidate===cmd||
-      at>0&&printed.endsWith(cmd)&&/^[^\r\n]{1,160}[#>$%]\s*$/.test(prefix));
+      at>0&&printed.endsWith(cmd)&&(/^[^\r\n]{1,160}[#>$%]\s*$/.test(prefix)||esxiPrompt(prefix)));
     if(echoed)continue;
    }
    shown.push(line);
@@ -119,7 +127,7 @@ function completePacedPaste(entry,item,capture){
    .map(s=>({index:s.index,command:s.command,output:s.output}));
  if(!steps.length){discardPacedPaste(entry,item);return true;}
  item.pacedCapture={steps,state:capture.state||'completed',truncated:!!capture.truncated};
- if(!item.closed){item.end=marker(entry);item.closed=true;root.NetworkToolkitTerminalOutputArchive?.close(entry,item);}
+ if(!item.closed){item.end=boundaryMarker(entry);item.closed=true;root.NetworkToolkitTerminalOutputArchive?.close(entry,item);}
  const last=[...steps].reverse().find(s=>s.command.trim());
  if(last){
   const commandItem={id:'block-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),
@@ -155,7 +163,7 @@ function rows(entry,item){
    const cmd=item.expected[next];if(!cmd)break;
    const t=line.text.trim();const at=t.length-cmd.length;
    const prefix=at>=0?t.slice(0,at):'';
-   if(at>0&&t.endsWith(cmd)&&/^[^\r\n]{1,160}[#>$%]\s*$/.test(prefix)){
+   if(at>0&&t.endsWith(cmd)&&(/^[^\r\n]{1,160}[#>$%]\s*$/.test(prefix)||esxiPrompt(prefix))){
      item.echo.push({start:marker(entry,line.start),end:marker(entry,line.end),text:line.text,prefix:idlePrompt(line.text)});next++;
    }
  }item.matched=next;if(next>=item.expected.length){item.expected=[];item.matched=0;}}
@@ -167,7 +175,7 @@ function screenOutput(entry,item,includeCommands=false){
  if(!includeCommands&&lines[0]?.start===range.start&&idlePrompt(lines[0].text))lines=lines.slice(1);
  if(!includeCommands)lines=lines.filter(line=>!item.echo.some(e=>live(e.start)&&live(e.end)&&line.start>=e.start.line&&line.start<=e.end.line&&echoMatches(line,e)));
  // The final idle prompt is a boundary, rather than generated command output.
- if(lines.length&&!item.closed&&/^[\w.@:/()~\[\] -]{0,150}[#>$%]\s*$/.test(lines.at(-1).text))lines=lines.slice(0,-1);
+ if(lines.length&&!item.closed&&idlePrompt(lines.at(-1).text))lines=lines.slice(0,-1);
  while(lines.length&&!lines.at(-1).text.trim())lines=lines.slice(0,-1);
  return {...range,lines,text:lines.map(l=>l.text).join('\n')};
 }
@@ -178,7 +186,8 @@ function afterCapture(entry,item,action){
  if(!archive?.pending(entry,item))return action();
  return archive.flush(entry,item).then(()=>history(entry).includes(item)?action():false).catch(error=>{toast(error.message,'error');return false;});
 }
-function preview(entry,item,which='select',includeCommands=prefs(entry).pasteIncludeCommands===true){const result=output(entry,item,includeCommands);if(!result?.text){toast('No captured output is available for this block yet.');return false;}withoutInput(entry,()=>{openModal('Command output','<p class="hint">'+(result.truncated?'This window received a shortened output archive. The retained portion is shown.':'This output is retained separately from the console scrollback.')+'</p><textarea id="terminalSelectedOutput" class="mono terminal-selected-output" readonly spellcheck="false"></textarea>','<button class="btn ghost" data-action="close-modal">Close</button><button class="btn primary" data-terminal-extra="copy-selection-preview">'+icon('copy')+'Copy output</button>',true);const field=document.querySelector('#terminalSelectedOutput');field.value=result.text;field.focus();if(which==='select')field.select();else{const end=which==='end',firstBreak=field.value.indexOf('\n');const start=end?field.value.lastIndexOf('\n')+1:0,finish=end||firstBreak<0?field.value.length:firstBreak;field.setSelectionRange(start,finish);field.scrollTop=end?field.scrollHeight:0;}});return true;}
+function outputLabel(includeCommands){return includeCommands?'Output with command lines included':'Output with recognized command echoes excluded';}
+function preview(entry,item,which='select',includeCommands=prefs(entry).pasteIncludeCommands===true){const result=output(entry,item,includeCommands);if(!result?.text){toast('No captured output is available for this block yet.');return false;}withoutInput(entry,()=>{openModal('Command output','<p class="hint">'+(result.truncated?'This window received a shortened output archive. The retained portion is shown.':'This output is retained separately from the console scrollback.')+'</p><div class="field"><label for="terminalSelectedOutput">'+outputLabel(includeCommands)+'</label><textarea id="terminalSelectedOutput" class="mono terminal-selected-output" readonly spellcheck="false"></textarea></div>','<button class="btn ghost" data-action="close-modal">Close</button><button class="btn primary" data-terminal-extra="copy-selection-preview">'+icon('copy')+'Copy output</button>',true);const field=document.querySelector('#terminalSelectedOutput');field.value=result.text;field.focus();if(which==='select')field.select();else{const end=which==='end',firstBreak=field.value.indexOf('\n');const start=end?field.value.lastIndexOf('\n')+1:0,finish=end||firstBreak<0?field.value.length:firstBreak;field.setSelectionRange(start,finish);field.scrollTop=end?field.scrollHeight:0;}});return true;}
 function nativeFollow(entry,enabled){const service=entry?.xterm?._core?._bufferService;if(service)service.isUserScrolling=!enabled;}
 function followCurrent(entry){if(!entry?.xterm)return;const follow=prefs(entry).autoScroll;nativeFollow(entry,follow);if(follow)entry.xterm.scrollToBottom();}
 function beforeFit(entry){if(!entry?.xterm)return null;const follow=prefs(entry).autoScroll;nativeFollow(entry,follow);const buffer=!follow&&normal(entry)?entry.xterm.buffer.normal:null;return {epoch:entry._ntScrollEpoch||0,anchor:buffer?marker(entry,buffer.viewportY):null,viewportY:buffer?buffer.viewportY:null};}
@@ -210,7 +219,9 @@ function selectReady(entry,item,includeCommands){
  if(contiguous){withoutInput(entry,()=>{entry.xterm.selectLines(displayed.lines[0].start,displayed.lines.at(-1).end);entry.xterm.scrollToLine(displayed.lines[0].start);entry.xterm.focus();});return true;}
  // xterm supports one continuous selection. A plain-text selection preserves
  // output without reintroducing interleaved command echoes.
- withoutInput(entry,()=>{openModal('Select output','<div class="field"><label for="terminalSelectedOutput">Output with recognized command echoes excluded</label><textarea id="terminalSelectedOutput" class="mono terminal-selected-output" readonly spellcheck="false"></textarea></div>','<button class="btn ghost" data-action="close-modal">Close</button><button class="btn primary" type="button" data-terminal-extra="copy-selection-preview">'+icon('copy')+'Copy output</button>',true);
+ const label=outputLabel(includeCommands);
+ const reason=displayed?.text===result.text?'The output is separated by other terminal lines. Select it here without including those lines.':'The captured output differs from the text still in the terminal. Select or copy it here.';
+ withoutInput(entry,()=>{openModal('Select output','<p class="hint">'+(result.truncated?'This window received a shortened output archive. The retained portion is shown. ':'')+reason+'</p><div class="field"><label for="terminalSelectedOutput">'+label+'</label><textarea id="terminalSelectedOutput" class="mono terminal-selected-output" readonly spellcheck="false"></textarea></div>','<button class="btn ghost" data-action="close-modal">Close</button><button class="btn primary" type="button" data-terminal-extra="copy-selection-preview">'+icon('copy')+'Copy output</button>',true);
  const field=document.querySelector('#terminalSelectedOutput');field.value=result.text;field.focus();field.select();});return true;
 }
 // Text of the chosen output block (Last command / Last batch, with or without
@@ -448,5 +459,5 @@ function bind(entry){if(!entry?.xterm||bindings.has(entry))return;bindings.add(e
  const scrolled=entry.xterm.onScroll?.(()=>{if(!prefs(entry).autoScroll)nativeFollow(entry,false);});const parsed=entry.xterm.onWriteParsed?.(()=>scheduleOutputSync(entry));
  entry.disposables.push({dispose(){entry.element?.removeEventListener('wheel',wheel,true);entry.element?.removeEventListener('pointerdown',pointer,true);entry.element?.removeEventListener('keydown',key,true);scrolled?.dispose();parsed?.dispose();clear(entry);}});
 }
-root.NetworkToolkitTerminalExtras=Object.freeze({openSettings,selectSettingsTab,settingsTab:()=>settingsTab,capture,notePaste,discardPacedPaste,completePacedPaste,noteManualInput,observeOutput,beforeOutput,afterOutput,beforeFit,afterFit,followCurrent,scrollTop,scrollBottom,jump,step,select,copy,sync,finalize,prefs,clear,snapshot,restore,current,output,rows,lineText,screenOutput,followInput,pauseFollow,flush:entry=>root.NetworkToolkitTerminalOutputArchive?.flush(entry),pagerPrompt,matchPagerLine,idlePrompt,echoMatches,createPagerRecognizer,pagerInput,pasteChoice});
+root.NetworkToolkitTerminalExtras=Object.freeze({openSettings,selectSettingsTab,settingsTab:()=>settingsTab,capture,notePaste,discardPacedPaste,completePacedPaste,noteManualInput,observeOutput,beforeOutput,afterOutput,beforeFit,afterFit,followCurrent,scrollTop,scrollBottom,jump,step,select,copy,sync,finalize,prefs,clear,snapshot,restore,current,output,rows,lineText,promptBoundary,screenOutput,followInput,pauseFollow,flush:entry=>root.NetworkToolkitTerminalOutputArchive?.flush(entry),pagerPrompt,matchPagerLine,idlePrompt,echoMatches,createPagerRecognizer,pagerInput,pasteChoice});
 })(window);

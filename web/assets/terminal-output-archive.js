@@ -63,7 +63,7 @@ function read(entry,item,include=false){
  const a=archives.get(item);if(!a)return null;const saved=value(a);if(!saved)return null;
  let lines=saved.screen.split('\n');if(!include){const echoes=new Set(saved.echo);lines=lines.filter((line,i)=>!echoes.has(i)&&!(i===0&&root.NetworkToolkitTerminalExtras.idlePrompt(line)));}
  lines=lines.filter(line=>!root.NetworkToolkitTerminalExtras.matchPagerLine(line));
- if(!saved.closed&&lines.length&&/^[\w.@:/()~\[\] -]{0,150}[#>$%]\s*$/.test(lines.at(-1)))lines.pop();
+ if(!saved.closed&&lines.length&&root.NetworkToolkitTerminalExtras.idlePrompt(lines.at(-1)))lines.pop();
  while(lines.length&&!lines.at(-1).trim())lines.pop();return {text:lines.join('\n'),truncated:saved.truncated,archived:true};
 }
 function seed(entry,item,saved,expected=[],initialEcho=false){
@@ -83,7 +83,7 @@ function feed(entry,bytes){
 }
 function close(entry,item){
  const a=archives.get(item);if(entry?._ntArchiveActive===item)entry._ntArchiveActive=null;if(!a?.term||a.finishing)return;a.finishing=true;
- queue(a,()=>{a.item.end=position(a.term,a.term.buffer.normal.baseY+a.term.buffer.normal.cursorY);a.item.closed=true;a.cached=null;a.value=tail(a);a.term.dispose();a.term=null;});
+ queue(a,()=>{a.item.end=position(a.term,root.NetworkToolkitTerminalExtras.promptBoundary(a.entry));a.item.closed=true;a.cached=null;a.value=tail(a);a.term.dispose();a.term=null;});
 }
 function dispose(entry,item){const a=archives.get(item);if(a){a.disposed=true;a.term?.dispose();for(const resolve of a.waiters||[])resolve();a.waiters?.clear();}archives.delete(item);if(entry?._ntArchiveActive===item)entry._ntArchiveActive=null;}
 function snapshot(entry,item){
