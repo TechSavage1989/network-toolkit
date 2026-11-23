@@ -52,6 +52,25 @@ async function selectionCheckpoint(page,label,expected){const actual=await snaps
 async function snapshot(page){return page.evaluate(()=>{const d=NetworkToolkitFileEditor.active,ta=document.querySelector('[data-ed-text]');return {uid:d.uid,text:d.content,dirty:d.dirty,undo:[...d.undo],revision:d.editRevision,start:ta.selectionStart,end:ta.selectionEnd,top:ta.scrollTop,left:ta.scrollLeft};});}
 
 async function compareText(page,side){return page.evaluate(side=>NetworkToolkitFileEditor.documents.get(NetworkToolkitFileEditor.comparison.selection[side]).content,side);}
+async function pasteComparison(page,side,text){
+ // Large contenteditable fill uses native insertText, which emits per-line
+ // input events and can exceed the action timeout. Exercise real user paste.
+ const origin='https://layout109.toolkit.test';assert.equal(new URL(page.url()).origin,origin);
+ await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
+ const input=page.locator('[data-compare-text="'+side+'"]'),peer=side==='left'?'right':'left';
+ const before=await page.evaluate(({side,peer})=>{const c=NetworkToolkitFileEditor.comparison,d=NetworkToolkitFileEditor.documents;return {id:c.selection[side],length:d.get(c.selection[side]).content.length,peerID:c.selection[peer],peerText:d.get(c.selection[peer]).content};},{side,peer});
+ await input.press('Control+Home');await input.press('Control+Shift+End');
+ assert.deepEqual(await page.evaluate(side=>{const view=NetworkToolkitFileEditor.comparison.sourceView(side);return {start:view.selectionStart,end:view.selectionEnd};},side),{start:0,end:before.length},'Paste replaces the complete source document');
+ await page.evaluate(text=>navigator.clipboard.writeText(text),text);
+ await input.evaluate((element,side)=>{window.layoutMapPaste=null;element.addEventListener('paste',event=>{window.layoutMapPaste={trusted:event.isTrusted,side,text:event.clipboardData?.getData('text/plain')};},{once:true,capture:true});},side);
+ await input.press('Control+V');
+ await page.waitForFunction(({side,text})=>NetworkToolkitFileEditor.documents.get(NetworkToolkitFileEditor.comparison.selection[side]).content===text,{side,text});
+ const after=await page.evaluate(({side,peer})=>{const c=NetworkToolkitFileEditor.comparison,d=NetworkToolkitFileEditor.documents;return {id:c.selection[side],text:d.get(c.selection[side]).content,peerID:c.selection[peer],peerText:d.get(c.selection[peer]).content,paste:window.layoutMapPaste};},{side,peer});
+ assert.equal(after.id,before.id);assert.equal(after.text,text,'Native paste preserves the exact setup text');
+ assert.equal(after.peerID,before.peerID);assert.equal(after.peerText,before.peerText,'Native paste leaves the other document unchanged');
+ assert.deepEqual(after.paste,{trusted:true,side,text},'Setup uses a trusted clipboard paste with the exact fixture');
+ (report.pasteInputs||=[]).push({side,trusted:after.paste.trusted,characters:text.length,completeSelection:true,peerUnchanged:true});
+}
 async function ready(p){await p.waitForFunction(()=>document.querySelector('[data-compare-map]')?.getAttribute('aria-disabled')==='false');await settle(p);}
 async function compareOpen(p){await p.locator('[data-ed="compare"]').click();await ready(p);}
 (async()=>{
@@ -124,7 +143,7 @@ async function compareOpen(p){await p.locator('[data-ed="compare"]').click();awa
    for(const pair of [['',''],['a','b'],[Array.from({length:900},(_,i)=>'left'+i).join('\n'),Array.from({length:950},(_,i)=>'right'+i).join('\n')]]){await p.evaluate(([a,b])=>{const c=NetworkToolkitFileEditor.comparison,l=NetworkToolkitFileEditor.documents.get(c.selection.left),r=NetworkToolkitFileEditor.documents.get(c.selection.right);l.content=a;r.content=b;l.editRevision++;r.editRevision++;c.refresh(true);},pair);await ready(p);assert.equal(await p.locator('[data-compare-map-viewport]:visible').count(),2);}
    check('empty, one-line, unequal-length and heavily changed documents render both tracks');
    await p.setViewportSize({width:1440,height:1000});await p.uncheck('[data-ed-wrap]');await p.evaluate(()=>setTheme('dark'));
-   const example=Array.from({length:600},(_,i)=>'const synthetic'+i+' = '+i+';'),revised=example.slice();revised.splice(450,15,...Array.from({length:15},(_,i)=>'const modified'+i+' = true;'));revised.splice(260,0,...Array.from({length:35},(_,i)=>'const added'+i+' = true;'));revised.splice(90,25);await left.fill(example.join('\n'));await ready(p);await right.fill(revised.join('\n'));await ready(p);
+   const example=Array.from({length:600},(_,i)=>'const synthetic'+i+' = '+i+';'),revised=example.slice();revised.splice(450,15,...Array.from({length:15},(_,i)=>'const modified'+i+' = true;'));revised.splice(260,0,...Array.from({length:35},(_,i)=>'const added'+i+' = true;'));revised.splice(90,25);await pasteComparison(p,'left',example.join('\n'));await ready(p);await pasteComparison(p,'right',revised.join('\n'));await ready(p);
    await p.waitForFunction(()=>[
     ['left','removed'],['right','added'],['left','changed'],['right','changed']
    ].every(([side,kind])=>document.querySelector('[data-compare-map-marks="'+side+'"] .'+kind)));

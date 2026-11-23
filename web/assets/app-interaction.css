@@ -1,0 +1,37 @@
+/* App controls do not create browser text selections. Data and editors opt
+   back in below; xterm keeps its own selection layer and accessibility rules. */
+body{-webkit-user-select:none;user-select:none}
+
+/* Readable results keep native selection, including report values, protocol
+   fields, logs and the small values that already offer an explicit Copy tool. */
+:where(pre,code,output,td,dd,.value,.val,.record-value,.result-record-value,
+ .result-value-list,.result-detail-target strong,.overview-card-value,
+ .calc-value,.detail-value,.kv-value,.public-ip-address,.dns-record-fields span,
+ .packet-field>span:last-child,.packet-hex,.log,.long-output,
+ .transfer-log-line,.transfer-location-value,.transfer-root-display strong,
+ .rb-fingerprint,[data-copy-value],[data-selectable-text]){
+ -webkit-user-select:text;user-select:text;
+}
+
+/* A control remains a control when it sits inside a result, a log or a label.
+   Text fields are restored after these rules, including fields in menus. */
+:where(button,.btn,.iconbtn,.tab,.nav-item,summary,label,legend,th,select,option,
+ h1,h2,h3,h4,h5,h6,.rb-scroll tr[data-rb-item],.fm-table tr[data-fm-row],
+ optgroup,[role="button"],[role="tab"],[role="menuitem"],
+ [role="menuitemcheckbox"],[role="menuitemradio"],[role="option"],
+ [role="checkbox"],[role="radio"],[role="switch"]),
+:where(button,.btn,.iconbtn,.tab,.nav-item,summary,label,legend,th,select,option,optgroup,
+ h1,h2,h3,h4,h5,h6,.rb-scroll tr[data-rb-item],.fm-table tr[data-fm-row],
+ [role="button"],[role="tab"],[role="menuitem"],[role="menuitemcheckbox"],
+ [role="menuitemradio"],[role="option"],[role="checkbox"],[role="radio"],
+ [role="switch"]) *{
+ -webkit-user-select:none;user-select:none;
+}
+
+/* Native input selection, readonly output boxes, contenteditable and both
+   editor engines remain available to mouse, keyboard and copy actions. */
+:where(input:not([type]),input[type="text"],input[type="search"],input[type="url"],
+ input[type="email"],input[type="tel"],input[type="password"],input[type="number"],
+ textarea,[contenteditable]:not([contenteditable="false"]),.cm-content){
+ -webkit-user-select:text;user-select:text;
+}

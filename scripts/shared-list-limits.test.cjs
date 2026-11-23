@@ -122,17 +122,17 @@ test('saving one of 150 sessions from the connection form keeps all 150, and a f
 });
 
 // Saved TFTP profiles (main window only).
-test('a full list of TFTP profiles refuses a new one and keeps the others',()=>{
+test('a full list of TFTP profiles refuses a new one and keeps the others',async()=>{
  const toasts=[];let saves=0;
  const limit=shared.SAVED_LIMITS.tftpProfiles,profile=index=>({id:'tftp-'+index,name:'Transfer '+index,host:'192.0.2.9',operation:'download',remotePath:'a',localPath:'b',port:69,blockSize:512,timeoutSec:5,retries:3,overwrite:false});
  const state={target:'192.0.2.50',forms:{tftp:{operation:'download',remotePath:'x',localPath:'y',port:69}},tftpProfiles:many(limit,profile),tftpRecent:[],activePage:'tftp'};
- const c={state,console,Date,Math,Object,String,Number,Array,document:{addEventListener(){},getElementById:()=>null,querySelector:()=>null},prompt:()=>'One too many',toast:(text,kind)=>toasts.push([kind,text]),saveState:()=>{saves++;},NetworkToolkitSharedData:shared};
+ const c={state,console,Date,Math,Object,String,Number,Array,document:{addEventListener(){},getElementById:()=>null,querySelector:()=>null},NetworkToolkitDialogs:{prompt:async()=>'One too many'},toast:(text,kind)=>toasts.push([kind,text]),saveState:()=>{saves++;},NetworkToolkitSharedData:shared};
  c.window=c;vm.createContext(c);vm.runInContext(read('assets/tftp-connections.js'),c);
  const before=JSON.stringify(state.tftpProfiles);
- c.NetworkToolkitTFTPConnections.save();
+ await c.NetworkToolkitTFTPConnections.save();
  assert.equal(JSON.stringify(state.tftpProfiles),before);assert.equal(saves,0);assert.equal(toasts.at(-1)[0],'error');
  // Saving over a profile with the same name and host is an edit.
- state.target='192.0.2.9';c.prompt=()=>'Transfer 4';c.NetworkToolkitTFTPConnections.save();
+ state.target='192.0.2.9';c.NetworkToolkitDialogs.prompt=async()=>'Transfer 4';await c.NetworkToolkitTFTPConnections.save();
  assert.equal(state.tftpProfiles.length,limit);assert.equal(saves,1);
 });
 

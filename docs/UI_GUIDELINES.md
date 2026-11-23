@@ -159,6 +159,14 @@ Dark is the default theme; light is equivalent. Use roles, not hex values.
 
 Never rely on color alone: status dots also have text (tooltip and screen-reader label).
 
+## Selection and browser UI
+
+Ordinary labels, navigation, buttons, tabs, menus, table headings and other controls are not text-selectable. Use the shared app-interaction.css rules; opt real data back into native selection with semantic data elements or data-selectable-text. Text inputs, read-only output fields, both editor engines and xterm's own selection must continue to support selection and copying. A control inside a selectable result remains a control.
+
+The app-interaction.js contextmenu listener cancels only the browser default. It must not stop propagation, steal focus, intercept editing keys or replace app-owned menus. New context menus must continue working when event.defaultPrevented is already true.
+
+Use app dialogs for names, confirmations and other questions. Never call the browser's synchronous alert, confirm or prompt. NetworkToolkitDialogs preserves the previous modal's nodes and focus and cancels on dismissal or replacement. After awaiting a question, recheck the identity of the item or connection before changing it. File pickers, UAC, credential dialogs and unsaved-work protection keep their existing authorization paths. External browser window-close warnings cannot be removed at the cost of data or live sessions.
+
 ## Confirmations
 
 Keep a confirmation only when an action can lose data, interrupt live sessions or change system or security state. Owner-approved policy (from [UX_AUDIT.md](UX_AUDIT.md) section 10):

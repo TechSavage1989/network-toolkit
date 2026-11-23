@@ -269,14 +269,16 @@ function eventTarget(node){const row=node.closest?.('[data-session-kind][data-se
 document.addEventListener('dblclick',event=>{const ftp=event.target.closest?.('[data-transfer-session-open]');const entry=ftp?.closest('[data-transfer-session-id]');if(entry){event.preventDefault();event.stopImmediatePropagation();void root.NetworkToolkitRemoteBrowser?.openLibraryEntry?.('ftp',entry.dataset.transferSessionKind,entry.dataset.transferSessionId);return;}},true);
 document.addEventListener('dblclick',event=>{if(event.target.id==='terminalSidebarDivider'){event.preventDefault();event.stopImmediatePropagation();setCollapsed(!state.terminalSidebarCollapsed);return;}if(!event.target.closest?.('[data-session-entry]'))return;const target=eventTarget(event.target);if(target){event.preventDefault();event.stopImmediatePropagation();void open(target).catch(error=>toast(error.message,'error'));}},true);
 document.addEventListener('contextmenu',event=>{const target=eventTarget(event.target);if(!target)return;event.preventDefault();event.stopImmediatePropagation();openMenu(target,event.clientX,event.clientY);},true);
-document.addEventListener('click',event=>{
+document.addEventListener('click',async event=>{
  const folder=event.target.closest?.('[data-session-folder]');if(folder){event.preventDefault();event.stopImmediatePropagation();folderDialog(folder.dataset.sessionFolder,folder.dataset.sessionFolderId);return;}
  const ftpOpen=event.target.closest?.('[data-transfer-session-open]');
  const ftpRemove=event.target.closest?.('[data-transfer-session-remove]');
  if(ftpOpen||ftpRemove){const row=(ftpOpen||ftpRemove).closest('[data-transfer-session-id]');if(!row)return;event.preventDefault();event.stopImmediatePropagation();
   if(ftpOpen){void root.NetworkToolkitRemoteBrowser?.openLibraryEntry?.('ftp',row.dataset.transferSessionKind,row.dataset.transferSessionId);return;}
-  const group=row.dataset.transferSessionKind==='saved'?'ftpProfiles':'ftpRecent';if(!confirm('Remove this FTP/FTPS connection from '+row.dataset.transferSessionKind+'?'))return;
-  state[group]=(state[group]||[]).filter(item=>item.id!==row.dataset.transferSessionId);saveState();render();return;
+  const kind=row.dataset.transferSessionKind,id=row.dataset.transferSessionId,group=kind==='saved'?'ftpProfiles':'ftpRecent',item=(state[group]||[]).find(x=>x.id===id);if(!item)return;const before=signature(item);
+  if(!await root.NetworkToolkitDialogs.confirm({title:'Remove FTP / FTPS connection',message:'Remove this FTP/FTPS connection from '+kind+'?',acceptLabel:'Remove connection',danger:true}))return;
+  if(signature((state[group]||[]).find(x=>x.id===id))!==before){toast('The connection entry changed. Select it again.','error');return;}
+  state[group]=(state[group]||[]).filter(item=>item.id!==id);saveState();render();return;
  }
  const tab=event.target.closest?.('[data-session-tab]');
  if(tab){event.preventDefault();event.stopImmediatePropagation();if(!tab.disabled)activateTab(tab.dataset.sessionTab,{toggle:true});return;}

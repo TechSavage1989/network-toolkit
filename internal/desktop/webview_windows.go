@@ -45,6 +45,9 @@ type WebView struct {
 	controller              uintptr
 	core                    uintptr
 	core4                   uintptr
+	core11                  uintptr
+	fetchReceiver           uintptr
+	fetchRegistration       eventRegistration
 	bounds                  Rect
 	registrations           []eventRegistration
 	downloads               map[uintptr]eventRegistration
@@ -52,6 +55,8 @@ type WebView struct {
 	bootstrapScriptID       string
 	blockedDocumentResponse uintptr
 	documentRequestPermit   nativeDocumentRequestPermit
+	documentFetchPermit     nativeDocumentFetchPermit
+	documentFetchReady      bool
 }
 
 type pendingDownload struct {
@@ -309,7 +314,7 @@ func (w *WebView) initializeController() error {
 	if err := w.installDocumentRequestPolicy(); err != nil {
 		return err
 	}
-	return w.installNativeBootstrap()
+	return w.installDocumentFetchPolicy()
 }
 
 func (w *WebView) fail(err error) {
@@ -567,6 +572,8 @@ func (w *WebView) Close() {
 	w.closed = true
 	w.documentRequestPermit.pending = false
 	w.documentRequestPermit.navigationPending = false
+	w.documentFetchPermit.pending = false
+	w.documentFetchReady = false
 	if w.bootstrapScriptID != "" && w.core != 0 {
 		_ = comPutString(w.core, 28, w.bootstrapScriptID)
 		w.bootstrapScriptID = ""
@@ -588,13 +595,21 @@ func (w *WebView) Close() {
 	if w.controller != 0 {
 		comCall(w.controller, 24)
 	}
+	// Keep Fetch enabled until the controller is closed. Disabling it while
+	// a request is paused could release work that the document policy denied.
+	w.fetchRegistration.remove()
+	w.fetchRegistration = eventRegistration{}
+	comRelease(w.fetchReceiver)
+	w.fetchReceiver = 0
 	comRelease(w.blockedDocumentResponse)
 	w.blockedDocumentResponse = 0
+	comRelease(w.core11)
 	comRelease(w.core4)
 	comRelease(w.core)
 	comRelease(w.controller)
 	comRelease(w.environment)
 	w.core4 = 0
+	w.core11 = 0
 	w.core = 0
 	w.controller = 0
 	w.environment = 0

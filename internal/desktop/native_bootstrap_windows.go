@@ -36,7 +36,7 @@ func nativeBootstrapScriptID(pointer uintptr) (string, error) {
 // missing callback, failed registration, closed host or refused dispatch never
 // falls back to unauthenticated navigation or a token-bearing HTTP response.
 func (w *WebView) installNativeBootstrap() error {
-	if w == nil || w.closed || w.core == 0 || w.cfg.Post == nil {
+	if w == nil || w.closed || w.core == 0 || w.cfg.Post == nil || !w.documentFetchReady {
 		return errors.New("The native interface is unavailable for private bootstrap")
 	}
 	script, err := nativeSessionBootstrap(w.cfg.AppURL, w.cfg.SessionToken)
@@ -67,7 +67,7 @@ func (w *WebView) installNativeBootstrap() error {
 				return
 			}
 			w.bootstrapScriptID = id
-			if !w.documentRequestPermit.begin() {
+			if !w.documentRequestPermit.begin() || !w.documentFetchPermit.begin() {
 				w.fail(errors.New("The native interface document was already started; close and reopen the window"))
 				return
 			}

@@ -34,6 +34,7 @@
 - **Customizable Overview:** choose which dashboard sections to show, and drag them into the order you want; the layout is kept between runs.
 - **One set of settings and saved data:** the portable program, the installed program, the Terminal window and the Text Editor window share saved connections, saved credentials, trusted SSH keys, macros and settings. Change something in one and it shows in the others.
 - **Settings and updates:** save preferences and use the built-in updater.
+- **App controls and copying:** interface labels, buttons and tabs do not create text selections. Text fields, documents, terminal output and result values keep their selection and Copy actions. Right-click uses Network Toolkit menus, and profile and file questions appear in the app.
 
 ## Screenshots
 
@@ -74,8 +75,6 @@
 </table>
 
 ## Download
-
-**Latest beta: 1.21.75** improves Select output and Copy output for VMware ESXi and explains the Select output preview. Available on the [releases page](https://github.com/TechSavage1989/network-toolkit/releases).
 
 [Download the latest stable release](https://github.com/TechSavage1989/network-toolkit/releases/latest). It provides the portable package **`Network_Toolkit_<version>_Portable.zip`**, the executable **`Network_Toolkit.exe`** and **`SHA256SUMS`** for checking the files.
 

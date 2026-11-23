@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -56,7 +57,7 @@ func TestWindowsUsesABrowserWindowOnlyWithoutWebView2(t *testing.T) {
 func TestWindowsBrowserWindowIsADedicatedAppWindow(t *testing.T) {
 	args := windowsBrowserArgs("http://127.0.0.1:4000/launch?ticket=x", `C:\data\browser-window`)
 	joined := strings.Join(args, " ")
-	for _, want := range []string{"--app=http://127.0.0.1:4000/launch?ticket=x", `--user-data-dir=C:\data\browser-window`, "--disable-background-mode", "--no-first-run", "--disable-sync", "--disable-extensions"} {
+	for _, want := range []string{"--app=http://127.0.0.1:4000/launch?ticket=x", `--user-data-dir=C:\data\browser-window`, "--new-window", "--disable-background-mode", "--no-first-run", "--disable-sync", "--disable-extensions", "--disable-component-extensions-with-background-pages", "--disable-notifications", "--disable-features=Translate"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("missing %s in %v", want, args)
 		}
@@ -64,6 +65,34 @@ func TestWindowsBrowserWindowIsADedicatedAppWindow(t *testing.T) {
 	for _, arg := range args {
 		if strings.Contains(arg, "no-sandbox") || strings.Contains(arg, "disable-web-security") || strings.Contains(arg, "remote-debugging") {
 			t.Fatalf("the window must keep the browser's protections: %v", args)
+		}
+	}
+}
+
+func TestAppBrowserPolicyKeepsClipboardDialogsAndSecurity(t *testing.T) {
+	args := appBrowserArgs("http://127.0.0.1:4000/launch?ticket=x", "/private/app profile")
+	for _, want := range []string{
+		"--app=http://127.0.0.1:4000/launch?ticket=x", "--user-data-dir=/private/app profile",
+		"--no-first-run", "--no-default-browser-check", "--disable-sync",
+		"--disable-extensions", "--disable-component-extensions-with-background-pages",
+		"--disable-default-apps", "--disable-background-mode", "--disable-notifications",
+		"--disable-features=Translate",
+	} {
+		if !slices.Contains(args, want) {
+			t.Errorf("application browser policy lacks %q: %v", want, args)
+		}
+	}
+	for _, forbidden := range []string{
+		"--no-sandbox", "--disable-web-security", "--ignore-certificate-errors",
+		"--disable-background-networking", "--disable-popup-blocking",
+		"--deny-permission-prompts", "--disable-external-intent-requests",
+		"--disable-javascript", "--enable-automation", "--test-type", "--noerrdialogs",
+		"--remote-debugging-port", "--remote-debugging-pipe", "--block-new-web-contents",
+	} {
+		for _, arg := range args {
+			if arg == forbidden || strings.HasPrefix(arg, forbidden+"=") {
+				t.Errorf("application browser must preserve supported user actions and protections, found %q", arg)
+			}
 		}
 	}
 }

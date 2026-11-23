@@ -72,7 +72,9 @@ func (w *WebView) documentResourceRequested(_ uintptr, args uintptr) uintptr {
 		hr = comCall(args, 5, w.blockedDocumentResponse)
 	}
 	if w.cfg.navigationObserver != nil {
-		w.cfg.navigationObserver(nativeNavigationObservation{Kind: "resource", URI: uri, Blocked: blocked, InitialDocumentPermit: pending, ResponseResult: uint32(hr)})
+		resourceContext := int32(-1)
+		contextResult := comCall(args, 7, uintptr(unsafe.Pointer(&resourceContext)))
+		w.cfg.navigationObserver(nativeNavigationObservation{Kind: "resource", URI: uri, Blocked: blocked, InitialDocumentPermit: pending, ResourceContext: resourceContext, ResourceContextResult: uint32(contextResult), ResponseResult: uint32(hr)})
 	}
 	if failed(hr) {
 		// Never continue with the original request if response replacement failed.
