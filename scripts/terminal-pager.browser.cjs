@@ -48,12 +48,12 @@ async function shot(name,fullPage=false){if(!out)return;const file=path.join(out
   if(!document.querySelector('#terminalInteractionSettings'))document.body.insertAdjacentHTML('beforeend',NetworkToolkitTerminalInteraction.settingsHTML());
   if(value===null)delete state.terminalInteraction;else state.terminalInteraction=value;
   NetworkToolkitTerminalInteraction.sync();
-  const fields={copyOnSelect:'terminalCopyOnSelect',copyOnClick:'terminalCopyOnClick',pasteReview:'terminalPasteReview',rightClick:'terminalRightClick',ctrlC:'terminalCtrlC',autoPager:'terminalAutoPager',pagerKey:'terminalPagerKey'};
+  const fields={copyOnSelect:'terminalCopyOnSelect',copyOnClick:'terminalCopyOnClick',pasteReview:'terminalPasteReview',pasteAddEnter:'terminalPasteAddEnter',rightClick:'terminalRightClick',ctrlC:'terminalCtrlC',autoPager:'terminalAutoPager',pagerKey:'terminalPagerKey'};
   return Object.fromEntries(Object.entries(fields).map(([key,id])=>{const el=document.getElementById(id);return [key,el.type==='checkbox'?el.checked:el.value];}));
  },value);
- const defaults={copyOnSelect:true,copyOnClick:true,pasteReview:true,rightClick:'paste',ctrlC:'copy-selection',autoPager:true,pagerKey:'auto'};
+ const defaults={copyOnSelect:true,copyOnClick:true,pasteReview:true,pasteAddEnter:false,rightClick:'paste',ctrlC:'copy-selection',autoPager:true,pagerKey:'auto'};
  assert.deepEqual(await settings(null),defaults,'Unset preferences render screenshot-matched defaults in production controls');
- const saved={copyOnSelect:false,copyOnClick:false,pasteReview:false,rightClick:'menu',ctrlC:'send',autoPager:false,pagerKey:'enter'};
+ const saved={copyOnSelect:false,copyOnClick:false,pasteReview:false,pasteAddEnter:true,rightClick:'menu',ctrlC:'send',autoPager:false,pagerKey:'enter'};
  assert.deepEqual(await settings(saved),saved,'Explicit saved choices survive normalization and render unchanged');
  assert.deepEqual(await settings({}),defaults,'An empty/reset preference object returns to the same defaults');
  await shot('default-settings');
@@ -98,6 +98,20 @@ async function shot(name,fullPage=false){if(!out)return;const file=path.join(out
   assert.match(await capture('last-paste',true),/switch# show one\nFIRST PASTED OUTPUT/);
  }
  pass('Native Ctrl+V and right-click multiline paste retain ordered echoes and all manually paged output');
+ // End multiline pastes with Enter (owner request after v1.21.79): the user's
+ // own multiline paste gets a final Enter; Send to terminal never does.
+ {
+  const typed=async()=>{await settle();return page.evaluate(()=>sent.filter(x=>x.origin!=='pager').map(x=>x.data).join(''));};
+  await fresh({autoPager:false});await page.evaluate(()=>{state.terminalInteraction={...state.terminalInteraction,pasteAddEnter:true};sent.length=0;});
+  await page.evaluate(async()=>navigator.clipboard.writeText('show one\nshow two'));await page.keyboard.press('Control+v');
+  assert.equal(await typed(),'show one\rshow two\r','the last command of an own multiline paste is sent with Enter');
+  await page.evaluate(()=>{sent.length=0;NetworkToolkitTerminalInteraction.pasteText(entry,'show three\nshow four');});
+  assert.equal(await typed(),'show three\rshow four','text sent to the terminal from another tool never gets an Enter');
+  await page.evaluate(()=>{sent.length=0;state.terminalInteraction={...state.terminalInteraction,pasteAddEnter:false};});
+  await page.evaluate(async()=>navigator.clipboard.writeText('show five\nshow six'));await page.keyboard.press('Control+v');
+  assert.equal(await typed(),'show five\rshow six','with the setting off a paste is sent as it was copied');
+ }
+ pass('End multiline pastes with Enter adds Enter only to the user\'s own multiline paste');
 
 
  // ESXi's prompt ends with ']', not a traditional shell terminator. Exercise

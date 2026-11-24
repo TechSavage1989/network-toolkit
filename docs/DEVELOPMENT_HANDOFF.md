@@ -1,3 +1,11 @@
+# v1.21.80 Beta 1 - Terminal paste: cursor at the end, optional final Enter
+
+Owner request after v1.21.79 (see CHANGELOG): the paste review starts with its cursor at the end of the pasted text, and **End multiline pastes with Enter** (off by default) adds a final line break to the user's own multiline paste so its last command runs. Send to terminal, window send and peer send never add an Enter (AGENTS.md rule for those paths), and the rule is recorded in AGENTS.md ("Terminal paste ending").
+
+Release channel: `docs/RELEASE_CHANNEL.txt` is `beta` for this release. v1.21.76 to v1.21.79 were published as stable at the owner's request; the standing approval covers betas, so promoting this change to stable is the owner's call.
+
+Known limits: the setting is global, not per session. In paced paste the added line break completes the last line, so it is sent and waited for like the others. Not checked on real Windows.
+
 # v1.21.79 Stable - Automatic SSH notices enabled by default
 
 Owner request: publish a full stable release with the new SSH notice option enabled by default. Work is on fix/ssh-notices-default-on. This changes the default for new SSH connections and missing saved choices; literal false settings are preserved because an earlier untouched default cannot be distinguished from a deliberate opt-out. No published tag, release or binary is changed.

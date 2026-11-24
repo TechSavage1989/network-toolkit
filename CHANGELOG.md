@@ -1,3 +1,10 @@
+## 1.21.80 Beta 1 - Terminal paste: cursor at the end, optional final Enter
+
+- Owner request after v1.21.79: "when pasting multi line commands into terminal, the cursor should automatically go to the end of the paste and there should also be a configuration option to add an additional enter/line break to make sure the command runs fully after sending".
+- The paste review (`openReview`) opens with its cursor at the end of the text, scrolled to it (it started at the beginning); a sent paste scrolls the console to its end (`sendPaste`).
+- **End multiline pastes with Enter** (Terminal settings → Mouse & keyboard; `terminalInteraction.pasteAddEnter`, off by default, kept by `safeTerminalInteraction`) adds one line break in the paste's own style (`withFinalEnter`) to a multiline paste of the user's own that does not end with one, before the review, so the review shows it. Only the clipboard read and the native paste event pass `own` to `acceptText`; `pasteText` (Send to terminal, window send, peer send) never adds an Enter.
+- Checks: `scripts/terminal-interaction-defaults.test.cjs` (default, saved value, line-break styles, single lines, the Send-to path, the review cursor) and `scripts/terminal-pager.browser.cjs` (a real Ctrl+V with the setting on and off, and Send to terminal, through the terminal's input; fails without the change).
+
 ## 1.21.79 Stable - Automatic SSH notices enabled by default
 
 - Enabled **Automatically continue through SSH notices** by default for fresh SSH connections and saved profiles without a notice preference. Existing literal false values remain disabled, including choices saved under the earlier default.
