@@ -150,6 +150,12 @@ func randomHex(n int) string {
 }
 
 func main() {
+	if err := waitAdminReopenIfRequested(); err != nil {
+		if !errors.Is(err, errAdminReopenCancelled) {
+			platform.NotifyFatal("Network Toolkit could not restart as administrator: " + err.Error())
+		}
+		return
+	}
 	if err := waitUpdateReopenIfRequested(); err != nil {
 		platform.NotifyFatal("Network Toolkit could not finish reopening: " + err.Error())
 		return
@@ -176,8 +182,6 @@ func main() {
 	localParent := flag.Uint("local-tools-parent", 0, "Expected local configuration helper parent process")
 	packetHelper := flag.String("packet-capture-helper", "", "Private packet capture helper pipe")
 	packetParent := flag.Uint("packet-capture-parent", 0, "Expected packet capture helper parent process")
-	shellHelper := flag.String("terminal-shell-helper", "", "Private administrator terminal pipe")
-	shellParent := flag.Uint("terminal-shell-parent", 0, "Expected administrator terminal parent")
 	editorRegistration := flag.String(textEditorRegistrationFlag, "", "Private Text Editor registration action for the hosted Setup check")
 	flag.Parse()
 	// Alone only: no other switch, no argument, no window and no data folder.
@@ -194,23 +198,6 @@ func main() {
 			os.Exit(2)
 		}
 		os.Exit(runTextEditorRegistrationCommand(*editorRegistration))
-	}
-	shellRequested, shellOther := false, false
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "terminal-shell-helper" || f.Name == "terminal-shell-parent" {
-			shellRequested = true
-		} else {
-			shellOther = true
-		}
-	})
-	if shellRequested {
-		if shellOther || flag.NArg() != 0 || *shellHelper == "" || *shellParent == 0 || uint64(*shellParent) > uint64(^uint32(0)) {
-			platform.NotifyFatal("Invalid private terminal helper request.")
-			return
-		}
-		// No HTTP listener, settings, vault or browser is initialized in this role.
-		_ = runTerminalShellHelper(*shellHelper, uint32(*shellParent))
-		return
 	}
 	packetRequested, packetOther := false, false
 	flag.Visit(func(f *flag.Flag) {
@@ -768,6 +755,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handlePeerHandover(w, r) // the main window's tabs to the standalone Text Editor
 	case strings.HasPrefix(r.URL.Path, "/api/updates/"):
 		a.handleUpdates(w, r)
+	case r.URL.Path == "/api/admin-restart":
+		a.handleAdminRestart(w, r)
 	case r.URL.Path == "/api/activity":
 		a.handleActivity(w, r)
 	case r.URL.Path == "/api/status":
@@ -783,7 +772,7 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.stateMu.Lock()
 		writable, storageErr := a.storageWritable, a.storageError
 		a.stateMu.Unlock()
-		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.currentUIHost(), "windowMode": a.windowMode, "localShellAvailable": terminal.LocalShellAvailable(), "terminalWindowAvailable": a.windowMode == "terminal" || a.openTerminalWindow != nil, "terminalDetachAvailable": a.launchTerminalView != nil, "editorDiskAvailable": a.editorViews != nil, "editorWindowAvailable": a.launchEditorView != nil && a.editorViews != nil, "editorLaunchAvailable": a.editorLaunchAvailable, "editorLaunchReusable": a.editorLaunchReusable, "editorSessionAvailable": a.windowMode == "main" || a.windowMode == standaloneEditorMode, "peerReceive": a.peerReceiveAvailable(), "windowSend": a.windowSendAvailable(), "connectionLaunchAvailable": runtime.GOOS == "windows", "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storagePath": a.dataPath, "storageWritable": writable, "storageError": storageErr, "capabilities": capabilities, "limits": map[string]int{"maxJobs": maxConcurrent, "maxHistory": maxRetained}, "system": a.getSystem(false)})
+		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.currentUIHost(), "windowMode": a.windowMode, "localShellAvailable": terminal.LocalShellAvailable(), "processElevated": processElevated(), "adminRestartAvailable": a.adminRestartAvailable(), "terminalWindowAvailable": a.windowMode == "terminal" || a.openTerminalWindow != nil, "terminalDetachAvailable": a.launchTerminalView != nil, "editorDiskAvailable": a.editorViews != nil, "editorWindowAvailable": a.launchEditorView != nil && a.editorViews != nil, "editorLaunchAvailable": a.editorLaunchAvailable, "editorLaunchReusable": a.editorLaunchReusable, "editorSessionAvailable": a.windowMode == "main" || a.windowMode == standaloneEditorMode, "peerReceive": a.peerReceiveAvailable(), "windowSend": a.windowSendAvailable(), "connectionLaunchAvailable": runtime.GOOS == "windows", "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storagePath": a.dataPath, "storageWritable": writable, "storageError": storageErr, "capabilities": capabilities, "limits": map[string]int{"maxJobs": maxConcurrent, "maxHistory": maxRetained}, "system": a.getSystem(false)})
 	case r.URL.Path == "/api/terminal-views" || strings.HasPrefix(r.URL.Path, "/api/terminal-views/"):
 		a.handleTerminalViews(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/terminal-automation/"):

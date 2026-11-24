@@ -811,10 +811,10 @@ jobs:
         env:
           GOTOOLCHAIN: local
         run: go test -mod=vendor ./internal/terminal -run 'TestWindowsLocalShell|TestLocalShell' -count=1 -v
-      - name: Verify explicit local-shell approval and native helper boundaries
+      - name: Verify administrator shells need an administrator process and the restart handshake
         env:
           GOTOOLCHAIN: local
-        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestTerminalShell(ExplicitApprovalAndLateCancellation|NativeHelper)$' -count=1 -v
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestAdmin' -count=1 -v
       - name: Test native credential protection and capability isolation
         env:
           GOTOOLCHAIN: local

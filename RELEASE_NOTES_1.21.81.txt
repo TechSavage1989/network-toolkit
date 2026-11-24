@@ -1,0 +1,13 @@
+Network Toolkit 1.21.81
+
+## What's New
+
+- Run as administrator for Command Prompt and PowerShell no longer starts a hidden helper program, which some security software removed along with Network Toolkit.
+- Instead, Network Toolkit offers to restart itself as administrator. After Windows approves, administrator shells open as ordinary tabs with every Terminal feature.
+
+## Additional Details
+
+- Network Toolkit asks before it restarts and says which connected sessions will disconnect. Settings, saved connections and unsaved Text Editor work are kept. If you keep the app open, or Windows approval is declined, nothing changes.
+- While it runs as administrator, every local shell it opens is an administrator shell, and files cannot be dragged in from File Explorer (Windows does not allow that into an administrator program). Close it and open it normally to go back.
+- Close popped-out Terminal and Text Editor windows before restarting. A popped-out Terminal window asks you to choose Run as administrator in the main window.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

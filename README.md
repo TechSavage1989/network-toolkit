@@ -92,7 +92,7 @@ Started from the portable package, Network Toolkit can do the same from **App se
 - Windows shows the app in its own window with the Microsoft Edge WebView2 Runtime, which Windows 11 and current Windows 10 include. Windows Server does not, even with Edge installed: there the app opens in a Microsoft Edge or Google Chrome app window instead, without pop-out Terminal and Text Editor windows or dragging files out to Explorer. Installing the [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (Evergreen Standalone Installer, x64) gives it its own window.
 - Linux beta: a 64-bit x86 or Arm Linux desktop (Ubuntu, Debian, Mint, Fedora, Arch and similar). Google Chrome, Chromium, Microsoft Edge, Brave or Vivaldi gives the app its own window; otherwise it opens in your default browser.
 - Network access and permissions appropriate to the tools being used.
-- Windows administrative approval for protected system changes, when requested.
+- Windows administrative approval for protected system changes, when requested. Administrator Command Prompt and PowerShell tabs need Network Toolkit to run as administrator; it offers to restart that way (see [Terminal](docs/guide/terminal.md)).
 - Compatible remote services, such as an SSH server with SFTP enabled, for connection-dependent features.
 
 ## Getting started
