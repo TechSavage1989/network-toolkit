@@ -17,7 +17,10 @@ func TestAdminReopenArguments(t *testing.T) {
 	if got, err := prepareAdminReopen(plain, never); err != nil || strings.Join(got, " ") != "app.exe --terminal" {
 		t.Fatalf("an ordinary start changed: %v %v", got, err)
 	}
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir()) // Windows runners' TEMP is a short (8.3) name
+	if err != nil {
+		t.Fatal(err)
+	}
 	dir := filepath.Join(root, adminReopenPrefix+"x")
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		t.Fatal(err)

@@ -96,9 +96,12 @@ type adminRestart struct {
 
 var adminRestartState adminRestart
 
+// adminRestartElevated reports whether this process runs as administrator (tests replace it).
+var adminRestartElevated = processElevated
+
 // adminRestartAvailable reports whether this window may offer the restart.
 func (a *application) adminRestartAvailable() bool {
-	return adminRestartSupported() && !processElevated() && (a.windowMode == "main" || a.windowMode == "terminal")
+	return adminRestartSupported() && !adminRestartElevated() && (a.windowMode == "main" || a.windowMode == "terminal")
 }
 
 func (a *application) handleAdminRestart(w http.ResponseWriter, r *http.Request) {
@@ -145,7 +148,7 @@ func (a *application) startAdminRestart() error {
 	switch {
 	case !adminRestartSupported():
 		return errors.New("Restart as administrator is available on Windows only.")
-	case processElevated():
+	case adminRestartElevated():
 		return errAdminRestartAlready
 	case a.windowMode != "main" && a.windowMode != "terminal":
 		return errAdminRestartWindow

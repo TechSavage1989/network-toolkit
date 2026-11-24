@@ -78,16 +78,18 @@ func TestAdminRestartWaitsForTheOldCopy(t *testing.T) {
 // The restart asks Windows for approval with the run's own switches behind the
 // restart switch, visibly, and reports a declined approval without changing anything.
 func TestAdminRestartLaunch(t *testing.T) {
-	saved := adminRestartLaunch
-	t.Cleanup(func() { adminRestartLaunch = saved; adminRestartState = adminRestart{} })
-	data, err := filepath.EvalSymlinks(t.TempDir()) // the runner's TEMP is a short (8.3) name
+	saved, savedElevated := adminRestartLaunch, adminRestartElevated
+	t.Cleanup(func() {
+		adminRestartLaunch = saved
+		adminRestartElevated = savedElevated
+		adminRestartState = adminRestart{}
+	})
+	adminRestartElevated = func() bool { return false } // hosted runners run as administrator
+	data, err := filepath.EvalSymlinks(t.TempDir())     // the runner's TEMP is a short (8.3) name
 	if err != nil {
 		t.Fatal(err)
 	}
 	a := &application{windowMode: "main", dataPath: filepath.Join(data, "Network_Toolkit.settings.json")}
-	if processElevated() {
-		t.Skip("the test runs as administrator")
-	}
 	adminRestartLaunch = func(string, []string, string) (syscall.Handle, error) { return 0, errAdminRestartDeclined }
 	if err := a.startAdminRestart(); !errors.Is(err, errAdminRestartDeclined) {
 		t.Fatalf("declined: %v", err)
