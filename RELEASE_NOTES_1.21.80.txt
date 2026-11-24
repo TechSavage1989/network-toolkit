@@ -1,0 +1,13 @@
+Network Toolkit 1.21.80
+
+## What's New
+
+- When you paste several lines into the terminal, the paste review now opens with the cursor at the end of the text.
+- New setting: End multiline pastes with Enter. When it's on, a multiline paste that doesn't end with a line break gets one, so its last command runs too.
+
+## Additional Details
+
+- Find the setting in Terminal settings, Mouse & keyboard. It is off by default, and the added line break shows in the paste review before anything is sent.
+- It applies only to your own pastes (Ctrl+V, Ctrl+Shift+V, Shift+Insert, right-click and Paste in the menu), never to text sent from the Text Editor or another window.
+- After a paste is sent, the console scrolls to its end.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

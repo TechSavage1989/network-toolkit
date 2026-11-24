@@ -50,6 +50,9 @@
       copyOnClick:v.copyOnClick !== false,
       pasteReview:v.pasteReview !== false,
       pasteIncludeCommands:v.pasteIncludeCommands === true,
+      // Off unless chosen (owner request after v1.21.79): the user's own
+      // multiline paste ends with Enter so its last command runs.
+      pasteAddEnter:v.pasteAddEnter === true,
       autoPager:v.autoPager !== false,
       pagerKey:['auto','space','enter'].includes(v.pagerKey) ? v.pagerKey : 'auto',
       rightClick:v.rightClick === 'menu' ? 'menu' : 'paste',
@@ -192,7 +195,9 @@
     review = {destination:token,original:text,editorOriginal:field.value,form,invalid:false,target,pending:false,uncertain:false,error:''};
     form.querySelector('#terminalPasteMode').value=pacedPasteReason(token,text,target)?'raw':'paced';
     updateReview();
-    requestAnimationFrame(()=>{ if (review?.form === form) { field.focus({preventScroll:true}); field.setSelectionRange(0,0); } });
+    // The cursor starts at the end of the pasted text, where a line can be
+    // added (owner request after v1.21.79), and the end is in view.
+    requestAnimationFrame(()=>{ if (review?.form === form) { field.focus({preventScroll:true}); const end=field.value.length; field.setSelectionRange(end,end); field.scrollTop=field.scrollHeight; } });
   }
   function sendPaste(token, text) {
     const start=pasteStarts.get(token?.id),target=root.NetworkToolkitTerminalMacros?.pasteTarget?.(token?.id);
@@ -215,11 +220,21 @@
       binding.nativePaste(text);
     } finally { approvedPaste = false; }
     token.xterm.focus();
+    token.xterm.scrollToBottom?.();
     return true;
   }
-  function acceptText(token, text) {
+  // A multiline paste of the user's own that does not end with a line break
+  // gets one in its own style when End multiline pastes with Enter is on.
+  // Only the user's pastes (Ctrl+V, Shift+Insert, right-click, the menu):
+  // text sent from the Text Editor or another window never gets an Enter.
+  function withFinalEnter(text) {
+    if (typeof text !== 'string' || !preferences().pasteAddEnter || !/[\r\n]/.test(text) || /[\r\n]$/.test(text)) return text;
+    return text + (text.match(/\r\n|\r|\n/)?.[0] || '\n');
+  }
+  function acceptText(token, text, own = false) {
     if (!validDestination(token)) { changedDestination(); return false; }
     if (typeof text !== 'string' || !text) return false;
+    if (own) text = withFinalEnter(text);
     if (review?.form.isConnected) { toast('Finish or cancel the open paste review before pasting again.'); return false; }
     if (byteLength(text) > MAX_PASTE_BYTES) { toast('Paste no more than 1 MiB of text at a time.','error'); return false; }
     if (/[\r\n]/.test(text) && root.NetworkToolkitTerminalExtras.prefs(token.entry).pasteReview || pasteWarnings(text).length) { openReview(token,text); return false; }
@@ -241,7 +256,7 @@
       const text = await navigator.clipboard.readText();
       if (sequence !== pasteSequence) return false;
       if (!validDestination(token)) { changedDestination(); return false; }
-      return acceptText(token,text);
+      return acceptText(token,text,true);
     } catch {
       if (sequence === pasteSequence && validDestination(token)) {
         token.xterm.focus();
@@ -424,14 +439,14 @@
   }
 
   function settingsHTML() {
-    return '<section id="terminalInteractionSettings" class="terminal-tools-section terminal-interaction-settings"><h3>Mouse and keyboard defaults</h3><div class="terminal-interaction-fields"><label><input type="checkbox" id="terminalCopyOnSelect">Copy selected text automatically</label><label><input type="checkbox" id="terminalCopyOnClick">Click highlighted values to copy</label><label><input type="checkbox" id="terminalPasteReview">Review multiline pastes before sending</label><div class="field"><label for="terminalRightClick">Right-click in the console</label><select id="terminalRightClick"><option value="paste">Paste</option><option value="menu">Context menu</option></select><span class="hint">Shift + right-click temporarily does the opposite.</span></div><div class="field"><label for="terminalCtrlC">Ctrl+C behavior</label><select id="terminalCtrlC"><option value="send">Always send Ctrl+C to the device</option><option value="copy-selection">Copy selection; otherwise send Ctrl+C</option></select></div><label><input type="checkbox" id="terminalAutoPager">Automatically advance known More/pager prompts</label><div class="field"><label for="terminalPagerKey">Pager key</label><select id="terminalPagerKey"><option value="auto">Automatic</option><option value="space">Space</option><option value="enter">Enter</option></select></div></div><fieldset id="terminalPasteWarningSettings" class="terminal-paste-warning-settings"><legend>Warn before pasting</legend>' + PASTE_WARNING_IDS.map(id=>'<label><input type="checkbox" data-terminal-paste-warning="' + id + '">' + esc((root.NetworkToolkitPasteWarnings?.kinds.find(kind=>kind.id === id)?.label) || id) + '</label>').join('') + '<p class="hint">A paste with any of these opens the review first, even on one line. You can still send it.</p></fieldset><p class="terminal-interaction-help">Ctrl+A selects a recognized editable command without its prompt. Ctrl+Shift+C copies. Ctrl+V, Ctrl+Shift+V, and Shift+Insert paste. Ctrl+wheel changes console text size. Single-line pastes go directly to the console unless a paste warning applies. Multiline review is optional and enabled by default. Session controls in the console bar can override Review paste and Auto pager for the focused session.</p><details id="terminalContextMenuSettings"><summary>Choose context-menu tools</summary><div class="terminal-menu-options">' + MENU_ITEMS.map(item=>'<label><input type="checkbox" data-terminal-menu-option="' + item.id + '">' + esc(item.label) + '</label>').join('') + '</div><p class="hint">Mouse and keyboard settings always remain in the menu.</p></details></section>';
+    return '<section id="terminalInteractionSettings" class="terminal-tools-section terminal-interaction-settings"><h3>Mouse and keyboard defaults</h3><div class="terminal-interaction-fields"><label><input type="checkbox" id="terminalCopyOnSelect">Copy selected text automatically</label><label><input type="checkbox" id="terminalCopyOnClick">Click highlighted values to copy</label><label><input type="checkbox" id="terminalPasteReview">Review multiline pastes before sending</label><label><input type="checkbox" id="terminalPasteAddEnter">End multiline pastes with Enter</label><div class="field"><label for="terminalRightClick">Right-click in the console</label><select id="terminalRightClick"><option value="paste">Paste</option><option value="menu">Context menu</option></select><span class="hint">Shift + right-click temporarily does the opposite.</span></div><div class="field"><label for="terminalCtrlC">Ctrl+C behavior</label><select id="terminalCtrlC"><option value="send">Always send Ctrl+C to the device</option><option value="copy-selection">Copy selection; otherwise send Ctrl+C</option></select></div><label><input type="checkbox" id="terminalAutoPager">Automatically advance known More/pager prompts</label><div class="field"><label for="terminalPagerKey">Pager key</label><select id="terminalPagerKey"><option value="auto">Automatic</option><option value="space">Space</option><option value="enter">Enter</option></select></div></div><fieldset id="terminalPasteWarningSettings" class="terminal-paste-warning-settings"><legend>Warn before pasting</legend>' + PASTE_WARNING_IDS.map(id=>'<label><input type="checkbox" data-terminal-paste-warning="' + id + '">' + esc((root.NetworkToolkitPasteWarnings?.kinds.find(kind=>kind.id === id)?.label) || id) + '</label>').join('') + '<p class="hint">A paste with any of these opens the review first, even on one line. You can still send it.</p></fieldset><p class="terminal-interaction-help">Ctrl+A selects a recognized editable command without its prompt. Ctrl+Shift+C copies. Ctrl+V, Ctrl+Shift+V, and Shift+Insert paste. Ctrl+wheel changes console text size. Single-line pastes go directly to the console unless a paste warning applies. End multiline pastes with Enter adds a line break after your own multiline paste when it does not end with one, so its last command runs; text sent from the Text Editor is never changed. Multiline review is optional and enabled by default. Session controls in the console bar can override Review paste and Auto pager for the focused session.</p><details id="terminalContextMenuSettings"><summary>Choose context-menu tools</summary><div class="terminal-menu-options">' + MENU_ITEMS.map(item=>'<label><input type="checkbox" data-terminal-menu-option="' + item.id + '">' + esc(item.label) + '</label>').join('') + '</div><p class="hint">Mouse and keyboard settings always remain in the menu.</p></details></section>';
   }
   function updateSettings() {
     // Terminal settings → Mouse & keyboard (v1.21.11); the Tools panel only without it.
     const panel = document.querySelector('[data-terminal-settings-panel="input"]') || document.querySelector('#terminalToolsPanel');
     if (panel && !document.querySelector('#terminalInteractionSettings')) panel.insertAdjacentHTML('beforeend',settingsHTML());
     const p = preferences();
-    for (const [id,value] of [['terminalCopyOnSelect',p.copyOnSelect],['terminalCopyOnClick',p.copyOnClick],['terminalPasteReview',p.pasteReview],['terminalAutoPager',p.autoPager],['terminalPagerKey',p.pagerKey],['terminalRightClick',p.rightClick],['terminalCtrlC',p.ctrlC]]) {
+    for (const [id,value] of [['terminalCopyOnSelect',p.copyOnSelect],['terminalCopyOnClick',p.copyOnClick],['terminalPasteReview',p.pasteReview],['terminalPasteAddEnter',p.pasteAddEnter],['terminalAutoPager',p.autoPager],['terminalPagerKey',p.pagerKey],['terminalRightClick',p.rightClick],['terminalCtrlC',p.ctrlC]]) {
       const field = document.getElementById(id); if (!field) continue;
       if (field.type === 'checkbox') field.checked = value; else if (document.activeElement !== field) field.value = value;
     }
@@ -444,6 +459,7 @@
     else if (field.id === 'terminalCopyOnClick') p.copyOnClick = field.checked;
     else if (field.id === 'terminalPasteReview') p.pasteReview = field.checked;
     else if (field.id === 'terminalPasteIncludeCommands') p.pasteIncludeCommands = field.checked;
+    else if (field.id === 'terminalPasteAddEnter') p.pasteAddEnter = field.checked;
     else if (field.id === 'terminalAutoPager') p.autoPager = field.checked;
     else if (field.id === 'terminalPagerKey') p.pagerKey = field.value;
     else if (field.id === 'terminalRightClick') p.rightClick = field.value;
@@ -547,7 +563,7 @@
       const token = native?.destination || destination(entry);
       if (!token || token.entry !== entry || !validDestination(token)) { changedDestination(); return; }
       const text = event.clipboardData?.getData('text/plain');
-      if (typeof text === 'string') acceptText(token,text);
+      if (typeof text === 'string') acceptText(token,text,true);
       else toast('The clipboard did not contain text.');
     },true);
     listen(element,'pointerdown',event=>{
@@ -616,5 +632,5 @@
     }
   }
   function noteInput(entry,data){if(!approvedPaste)root.NetworkToolkitTerminalExtras?.noteManualInput?.(entry,data);}
-  root.NetworkToolkitTerminalInteraction = Object.freeze({init,bind,sync,preferences,safePreferences,paste,pasteText,submitPaste,suppressesInput,copy,copyValue,cancelSelectionCopy,settingsHTML,pasteStats,pasteWarnings,isPacedPastePrompt,pacedTextReason,pacedPasteReason,pasteStartState,beginPasteStart,endPasteStart,resolvePasteStart,noteInput});
+  root.NetworkToolkitTerminalInteraction = Object.freeze({init,bind,sync,preferences,safePreferences,withFinalEnter,paste,pasteText,submitPaste,suppressesInput,copy,copyValue,cancelSelectionCopy,settingsHTML,pasteStats,pasteWarnings,isPacedPastePrompt,pacedTextReason,pacedPasteReason,pasteStartState,beginPasteStart,endPasteStart,resolvePasteStart,noteInput});
 })(window);

@@ -30,3 +30,26 @@ test('terminal font size limits (8 to 36 px) agree in zoom, the Display field, s
  // The separate Terminal window uses the shared font size (shared_data.go), which passes the same sanitizer; it is no longer copied when the window is first used.
  const shared=fs.readFileSync(path.join(__dirname,'../cmd/network-toolkit/shared_data.go'),'utf8');assert.match(shared,/\{Name: "terminalFontSize", Kind: sharedValue, Live: true\}/);assert.match(shared,/sanitizeTerminalSettings\(picked\)/);
 });
+test('End multiline pastes with Enter is off by default and adds one line break in the paste\'s own style',()=>{
+ assert.equal(harness(undefined).api.preferences().pasteAddEnter,false,'off unless chosen');
+ assert.equal(harness({pasteAddEnter:'true'}).api.preferences().pasteAddEnter,false,'only a real true turns it on');
+ const off=harness({}).api;assert.equal(off.withFinalEnter('show run\nshow ver'),'show run\nshow ver','nothing is added while it is off');
+ const on=harness({pasteAddEnter:true}).api;assert.equal(on.preferences().pasteAddEnter,true);
+ assert.equal(on.withFinalEnter('show run\nshow ver'),'show run\nshow ver\n');
+ assert.equal(on.withFinalEnter('a\r\nb'),'a\r\nb\r\n');assert.equal(on.withFinalEnter('a\rb'),'a\rb\r');
+ assert.equal(on.withFinalEnter('a\nb\n'),'a\nb\n','a paste that already ends with a line break is unchanged');
+ assert.equal(on.withFinalEnter('show version'),'show version','a single line is never given an Enter');
+});
+test('only the user\'s own pastes get the Enter; Send to terminal never does',()=>{
+ // The clipboard read and the native paste event pass own=true; pasteText
+ // (Send to terminal from the Text Editor or another window, peer send) does not.
+ assert.match(source,/function pasteText\(entry, text\) \{\s*pasteSequence\+\+;\s*return acceptText\(destination\(entry\),text\);/);
+ assert.equal((source.match(/acceptText\(token,text,true\)/g)||[]).length,2,'clipboard read and native paste event');
+ assert.match(source,/if \(own\) text = withFinalEnter\(text\);/);
+ const go=fs.readFileSync(path.join(__dirname,'../cmd/network-toolkit/terminal_settings.go'),'utf8');
+ assert.match(go,/"pasteAddEnter":\s+false/);assert.match(go,/"pasteIncludeCommands", "pasteAddEnter", "autoPager"/);
+});
+test('the paste review starts with the cursor at the end of the pasted text',()=>{
+ assert.match(source,/const end=field\.value\.length; field\.setSelectionRange\(end,end\); field\.scrollTop=field\.scrollHeight;/);
+ assert.doesNotMatch(source,/field\.setSelectionRange\(0,0\)/);
+});

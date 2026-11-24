@@ -19,7 +19,7 @@ func TestTerminalInteractionPersistenceAndWindowTransfer(t *testing.T) {
 	}
 	want := map[string]any{
 		"copyOnSelect": false, "copyOnClick": false, "rightClick": "menu", "ctrlC": "copy-selection",
-		"pasteReview": true, "pasteIncludeCommands": false, "autoPager": true, "pagerKey": "auto",
+		"pasteReview": true, "pasteIncludeCommands": false, "pasteAddEnter": false, "autoPager": true, "pagerKey": "auto",
 		// Saved before revision 2, so Send to Text Editor is added once.
 		"menuItems": []any{"copy-line", "copy-token", "paste", "send-editor"}, "menuRevision": float64(2),
 		// Paste warnings (v1.21.9) default on.

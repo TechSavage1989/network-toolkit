@@ -72,6 +72,8 @@ Before text is pasted, the terminal checks it for commands that download and run
 
 With **Review multi-line paste** on, text containing line breaks opens a review before anything is sent. **One line at a time - wait for prompt** sends each complete command to an SSH session and waits for its next prompt. This includes standard VMware ESXi shell prompts such as "[root@lab-esxi:~]" and datastore paths. Blank lines are kept, and the last command must end with a line break.
 
+The review opens with the cursor at the end of the pasted text, so you can add a line before sending. **End multiline pastes with Enter** (Terminal settings → Mouse & keyboard, off by default) adds a line break after a multiline paste of your own that does not end with one, so its last command runs too; you see it in the review before anything is sent. It applies to Ctrl+V, Ctrl+Shift+V, Shift+Insert, right-click and the menu's Paste, never to text sent from the Text Editor or another window. After a paste is sent, the console scrolls to its end.
+
 If **Send lines** is disabled, the message at the top explains why. Finish any current command, return to an empty prompt and paste again. **Raw paste - all at once** sends the reviewed text without waiting between commands; you can also cancel and run the commands separately. The normal connection and destination checks still apply.
 
 ### Multiline input in the command bar

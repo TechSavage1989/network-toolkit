@@ -169,6 +169,7 @@ func safeTerminalInteraction(value any) map[string]any {
 		"copyOnClick":          true,
 		"pasteReview":          true,
 		"pasteIncludeCommands": false,
+		"pasteAddEnter":        false,
 		"autoPager":            true,
 		"pagerKey":             "auto",
 		"rightClick":           "paste",
@@ -190,7 +191,7 @@ func safeTerminalInteraction(value any) map[string]any {
 	if !ok {
 		return clean
 	}
-	for _, key := range []string{"copyOnSelect", "copyOnClick", "pasteReview", "pasteIncludeCommands", "autoPager"} {
+	for _, key := range []string{"copyOnSelect", "copyOnClick", "pasteReview", "pasteIncludeCommands", "pasteAddEnter", "autoPager"} {
 		if enabled, ok := source[key].(bool); ok {
 			clean[key] = enabled
 		}
