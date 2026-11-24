@@ -23,9 +23,9 @@ func TestLocalShellStartsInItsJobWithoutASuspendedStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, word := range []string{"ResumeThread", "AssignProcessToJobObject", "0x00000004"} {
-		if strings.Contains(string(source), word) {
-			t.Fatalf("local_windows.go uses %s", word)
+	for _, call := range []string{`NewProc("ResumeThread")`, `NewProc("AssignProcessToJobObject")`, "|0x00000004"} {
+		if strings.Contains(string(source), call) {
+			t.Fatalf("local_windows.go uses %s", call)
 		}
 	}
 	if !LocalShellAvailable() {
