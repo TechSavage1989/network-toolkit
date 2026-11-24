@@ -34,7 +34,7 @@ Earlier versions gave the Terminal window and the Text Editor window their own c
 
 Nothing is deleted: the earlier files stay in the data folder, and a copy of each file is kept as it was before the change (`Network_Toolkit.before-sharing…`).
 
-**Saved credentials of the earlier Terminal window** are not moved automatically, because that vault may have its own master password. Open **Password manager** and choose **Import saved credentials from the previous Terminal vault**. If that vault has a master password, Windows asks for it. The earlier vault is not changed. Until you import, a connection that uses one of those credentials tells you so. If the shared vault is full, the message names the credentials that did not fit; remove some you no longer need and import again.
+**Saved credentials of the earlier Terminal window** are not moved automatically, because that vault may have its own master password. Open **Password manager** and choose **Import saved credentials from the previous Terminal vault**. If that vault has a master password, Password manager asks for it. The earlier vault is not changed. Until you import, a connection that uses one of those credentials tells you so. If the shared vault is full, the message names the credentials that did not fit; remove some you no longer need and import again.
 
 ### Lists that are full
 You can save up to 200 sessions, 200 FTP connections, 200 targets and 100 TFTP profiles. When a list is full, saving another entry is refused with a message and nothing is changed; an existing entry can still be edited. If two apps add an entry at the same moment and only one fits, the other app tells you which entry was not saved.
@@ -68,7 +68,7 @@ On the Overview, choose **Customize** to show or hide its sections (summary card
 Open **Password manager** (from a connection's Saved credential field, or at the bottom of the Terminal's Saved sidebar) to store a username together with its password or SSH key. Choosing a saved credential in a connection fills in its username.
 
 When you set up the vault, choose one of two protections:
-- **With a master password.** Any password is allowed. A strength gauge in the Windows dialog shows how hard it is to guess. You can also create an offline recovery key and let Windows remember the unlock.
+- **With a master password.** Any password is allowed. You type it in Password manager's own form, where a strength gauge shows how hard it is to guess (Network Toolkit no longer opens a separate Windows password box, which security software such as SentinelOne flagged as a credential prompt). You can also create an offline recovery key and let Windows remember the unlock.
 - **Without a master password.** The vault opens automatically for your Windows account. Other software running as you, or an administrator, may be able to read saved credentials.
 
 You can switch later: **Add master password** or **Remove master password** in Password manager. Your saved credentials are kept either way.

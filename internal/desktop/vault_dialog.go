@@ -345,6 +345,43 @@ func promptVaultSecret(ctx context.Context, request VaultSecretRequest, prompt f
 	if err != nil {
 		return VaultSecretResponse{}, err
 	}
+	return vaultSecretResponse(request, spec, result), nil
+}
+
+// VaultSecretEntry is what the user typed into the app's own vault form
+// (owner decision after v1.21.81: SentinelOne's Behavioral AI removed the
+// program as "Credential Prompt" for its separate native password box).
+// The caller owns the slices and clears them after use.
+type VaultSecretEntry struct {
+	Password         []byte
+	Confirm          []byte
+	CurrentPassword  []byte
+	RecoveryKey      []byte
+	GenerateRecovery bool
+	Remember         bool
+}
+
+// VaultSecretFromEntry checks an entry with exactly the rules of the native
+// dialog for that operation and returns only the secrets it needs.
+func VaultSecretFromEntry(request VaultSecretRequest, entry VaultSecretEntry) (VaultSecretResponse, error) {
+	spec, err := vaultSecretSpec(request)
+	if err != nil {
+		return VaultSecretResponse{}, err
+	}
+	result := vaultDialogResult{accepted: true, values: map[uint16][]byte{}, remember: spec.remember && entry.Remember, generateRecovery: entry.GenerateRecovery}
+	for id, value := range map[uint16][]byte{vaultFieldPassword: entry.Password, vaultFieldConfirm: entry.Confirm, vaultFieldCurrent: entry.CurrentPassword, vaultFieldRecovery: entry.RecoveryKey} {
+		result.values[id] = append([]byte(nil), value...)
+	}
+	if spec.validate != nil {
+		if err := spec.validate(result); err != nil {
+			result.clear()
+			return VaultSecretResponse{}, err
+		}
+	}
+	return vaultSecretResponse(request, spec, result), nil
+}
+
+func vaultSecretResponse(request VaultSecretRequest, spec vaultDialogSpec, result vaultDialogResult) VaultSecretResponse {
 	// Move only the requested secrets to the backend; discard confirmation and
 	// unexpected fields, even for an injected test callback.
 	response := VaultSecretResponse{Password: result.values[vaultFieldPassword], Remember: result.remember, GenerateRecovery: spec.recovery && result.generateRecovery}
@@ -358,7 +395,7 @@ func promptVaultSecret(ctx context.Context, request VaultSecretRequest, prompt f
 		delete(result.values, vaultFieldRecovery)
 	}
 	result.clear()
-	return response, nil
+	return response
 }
 
 func vaultActionSpec(request VaultActionRequest) (vaultDialogSpec, error) {

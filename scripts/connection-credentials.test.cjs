@@ -9,7 +9,7 @@ function harness(){const records=new Map(),calls=[],state={},fields={},document=
   if(path==='/credentials')return {vault:{available:true,state:'unlocked'},entries:[...records.values()].map(({secret,...record})=>record)};
   if(path.endsWith('/bindings')&&method==='POST'){const item=records.get(path.split('/')[2]);item.bindings=[...(item.bindings||[]),body.binding];return {entry:item};}
   throw Error('Unexpected credential request '+path+' '+method);
- }};root.window=root;vm.runInNewContext(source.replace('root.NetworkToolkitCredentials=Object.freeze','root.__test={renderSecret,editorHTML,saveForm};root.NetworkToolkitCredentials=Object.freeze'),root);return {root,tool:root.NetworkToolkitCredentials,records,calls,state,fields};}
+ }};root.window=root;vm.runInNewContext(source.replace('root.NetworkToolkitCredentials=Object.freeze','root.__test={renderSecret,editorHTML,saveForm,vaultStrength,vaultFormBody,VAULT_FORMS};root.NetworkToolkitCredentials=Object.freeze'),root);return {root,tool:root.NetworkToolkitCredentials,records,calls,state,fields};}
 test('shared password save/update binds endpoint and prepares only a credential reference',async()=>{
  const h=harness(),config={...endpoint,name:'Core login',authMethod:'password',password:'first-fixture-password'};
  const created=await h.tool.saveConnection(config);
@@ -99,8 +99,9 @@ test('native vault actions send only the action and clear editor secrets after s
  for(const id of ['credentialSecret','credentialPrivateKey','credentialPassphrase'])assert.equal(h.fields['#'+id].value,'');
  assert(!JSON.stringify(h.calls).includes('TRANSIENT_EDITOR_CANARY'));
 });
-test('cancelled native vault operation preserves current editor input and unlocked metadata',async()=>{
+test('a failed vault operation preserves current editor input and unlocked metadata',async()=>{
  const h=harness();h.records.set('id',{id:'id',kind:'password'});await h.tool.refresh();h.fields['#credentialSecret']={value:'keep-typed-input'};
+ h.root.NetworkToolkitDialogs={form:async()=>({password:'new-fixture',confirm:'new-fixture',currentPassword:'old-fixture',generateRecovery:false,remember:false})};
  const original=h.root.api;h.root.api=async(path,...args)=>{if(path==='/credential-vault')throw Error('Native vault dialog cancelled');return original(path,...args);};await assert.rejects(()=>h.tool.vaultAction('change-password'),/cancelled/);
  assert.equal(h.fields['#credentialSecret'].value,'keep-typed-input');assert.equal(h.tool.meta('id').id,'id');assert.equal(h.tool.vaultStatus().state,'unlocked');
 });
@@ -111,10 +112,15 @@ test('duplicate vault clicks share one native operation and stale metadata respo
  finishOld({vault:{available:true,state:'unlocked'},entries:[{id:'stale',kind:'password'}]});await old;
  assert.equal(h.tool.vaultStatus().state,'locked');assert.equal(h.tool.meta('stale'),null);
 });
-test('vault UI has no master-password or recovery input fields and unknown actions are rejected',async()=>{
+test('vault secrets are asked for only in the vault form, sent only with their action, and unknown actions are rejected',async()=>{
  const h=harness();await assert.rejects(()=>h.tool.vaultAction('arbitrary'),/Unknown/);assert.equal(h.calls.length,0);
- assert.doesNotMatch(source,/id=["'](?:masterPassword|recoveryKey)|type=["']password[^\n]*master/i);
- assert.match(source,/api\('\/credential-vault','POST',\{action\}\)/);
+ // Owner decision after v1.21.81: no separate Windows password box; the app's own form asks.
+ assert.doesNotMatch(source,/PromptVaultSecret|native Windows dialog/);
+ for(const action of ['lock','forget','delete-vault','cleanup-legacy','setup-windows'])assert(!(action in h.root.__test.VAULT_FORMS),action+' needs no secret');
+ const body=h.root.__test.vaultFormBody(h.root.__test.VAULT_FORMS['change-password']);
+ assert.match(body,/id="vaultFormCurrent" type="password"/);assert.match(body,/id="vaultFormPassword" type="password"/);assert.match(body,/id="vaultFormConfirm" type="password"/);assert.match(body,/autocomplete="off"/);
+ assert.match(h.root.__test.vaultFormBody(h.root.__test.VAULT_FORMS.recover),/id="vaultFormRecovery" type="text"/);
+ assert.doesNotMatch(h.root.__test.vaultFormBody(h.root.__test.VAULT_FORMS['remove-password']),/vaultFormRemember|vaultFormConfirm/);
  assert.match(source,/Resetting app configuration forgets automatic unlock but keeps encrypted vault files/);
 });
 test('partly completed lock failure still removes rendered secrets and stale metadata',async()=>{
@@ -129,4 +135,29 @@ test('missing vault status never turns metadata-only fixture data into an unlock
  await h.tool.refresh();assert.equal(h.tool.meta('id'),null);assert(!h.tool.options().includes('MISSING_STATUS_MUST_HIDE'));assert.equal(h.tool.vaultStatus().available,false);
  await assert.rejects(()=>h.tool.prepare({...endpoint,credentialId:'id'}),/locked|Set up/);
  assert.equal(h.calls.filter(row=>row.method==='POST').length,0);
+});
+
+test('an action that needs the master password opens the form first; Cancel sends nothing and the secret goes only with that action',async()=>{
+ const h=harness();let answer=null,asked=[];h.root.NetworkToolkitDialogs={form:async options=>{asked.push(options.title);return answer;}};
+ h.root.api=async(path,method,body)=>{h.calls.push({path,method,body:body&&JSON.parse(JSON.stringify(body))});return path==='/credential-vault'?{available:true,state:'unlocked',mode:'password'}:{vault:{available:true,state:'unlocked'},entries:[]};};
+ await h.tool.vaultAction('unlock');assert.deepEqual(asked,['Unlock credential vault']);assert.equal(h.calls.filter(c=>c.path==='/credential-vault').length,0,'Cancel sends nothing');
+ answer={password:'fixture pass',remember:true};await h.tool.vaultAction('unlock');
+ assert.deepEqual(h.calls.find(c=>c.path==='/credential-vault').body,{action:'unlock',secret:{password:'fixture pass',remember:true}});
+ assert.equal(answer.password,undefined,'the page drops the typed value after sending');
+ asked=[];await h.tool.vaultAction('lock');assert.deepEqual(asked,[],'lock needs no password');
+ assert.deepEqual(h.calls.filter(c=>c.path==='/credential-vault').at(-1).body,{action:'lock'});
+});
+test('importing a previous vault with a master password asks in the form and retries with it',async()=>{
+ const h=harness();let tries=0;h.root.NetworkToolkitDialogs={form:async options=>{assert.match(options.message,/previous Terminal credential vault/);return {password:'old vault fixture'};}};
+ h.root.api=async(path,method,body)=>{h.calls.push({path,method,body:body&&JSON.parse(JSON.stringify(body))});
+  if(path==='/credential-vault'){tries++;if(!body.secret){const e=new Error('Enter the master password in the Password manager form.');e.code='vault-password-required';throw e;}return {ok:true,imported:1,previousVaults:[]};}
+  return {vault:{available:true,state:'unlocked'},entries:[],previousVaults:[{source:'terminal'}]};};
+ h.root.toast=()=>{};h.root.document.querySelectorAll=()=>[];await h.tool.refresh();await h.tool.importPrevious('terminal');
+ assert.equal(tries,2);assert.deepEqual(h.calls.filter(c=>c.path==='/credential-vault').at(-1).body,{action:'import-previous',source:'terminal',secret:{password:'old vault fixture'}});
+});
+test('the form strength gauge gives the same estimate as the engine (desktop.estimateVaultPasswordStrength)',()=>{
+ const h=harness(),strength=h.root.__test.vaultStrength;
+ // Labels from TestVaultStrengthVectors in internal/desktop; keep both lists equal.
+ const vectors=[['','Enter a password'],['password','Very weak'],['Password1!','Very weak'],['abcdefgh','Very weak'],['correct horse battery staple','Very strong'],['Tr0ub4dor&3','Strong'],['kX9#mQ2v','Fair'],['zq8!Lm3@Rt7$wp','Very strong'],['пароль-секрет-2026','Very strong'],['aaaaaaaaaaaaaaaaaaaa','Very weak']];
+ for(const [password,label] of vectors)assert.equal(strength(password).label,label,JSON.stringify(password));
 });

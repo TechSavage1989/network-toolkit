@@ -203,13 +203,13 @@ func (a *application) previousVaultRecords(ctx context.Context, workspace legacy
 				return nil, err
 			}
 		} else {
-			if a.promptVaultSecret == nil {
-				return nil, errors.New("Native secret entry is unavailable.")
-			}
-			response, err := a.promptVaultSecret(ctx, desktop.VaultSecretRequest{Mode: desktop.VaultSecretImport, Label: workspace.Label})
+			response, err := a.vaultSecret(ctx, vaultSecretInputFrom(ctx), desktop.VaultSecretRequest{Mode: desktop.VaultSecretImport, Label: workspace.Label})
 			defer clear(response.Password)
 			defer clear(response.CurrentPassword)
 			defer clear(response.RecoveryKey)
+			if errors.Is(err, errVaultSecretNeeded) {
+				return nil, err
+			}
 			if err != nil {
 				return nil, errors.New("The import was canceled; nothing was changed.")
 			}

@@ -13,13 +13,78 @@ function unavailableMessage(){const previous=pendingPreviousVault();return previ
 function previousVaultsHTML(){
  const pending=previousVaults.filter(item=>!item.imported);if(!pending.length)return '';
  const ready=vaultReady();
- return pending.map(item=>'<div class="notice info mt" data-previous-vault="'+item.source+'"><div><strong>Saved credentials of the previous '+esc(item.label)+' vault</strong><p class="help-line">Network Toolkit, the Terminal and the Text Editor now share one credential vault. The '+esc(item.label)+' window used to keep its own; its saved credentials are not in the shared vault yet. Importing copies them here and leaves the previous vault as it is. If that vault has a master password, Windows asks for it.</p>'+(ready?'':'<p class="help-line">Set up or unlock the shared vault first.</p>')+'<div class="row gap6 wrap mt"><button type="button" class="btn small ghost" data-vault-import="'+item.source+'" '+(ready&&!importPending&&!vaultPending?'':'disabled')+'>Import saved credentials from the previous '+esc(item.label)+' vault</button></div></div></div>').join('');
+ return pending.map(item=>'<div class="notice info mt" data-previous-vault="'+item.source+'"><div><strong>Saved credentials of the previous '+esc(item.label)+' vault</strong><p class="help-line">Network Toolkit, the Terminal and the Text Editor now share one credential vault. The '+esc(item.label)+' window used to keep its own; its saved credentials are not in the shared vault yet. Importing copies them here and leaves the previous vault as it is. If that vault has a master password, you are asked for it.</p>'+(ready?'':'<p class="help-line">Set up or unlock the shared vault first.</p>')+'<div class="row gap6 wrap mt"><button type="button" class="btn small ghost" data-vault-import="'+item.source+'" '+(ready&&!importPending&&!vaultPending?'':'disabled')+'>Import saved credentials from the previous '+esc(item.label)+' vault</button></div></div></div>').join('');
+}
+// The vault's master password and recovery key are typed into this form, never a
+// separate Windows password box (owner decision after v1.21.81: SentinelOne's
+// Behavioral AI removed the program as a "Credential Prompt" for that box). The
+// engine checks the fields with the box's own rules and clears them after use;
+// the form clears its fields when it closes. Strength is the same estimate the
+// box showed (desktop.estimateVaultPasswordStrength, ported).
+const VAULT_COMMON=['password','passw0rd','123456','12345678','123456789','1234567890','qwerty','qwertyuiop','letmein','welcome','admin','administrator','root','toor','cisco','changeme','default','secret','iloveyou','monkey','dragon','master','network','toolkit','abc123','111111','000000','trustno1','login','guest'];
+function vaultStrength(password){
+ const runes=Array.from(String(password||''));
+ if(!runes.length)return {score:0,label:'Enter a password',hint:'Any password is allowed. Longer passphrases are much harder to guess.'};
+ let lower=false,upper=false,digit=false,symbol=false,space=false,other=false;
+ for(const ch of runes){const c=ch.codePointAt(0);if(c>=97&&c<=122)lower=true;else if(c>=65&&c<=90)upper=true;else if(c>=48&&c<=57)digit=true;else if(c===32)space=true;else if(c<128)symbol=true;else other=true;}
+ const pool=(lower?26:0)+(upper?26:0)+(digit?10:0)+(symbol?33:0)+(space?1:0)+(other?100:0),perChar=Math.log2(Math.max(pool,2));
+ let effective=1;for(let i=1;i<runes.length;i++){const delta=runes[i].codePointAt(0)-runes[i-1].codePointAt(0);effective+=delta===0||delta===1||delta===-1?0.25:1;}
+ let bits=effective*perChar;const folded=runes.join('').toLowerCase(),cut='0123456789!@#$%^&*. ';let a=0,b=folded.length;while(a<b&&cut.includes(folded[a]))a++;while(b>a&&cut.includes(folded[b-1]))b--;const trimmed=folded.slice(a,b);
+ for(const common of VAULT_COMMON){if(folded===common||trimmed===common){bits=Math.min(bits,10);break;}if(folded.includes(common))bits-=common.length*perChar*0.75;}
+ if(bits<28)return {score:0,label:'Very weak',hint:'Easy to guess. Use a longer passphrase of several unrelated words.'};
+ if(bits<40)return {score:1,label:'Weak',hint:'Add more length; mixing character types helps less than length.'};
+ if(bits<60)return {score:2,label:'Fair',hint:'Reasonable. A few more characters or words make it much stronger.'};
+ if(bits<80)return {score:3,label:'Strong',hint:'Hard to guess offline.'};
+ return {score:4,label:'Very strong',hint:'Very hard to guess offline.'};
+}
+const VAULT_REMEMBER='Remembering unlock uses this Windows user’s DPAPI protection. Other programs running as this user, administrators or a compromised OS may unlock the vault. This is not protection from same-user malware.';
+const VAULT_FORMS={
+ setup:{title:'Set master password',accept:'Set up',newPassword:true,remember:true,message:'Create a master password. Any password is allowed; the gauge shows how hard it is to guess. Spaces are significant; passwords are not trimmed. Existing legacy data, if present, is migrated only after successful setup; its original copy is retained until explicit cleanup.'},
+ unlock:{title:'Unlock credential vault',accept:'Unlock',remember:true,label:'Master password',message:'Enter the master password to unlock saved credentials. Existing authenticated connections are not changed.'},
+ 'change-password':{title:'Change master password',accept:'Change password',newPassword:true,current:true,remember:true,message:'Enter the current master password and choose a new one. Any password is allowed; the gauge shows how hard it is to guess. Spaces are significant. Previous recovery keys will no longer unlock the new vault.'},
+ 'set-password':{title:'Add a master password',accept:'Add password',newPassword:true,remember:true,message:'Choose a master password for the credential vault. Any password is allowed; the gauge shows how hard it is to guess. After this, the vault no longer unlocks automatically.'},
+ 'remove-password':{title:'Remove master password',accept:'Remove password',label:'Current master password',message:'Enter the current master password to switch to automatic unlock. Without a master password, saved credentials are protected by this Windows account and unlock automatically when you open Network Toolkit. Other programs running as this Windows user, administrators or a compromised OS may read them.'},
+ recover:{title:'Recover credential vault',accept:'Recover',newPassword:true,recovery:true,remember:true,message:'Enter your offline recovery key and choose a new master password (any password; the gauge shows its strength). The key is not your password. Previous recovery keys will no longer unlock the new vault.'},
+ import:{title:'Import saved credentials',accept:'Import',label:'Master password',message:''}
+};
+function vaultFormBody(spec){
+ const field=(id,label,type='password')=>'<div class="field mt"><label for="'+id+'">'+esc(label)+'</label><input id="'+id+'" type="'+type+'" autocomplete="off" spellcheck="false" maxlength="1024" data-vault-field></div>';
+ let body='';
+ if(spec.recovery)body+=field('vaultFormRecovery','Offline recovery key','text');
+ if(spec.current)body+=field('vaultFormCurrent','Current master password');
+ body+=field('vaultFormPassword',spec.newPassword?'New master password':spec.label||'Master password');
+ if(spec.newPassword)body+='<p class="help-line" id="vaultFormStrength" data-vault-strength aria-live="polite"></p>'+field('vaultFormConfirm','Confirm new master password')+'<label class="toggle-row mt"><input type="checkbox" id="vaultFormRecoveryKey"><span>Create an offline recovery key</span></label><p class="help-line">Optional. Network Toolkit then shows the key once in a Windows window; keep it offline.</p>';
+ if(spec.remember)body+='<label class="toggle-row mt"><input type="checkbox" id="vaultFormRemember"><span>Remember unlock on this Windows account</span></label><p class="help-line">'+esc(VAULT_REMEMBER)+'</p>';
+ return body;
+}
+async function vaultForm(action,label){
+ const spec=VAULT_FORMS[action];if(!spec)throw new Error('Unknown vault action.');
+ const message=action==='import'?'Enter the master password of the previous '+(label==='Text Editor'?'Text Editor':label==='Terminal'?'Terminal':'standalone')+' credential vault. Its saved credentials are copied into the vault that Network Toolkit, the Terminal and the Text Editor now share. The previous vault is not changed.':spec.message;
+ const dialogs=root.NetworkToolkitDialogs;if(!dialogs?.form)throw new Error('The vault form is unavailable.');
+ return dialogs.form({title:spec.title,message,body:vaultFormBody(spec),acceptLabel:spec.accept,
+  ready(form){const input=form.querySelector('#vaultFormPassword'),gauge=form.querySelector('[data-vault-strength]');if(!input||!gauge)return;const paint=()=>{const s=vaultStrength(input.value),filled=input.value?(s.score+1)*2:0;gauge.textContent='Strength: '+'█'.repeat(filled)+'░'.repeat(10-filled)+'  '+s.label+'. '+s.hint;};input.addEventListener('input',paint);paint();},
+  read(form){const value=id=>form.querySelector('#'+id)?.value||'',checked=id=>form.querySelector('#'+id)?.checked===true;
+   const secret={password:value('vaultFormPassword')};
+   if(!secret.password)throw new Error(spec.newPassword?'Enter a new master password.':'Enter the master password.');
+   if(spec.newPassword){secret.confirm=value('vaultFormConfirm');if(secret.confirm!==secret.password)throw new Error('The new master passwords do not match.');secret.generateRecovery=checked('vaultFormRecoveryKey');}
+   if(spec.current){secret.currentPassword=value('vaultFormCurrent');if(!secret.currentPassword)throw new Error('Enter the current master password.');}
+   if(spec.recovery){secret.recoveryKey=value('vaultFormRecovery');if(!secret.recoveryKey)throw new Error('Enter the offline recovery key.');}
+   if(spec.remember)secret.remember=checked('vaultFormRemember');
+   return secret;}});
 }
 async function importPrevious(source){
  if(importPending||vaultPending)return;requireVault();importPending=true;
  for(const button of document.querySelectorAll('[data-vault-import]'))button.disabled=true;
  try{
-  const result=await api('/credential-vault','POST',{action:'import-previous',source});
+  let result;
+  try{result=await api('/credential-vault','POST',{action:'import-previous',source});}
+  catch(error){
+   // The previous vault has a master password: ask for it in the app's form.
+   if(error?.code!=='vault-password-required')throw error;
+   const secret=await vaultForm('import',previousVaults.find(item=>item.source===source)?.label);
+   if(!secret)return;
+   try{result=await api('/credential-vault','POST',{action:'import-previous',source,secret});}finally{for(const key of Object.keys(secret))secret[key]=undefined;}
+  }
   previousVaults=cleanPreviousVaults(result.previousVaults);await refresh();
   document.dispatchEvent(new CustomEvent('credentials-updated',{detail:{imported:Number(result.imported)||0}}));
   const imported=Number(result.imported)||0,present=Number(result.alreadyPresent)||0,skipped=Number(result.skipped)||0;
@@ -47,24 +112,28 @@ function cleanMetadata(item){return {id:String(item.id||''),name:String(item.nam
 function meta(id){return cache.find(item=>item.id===id)||null;}
 function cleanVaultStatus(value={}){const state=['setup-required','legacy','locked','unlocked'].includes(value.state)?value.state:'unavailable';return {available:value.available===true,state,remembered:value.remembered===true,hasRecovery:value.hasRecovery===true,legacyBackup:value.legacyBackup===true,warning:String(value.warning||'').slice(0,2000),protection:String(value.protection||''),mode:value.mode==='windows'?'windows':'password'};}
 function vaultReady(){return vaultStatus.available&&vaultStatus.state==='unlocked';}
-function requireVault(){if(!vaultReady())throw new Error(vaultStatus.state==='locked'?'The credential vault is locked. Open Password manager and unlock it in the native Windows dialog.':'Set up the master-password vault in Password manager before saving or using credentials.');}
+function requireVault(){if(!vaultReady())throw new Error(vaultStatus.state==='locked'?'The credential vault is locked. Open Password manager and choose Unlock vault.':'Set up the master-password vault in Password manager before saving or using credentials.');}
 async function refresh(){if(OFFLINE)return[];if(loading)return loading;const epoch=++refreshEpoch;const pending=api('/credentials').then(result=>{if(epoch!==refreshEpoch)return cache;vaultStatus=cleanVaultStatus(result.vault);previousVaults=cleanPreviousVaults(result.previousVaults);cache=vaultReady()?(Array.isArray(result.entries)?result.entries:[]).map(cleanMetadata):[];protection=result.protection||vaultStatus.protection||'Encrypted credential storage';loaded=true;syncConnection();return cache;}).catch(()=>{if(epoch!==refreshEpoch)return cache;cache=[];loaded=false;vaultStatus=cleanVaultStatus();syncConnection();return[];}).finally(()=>{if(loading===pending)loading=null;});loading=pending;return pending;}
 function vaultControlsHTML(){
  const s=vaultStatus,button=(action,label,danger=false)=>'<button type="button" class="btn small '+(danger?'danger':'ghost')+'" data-vault-action="'+action+'" '+(vaultPending?'disabled':'')+'>'+label+'</button>';
  let title='Credential vault unavailable',detail='The encrypted credential provider is unavailable. No plaintext fallback is used.',buttons='';
  if(s.state==='setup-required'||s.state==='legacy'){title=s.state==='legacy'?'Upgrade the saved credential vault':'Set up the credential vault';detail=(s.state==='legacy'?'Existing credentials are migrated only after the new encrypted vault is verified. The original DPAPI backup remains until you explicitly remove it. ':'')+'Choose a master password (any password; a gauge shows its strength) and an optional offline recovery key, or set up without a master password: the vault then unlocks automatically for this Windows account, which is more convenient but protects less.';buttons=button('setup',s.state==='legacy'?'Set up with master password and migrate':'Set up with master password')+button('setup-windows',s.state==='legacy'?'Migrate without master password':'Set up without master password');}
- if(s.state==='locked'){title='Credential vault locked';detail='New saved-credential connections and reconnects are blocked. Existing authenticated connections remain open. Unlock using the native Windows dialog.';buttons=button('unlock','Unlock vault')+(s.hasRecovery?button('recover','Recover with offline key'):'');}
+ if(s.state==='locked'){title='Credential vault locked';detail='New saved-credential connections and reconnects are blocked. Existing authenticated connections remain open. Choose Unlock vault and enter the master password.';buttons=button('unlock','Unlock vault')+(s.hasRecovery?button('recover','Recover with offline key'):'');}
  if(s.state==='unlocked'&&s.mode==='windows'){title='Vault open — no master password';detail='Saved credentials are encrypted with a random key protected by this Windows account and open automatically. Other software running as you, administrators or a compromised Windows may read them. Add a master password to require it before use.';buttons=button('set-password','Add master password');}
  else if(s.state==='unlocked'){title=s.remembered?'Vault unlocked — remembered on this Windows account':'Vault unlocked for this session';detail=s.remembered?'A Windows-account-protected unlock key lets this vault reopen after app restarts and Windows reboots. The master password is not saved. Software running as you may access remembered unlock.':'The vault key is held only for this app session. No automatic idle or workstation-lock prompts are enabled.';buttons=button('lock','Lock and forget')+button('change-password','Change master password')+button('remove-password','Remove master password');}
  if(s.legacyBackup&&s.state==='unlocked')buttons+=button('cleanup-legacy','Remove legacy backup',true);
  if(s.state==='locked'||s.state==='unlocked')buttons+=button('delete-vault','Delete credential vault',true);
- return '<div id="credentialVaultPanel" class="notice"><div><strong>'+esc(title)+'</strong><p class="help-line">'+esc(detail)+'</p>'+(s.mode==='windows'&&s.state==='unlocked'?'':'<p class="help-line">Lock and forget keeps existing connections, blocks new saved-credential use and stops automatic unlock until you explicitly unlock again. Deleting an individual connection does not delete the vault. Resetting app configuration forgets automatic unlock but keeps encrypted vault files.</p>')+(s.warning?'<p class="help-line bad">'+esc(s.warning)+'</p>':'')+'<div class="row gap6 wrap mt">'+buttons+'</div>'+(vaultPending?'<p class="help-line" data-vault-progress aria-live="polite">Complete or cancel the native Windows dialog.</p>':'')+'</div></div>'+previousVaultsHTML();
+ return '<div id="credentialVaultPanel" class="notice"><div><strong>'+esc(title)+'</strong><p class="help-line">'+esc(detail)+'</p>'+(s.mode==='windows'&&s.state==='unlocked'?'':'<p class="help-line">Lock and forget keeps existing connections, blocks new saved-credential use and stops automatic unlock until you explicitly unlock again. Deleting an individual connection does not delete the vault. Resetting app configuration forgets automatic unlock but keeps encrypted vault files.</p>')+(s.warning?'<p class="help-line bad">'+esc(s.warning)+'</p>':'')+'<div class="row gap6 wrap mt">'+buttons+'</div>'+(vaultPending?'<p class="help-line" data-vault-progress aria-live="polite">Working… Complete or cancel any Windows confirmation that opens.</p>':'')+'</div></div>'+previousVaultsHTML();
 }
 async function vaultAction(action){
  if(!['setup','setup-windows','unlock','lock','forget','change-password','set-password','remove-password','recover','delete-vault','cleanup-legacy'].includes(action))throw new Error('Unknown vault action.');
  if(vaultPending)return vaultPending;
  const panel=document.querySelector('#credentialVaultPanel');refreshEpoch++;loading=null;
- const pending=(async()=>{const result=await api('/credential-vault','POST',{action});vaultStatus=cleanVaultStatus(result);cache=[];loaded=false;editing='';for(const id of ['credentialSecret','credentialPrivateKey','credentialPassphrase']){const field=document.querySelector('#'+id);if(field)field.value='';}await refresh();document.dispatchEvent(new CustomEvent('credentials-updated',{detail:{vaultState:vaultStatus.state}}));if(panel&&document.querySelector('#credentialVaultPanel')===panel)await show();return {...vaultStatus};})();
+ // Actions that need the master password or recovery key ask for it here first.
+ const formAction=action==='change-password'&&vaultStatus.mode==='windows'?'set-password':action;
+ let secret=null;if(VAULT_FORMS[formAction]){secret=await vaultForm(formAction);if(!secret)return {...vaultStatus};}
+ if(vaultPending)return vaultPending;
+ const pending=(async()=>{const body={action};if(secret)body.secret=secret;let result;try{result=await api('/credential-vault','POST',body);}finally{if(secret)for(const key of Object.keys(secret))secret[key]=undefined;}vaultStatus=cleanVaultStatus(result);cache=[];loaded=false;editing='';for(const id of ['credentialSecret','credentialPrivateKey','credentialPassphrase']){const field=document.querySelector('#'+id);if(field)field.value='';}await refresh();document.dispatchEvent(new CustomEvent('credentials-updated',{detail:{vaultState:vaultStatus.state}}));if(panel&&document.querySelector('#credentialVaultPanel')===panel)await show();return {...vaultStatus};})();
  vaultPending=pending;if(panel)for(const button of panel.querySelectorAll('[data-vault-action]'))button.disabled=true;
  try{return await pending;}catch(error){await refresh();if(!vaultReady()){for(const id of ['credentialSecret','credentialPrivateKey','credentialPassphrase']){const field=document.querySelector('#'+id);if(field)field.value='';}if(panel&&document.querySelector('#credentialVaultPanel')===panel)await show();}throw error;}finally{if(vaultPending===pending)vaultPending=null;const current=document.querySelector('#credentialVaultPanel');if(current){for(const button of current.querySelectorAll('[data-vault-action]'))button.disabled=false;current.querySelector('[data-vault-progress]')?.remove();}}
 }

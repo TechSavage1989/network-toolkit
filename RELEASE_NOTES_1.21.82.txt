@@ -1,0 +1,12 @@
+Network Toolkit 1.21.82
+
+## What's New
+
+- The credential vault's master password is now typed into Password manager itself. Network Toolkit no longer opens a separate Windows password box, which security software such as SentinelOne flagged as a credential prompt and removed the program for.
+
+## Additional Details
+
+- Setting, unlocking, changing, removing and recovering the master password, and importing a previous vault, all use the same form, with the same strength gauge and rules as before.
+- A wrong confirmation is shown in the form and nothing is sent. The typed passwords are cleared when the form closes and are never saved or shown again.
+- Yes/No confirmations and the one-time display of a new offline recovery key still open in a small Windows window.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
