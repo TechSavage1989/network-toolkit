@@ -1,3 +1,9 @@
+## 1.21.83 Beta 1 - Local shells start without a suspended process
+
+- Owner report on v1.21.82: SentinelOne (Behavioral AI, "Preload Injection detected", Malware, Suspicious) flagged `Network_Toolkit.exe` on Windows Server 2022 when an administrator Command Prompt opened. `openLocalShell` (internal/terminal/local_windows.go) created the shell with `CREATE_SUSPENDED`, assigned it to its kill-on-close job and called `ResumeThread`: the start-suspended-then-resume pattern of code injection, and the app's only suspended process start.
+- The job is now created first and given to `CreateProcess` through `PROC_THREAD_ATTRIBUTE_JOB_LIST` next to the pseudoconsole attribute (Windows 10 / Server 2016 and later, the app's minimum), with only `EXTENDED_STARTUPINFO_PRESENT`: the shell starts inside the job, so descendants still cannot escape cleanup, and there is no suspended start or `ResumeThread`.
+- Check: `TestLocalShellStartsInItsJobWithoutASuspendedStart` (hosted Windows step "Test Windows terminal transports and local shells": no suspend flag, no `ResumeThread`/`AssignProcessToJobObject`, a real cmd.exe is in its job).
+
 ## 1.21.82 Beta 1 - Vault master password in Password manager, not a Windows password box
 
 - Owner report after v1.21.81: SentinelOne (Behavioral AI, "Credential Prompt From Signed Process", classification Malware, confidence Suspicious) removed `Network_Toolkit.exe`, `Network_Toolkit_Terminal.exe` and update swap copies on Windows Server 2022. The app's only matching behaviour is its own native password dialog for the vault (an `ES_PASSWORD` field in a separate window, topmost over the browser window on Windows Server). Owner decision: ask for the master password inside the app.

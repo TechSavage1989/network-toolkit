@@ -27,8 +27,13 @@ var (
 	localSystemDirectory  = localKernel.NewProc("GetSystemDirectoryW")
 	localCreateJob        = localKernel.NewProc("CreateJobObjectW")
 	localSetJob           = localKernel.NewProc("SetInformationJobObject")
-	localAssignJob        = localKernel.NewProc("AssignProcessToJobObject")
-	localResumeThread     = localKernel.NewProc("ResumeThread")
+)
+
+const (
+	// PROC_THREAD_ATTRIBUTE_JOB_LIST
+	localJobListAttribute = 0x0002000D
+	// EXTENDED_STARTUPINFO_PRESENT; never CREATE_SUSPENDED (see openLocalShell).
+	localCreationFlags = 0x00080000
 )
 
 func LocalShellAvailable() bool {
@@ -129,14 +134,31 @@ func openLocalShell(ctx context.Context, req ConnectRequest, cb transportCallbac
 	if int32(hr) < 0 {
 		return nil, fmt.Errorf("create local terminal: HRESULT 0x%08x", uint32(hr))
 	}
+	// The cleanup job is created first so the shell starts inside it
+	// (PROC_THREAD_ATTRIBUTE_JOB_LIST, Windows 10 / Server 2016 and later):
+	// no suspended start and no ResumeThread, which security software such as
+	// SentinelOne reports as "Preload Injection" for an unsigned program
+	// (owner report on v1.21.82).
+	jobValue, _, callErr := localCreateJob.Call(0, 0)
+	if jobValue == 0 {
+		return nil, fmt.Errorf("create local session job: %w", callErr)
+	}
+	job = syscall.Handle(jobValue)
+	limits := localExtendedJobLimits{}
+	limits.basic.flags = 0x00002000 // JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+	ok, _, callErr := localSetJob.Call(uintptr(job), 9, uintptr(unsafe.Pointer(&limits)), unsafe.Sizeof(limits))
+	if ok == 0 {
+		return nil, fmt.Errorf("configure local session cleanup: %w", callErr)
+	}
+	jobs := []syscall.Handle{job}
 	var bytes uintptr
-	localInitAttributes.Call(0, 1, 0, uintptr(unsafe.Pointer(&bytes)))
+	localInitAttributes.Call(0, 2, 0, uintptr(unsafe.Pointer(&bytes)))
 	if bytes == 0 || bytes > 1024*1024 {
 		return nil, errors.New("invalid Windows process attribute size")
 	}
 	attributes := make([]uintptr, (bytes+unsafe.Sizeof(uintptr(0))-1)/unsafe.Sizeof(uintptr(0)))
 	attributePointer := uintptr(unsafe.Pointer(&attributes[0]))
-	ok, _, callErr := localInitAttributes.Call(attributePointer, 1, 0, uintptr(unsafe.Pointer(&bytes)))
+	ok, _, callErr = localInitAttributes.Call(attributePointer, 2, 0, uintptr(unsafe.Pointer(&bytes)))
 	if ok == 0 {
 		return nil, fmt.Errorf("initialize local terminal attributes: %w", callErr)
 	}
@@ -145,16 +167,9 @@ func openLocalShell(ctx context.Context, req ConnectRequest, cb transportCallbac
 	if ok == 0 {
 		return nil, fmt.Errorf("attach local terminal: %w", callErr)
 	}
-	jobValue, _, callErr := localCreateJob.Call(0, 0)
-	if jobValue == 0 {
-		return nil, fmt.Errorf("create local session job: %w", callErr)
-	}
-	job = syscall.Handle(jobValue)
-	limits := localExtendedJobLimits{}
-	limits.basic.flags = 0x00002000 // JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-	ok, _, callErr = localSetJob.Call(uintptr(job), 9, uintptr(unsafe.Pointer(&limits)), unsafe.Sizeof(limits))
+	ok, _, callErr = localUpdateAttribute.Call(attributePointer, 0, localJobListAttribute, uintptr(unsafe.Pointer(&jobs[0])), unsafe.Sizeof(jobs[0])*uintptr(len(jobs)), 0, 0)
 	if ok == 0 {
-		return nil, fmt.Errorf("configure local session cleanup: %w", callErr)
+		return nil, fmt.Errorf("own local session process: %w", callErr)
 	}
 	startup := localStartupInfo{attributes: &attributes[0]}
 	startup.Cb = uint32(unsafe.Sizeof(startup))
@@ -187,15 +202,13 @@ func openLocalShell(ctx context.Context, req ConnectRequest, cb transportCallbac
 	if err != nil {
 		return nil, err
 	}
-	// Suspend until assigned to our own job so descendants cannot escape cleanup.
-	err = syscall.CreateProcess(application, command, nil, nil, false, 0x00080000|0x00000004, nil, directory, &startup.StartupInfo, &process)
+	// EXTENDED_STARTUPINFO_PRESENT only: the job list puts the shell in our
+	// job before it runs, so descendants cannot escape cleanup.
+	err = syscall.CreateProcess(application, command, nil, nil, false, localCreationFlags, nil, directory, &startup.StartupInfo, &process)
 	runtime.KeepAlive(attributes)
+	runtime.KeepAlive(jobs)
 	if err != nil {
 		return nil, fmt.Errorf("start %s: %w", req.Type, err)
-	}
-	ok, _, callErr = localAssignJob.Call(uintptr(job), uintptr(process.Process))
-	if ok == 0 {
-		return nil, fmt.Errorf("own local session process: %w", callErr)
 	}
 	_ = syscall.CloseHandle(inputRead)
 	inputRead = 0
@@ -204,10 +217,6 @@ func openLocalShell(ctx context.Context, req ConnectRequest, cb transportCallbac
 	elevated, err := localProcessElevated(process.Process)
 	if err != nil {
 		return nil, err
-	}
-	resumed, _, callErr := localResumeThread.Call(uintptr(process.Thread))
-	if uint32(resumed) == 0xffffffff {
-		return nil, fmt.Errorf("resume local shell: %w", callErr)
 	}
 	_ = syscall.CloseHandle(process.Thread)
 	process.Thread = 0
