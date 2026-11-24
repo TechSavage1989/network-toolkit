@@ -1,0 +1,11 @@
+Network Toolkit 1.21.83
+
+## What's New
+
+- Command Prompt and PowerShell tabs now start the way ordinary programs do. SentinelOne reported the previous way as "Preload Injection" and blocked Network Toolkit when a local shell opened.
+
+## Additional Details
+
+- Network Toolkit used to start the shell paused, attach it to the tab's cleanup group and then let it run. It now starts the shell directly inside that group, so closing the tab still ends the shell and everything it started.
+- This applies to every Command Prompt and PowerShell tab, with or without Run as administrator.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

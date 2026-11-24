@@ -1,3 +1,11 @@
+# v1.21.83 Beta 1 - Local shells start without a suspended process
+
+Owner report on v1.21.82 (see CHANGELOG): SentinelOne flagged "Preload Injection" when a Command Prompt opened. Local shells were created suspended, put in their cleanup job and resumed; they now start inside the job through the job-list attribute.
+
+Release channel: `docs/RELEASE_CHANNEL.txt` stays `beta`.
+
+Known limits: the program is unsigned, and an unsigned administrator program starting cmd.exe may still be judged by other SentinelOne rules; code signing remains the lasting fix. Not checked on real Windows with SentinelOne.
+
 # v1.21.82 Beta 1 - Vault master password in Password manager
 
 Owner report after v1.21.81 (see CHANGELOG): SentinelOne's Behavioral AI flagged "Credential Prompt From Signed Process" on Network Toolkit and removed it. The vault's native password dialog was the matching behaviour; the master password is now entered in Password manager's own form and checked by the engine with the dialog's rules.
