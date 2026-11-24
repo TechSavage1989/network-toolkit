@@ -15,6 +15,9 @@ import (
 
 func adminRestartSupported() bool { return true }
 
+// adminRestartExecutable is the program the restart starts (tests replace it).
+var adminRestartExecutable = updateCurrentExecutable
+
 // adminRestartLaunch starts the program through Windows' administrator
 // approval, visibly (SW_SHOWNORMAL), with the given switches. Tests replace it.
 var adminRestartLaunch = func(executable string, args []string, directory string) (syscall.Handle, error) {
@@ -69,7 +72,7 @@ var adminRestartLaunch = func(executable string, args []string, directory string
 // launchAdminRestart starts the waiting administrator copy and returns its
 // folder once that copy holds this process open and is waiting for it.
 func (a *application) launchAdminRestart() (string, error) {
-	executable, err := updateCurrentExecutable()
+	executable, err := adminRestartExecutable()
 	if err != nil {
 		return "", err
 	}

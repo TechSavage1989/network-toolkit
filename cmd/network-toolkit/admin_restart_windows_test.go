@@ -90,6 +90,8 @@ func TestAdminRestartLaunch(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := &application{windowMode: "main", dataPath: filepath.Join(data, "Network_Toolkit.settings.json")}
+	// The test binary lives under the runner's short-named TEMP too.
+	adminRestartExecutable = func() (string, error) { return filepath.Join(data, "Network_Toolkit.exe"), nil }
 	adminRestartLaunch = func(string, []string, string) (syscall.Handle, error) { return 0, errAdminRestartDeclined }
 	if err := a.startAdminRestart(); !errors.Is(err, errAdminRestartDeclined) {
 		t.Fatalf("declined: %v", err)
