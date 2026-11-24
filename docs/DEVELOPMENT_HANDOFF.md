@@ -1,3 +1,11 @@
+# v1.21.82 Beta 1 - Vault master password in Password manager
+
+Owner report after v1.21.81 (see CHANGELOG): SentinelOne's Behavioral AI flagged "Credential Prompt From Signed Process" on Network Toolkit and removed it. The vault's native password dialog was the matching behaviour; the master password is now entered in Password manager's own form and checked by the engine with the dialog's rules.
+
+Release channel: `docs/RELEASE_CHANNEL.txt` stays `beta`.
+
+Known limits: the password now passes through the app page and its loopback API (session token, same machine) instead of a native field the page could not read. Native Yes/No confirmations and the recovery key display (which asks to re-enter the key) still open small Windows windows; if SentinelOne also flags those, they move next. The program is unsigned. Not checked on real Windows or with SentinelOne.
+
 # v1.21.81 Beta 1 - Administrator shells without a hidden helper
 
 Owner report after v1.21.80 (see CHANGELOG): using Run as administrator for CMD made the program disappear, most likely removed by security software that flagged the hidden elevated copy relaying cmd.exe through a pipe. The helper is gone; Run as administrator now restarts Network Toolkit as administrator (asking first) and administrator shells open as ordinary tabs of the elevated app.

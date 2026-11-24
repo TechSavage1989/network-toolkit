@@ -546,7 +546,6 @@ func newApplication(parent context.Context, dataPath string) *application {
 func newApplicationForRoot(parent context.Context, dataPath, sharedRoot string) *application {
 	ctx, cancel := context.WithCancel(parent)
 	a := &application{ctx: ctx, stop: cancel, jobs: make(map[string]*Job), started: time.Now(), token: randomHex(32), uiHost: "browser", dataPath: dataPath, state: json.RawMessage(`{}`), windowMode: "main", windowInstanceID: randomHex(16), windowActivationToken: randomHex(32), windowActivate: make(chan struct{}, 1), primaryWake: make(chan struct{}, 1)}
-	a.promptVaultSecret = desktop.PromptVaultSecret
 	a.confirmVaultAction = desktop.ConfirmVaultAction
 	a.confirmVaultRecovery = desktop.ConfirmVaultRecovery
 	a.confirmCredentialDestination = desktop.ConfirmCredentialDestination

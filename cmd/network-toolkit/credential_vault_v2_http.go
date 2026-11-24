@@ -31,20 +31,23 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 		Action string `json:"action"`
 		// For import-previous: which standalone window's previous vault.
 		Source string `json:"source,omitempty"`
+		// What the user typed in the app's own vault form (never a native box).
+		Secret *vaultSecretInput `json:"secret,omitempty"`
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 1024)
+	r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&request); err != nil {
-		jsonError(w, 400, "Supply only a vault action. Passwords and recovery keys must be entered in the native dialog.")
+		jsonError(w, 400, "Supply only a vault action and the vault form's fields.")
 		return
 	}
 	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
 		jsonError(w, 400, "Supply exactly one vault action.")
 		return
 	}
-	// Human native input may outlast the ordinary HTTP write deadline. No secret
-	// crosses this response and cancellation is still honored by native dialogs.
+	defer request.Secret.clear()
+	// A native confirmation may outlast the ordinary HTTP write deadline. No
+	// secret crosses this response and cancellation is still honored.
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 	if !a.credentialChanges.TryLock() {
 		jsonError(w, http.StatusConflict, "Another credential change or native vault dialog is already in progress.")
@@ -91,16 +94,12 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 			jsonError(w, 409, "Set up the master-password vault first.")
 			return
 		}
-		if a.promptVaultSecret == nil {
-			jsonError(w, 503, "Native secret entry is unavailable.")
-			return
-		}
-		response, promptErr := a.promptVaultSecret(r.Context(), desktop.VaultSecretRequest{Mode: mode})
+		response, promptErr := a.vaultSecret(r.Context(), request.Secret, desktop.VaultSecretRequest{Mode: mode})
 		defer clear(response.Password)
 		defer clear(response.CurrentPassword)
 		defer clear(response.RecoveryKey)
 		if promptErr != nil {
-			jsonError(w, 400, "Vault action was canceled or native secret entry was unavailable.")
+			writeVaultSecretError(w, promptErr)
 			return
 		}
 		if err := r.Context().Err(); err != nil {
@@ -120,7 +119,7 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 			err = a.credentials.removeMasterPassword(r.Context(), response.Password)
 		case "recover":
 			if len(response.RecoveryKey) == 0 {
-				err = errors.New("Enter the offline recovery key in the native dialog.")
+				err = errors.New("Enter the offline recovery key.")
 			} else {
 				err = a.credentials.rotate(r.Context(), nil, response.Password, string(response.RecoveryKey), response.GenerateRecovery, a.confirmVaultRecovery)
 			}
@@ -150,8 +149,12 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 	case "import-previous":
 		// Copy the saved credentials of the vault an earlier version kept for a
 		// standalone window into the shared vault. That vault is only read.
-		result, importErr := a.importPreviousVault(r.Context(), request.Source)
+		result, importErr := a.importPreviousVault(withVaultSecretInput(r.Context(), request.Secret), request.Source)
 		if importErr != nil {
+			if errors.Is(importErr, errVaultSecretNeeded) {
+				writeVaultSecretError(w, importErr)
+				return
+			}
 			code := http.StatusBadRequest
 			if errors.Is(importErr, errCredentialVaultLocked) {
 				code = http.StatusLocked

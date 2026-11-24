@@ -58,8 +58,9 @@ async function stableCredentialLayout(page){
    if(p==='/api/terminal-views')data={available:false,views:[],owners:{}};
    if(p==='/api/credential-vault'){
     if(method==='GET')return respond({...vault});
-    assert.equal(method,'POST');assert.deepEqual(Object.keys(body),['action'],'Vault requests must contain only an action, never native secrets');
-    const action=body.action;assert(['setup','unlock','lock','forget','change-password','recover','delete-vault','cleanup-legacy'].includes(action));
+    assert.equal(method,'POST');const action=body.action,keys=Object.keys(body).sort().join();
+    // Owner decision after v1.21.81: the master password comes from the app's own vault form, only with the action that needs it.
+    if(['setup','unlock','change-password','recover'].includes(action)){assert.equal(keys,'action,secret','Vault form actions carry the form');assert.equal(typeof body.secret.password,'string');}else assert.equal(keys,'action','Other vault actions carry no secret');assert(['setup','unlock','lock','forget','change-password','recover','delete-vault','cleanup-legacy'].includes(action));
     if(!await simulatedNativeApproval())return respond({error:'Fixture: native vault dialog cancelled; existing data was kept.'},400);
     if(['setup','unlock','change-password','recover'].includes(action)){
      if(action!=='unlock')vaultGeneration++;
@@ -104,6 +105,9 @@ async function stableCredentialLayout(page){
  const posts=path=>calls.filter(row=>row.path===path&&row.method==='POST');
  const assertNoSecretsInDOM=async()=>{const snapshot=await page.evaluate(()=>({html:document.documentElement.outerHTML,values:[...document.querySelectorAll('input,textarea')].map(el=>el.value)}));for(const value of [...canaries,...nativeCanaries])assert(!JSON.stringify(snapshot).includes(value),'Secret canary exposed in rendered DOM');};
  const vaultAction=action=>page.evaluate(async action=>{try{return {ok:true,value:await NetworkToolkitCredentials.vaultAction(action)};}catch(error){return {ok:false,error:error.message};}},action);
+ // The form is answered by a stub except where the real form is driven below.
+ const stubForm=()=>page.evaluate(()=>{window.__realDialogs=window.__realDialogs||NetworkToolkitDialogs;window.NetworkToolkitDialogs={...window.__realDialogs,form:async()=>({password:'fixture vault password',confirm:'fixture vault password',currentPassword:'fixture vault password',recoveryKey:'FIXTURE-RECOVERY',remember:true})};});
+ const realForm=()=>page.evaluate(()=>{if(window.__realDialogs)window.NetworkToolkitDialogs=window.__realDialogs;});
  const assertNativeOnlyEntry=async()=>{assert.equal(await page.locator('#credentialVaultPanel input,#credentialVaultPanel textarea').count(),0);await assertNoSecretsInDOM();};
  const stateLayouts=[];
  const captureVaultState=async label=>{
@@ -122,7 +126,7 @@ async function stableCredentialLayout(page){
   await page.goto('http://toolkit.local/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);
   await page.evaluate(()=>NetworkToolkitCredentials.show());
   assert.equal(await page.evaluate(()=>NetworkToolkitCredentials.meta('password')),null);assert.equal(await page.locator('#credentialManagerForm').count(),0);
-  await assertNativeOnlyEntry();await captureVaultState('legacy');
+  await stubForm();await assertNativeOnlyEntry();await captureVaultState('legacy');
   vault={...vault,state:'setup-required',legacyBackup:false};await page.evaluate(()=>NetworkToolkitCredentials.show());
   assert.equal(await page.locator('[data-vault-action="setup"]').innerText(),'Set up with master password');assert.equal(await page.locator('[data-vault-action="setup-windows"]').innerText(),'Set up without master password');await captureVaultState('setup');
   vault={...vault,state:'legacy',legacyBackup:true};await page.evaluate(()=>NetworkToolkitCredentials.show());
@@ -200,7 +204,18 @@ async function stableCredentialLayout(page){
   assert.deepEqual(await page.evaluate(async()=>Promise.all([window.__vaultPendingFirst,window.__vaultPendingSecond])),[{ok:true},{ok:true}]);
   assert.equal(await page.locator('#credentialVaultPanel').count(),0);assert.equal(await page.locator('#modalRoot .modal').count(),0);assert.equal(vault.state,'unlocked');
   await page.evaluate(()=>NetworkToolkitCredentials.show());
-  assert.equal((await vaultAction('change-password')).ok,true);assert.equal(vaultGeneration,2);assert.equal(vault.remembered,true);await assertNativeOnlyEntry();
+  // The real vault form: fields, strength gauge, an inline mismatch error that sends nothing, then one request with the form.
+  await realForm();const beforeChange=posts('/api/credential-vault').length;
+  await page.evaluate(()=>{window.__vaultChange=NetworkToolkitCredentials.vaultAction('change-password').then(()=>({ok:true}),error=>({ok:false,error:error.message}));});
+  await page.locator('#vaultFormCurrent').fill('fixture vault password');await page.locator('#vaultFormPassword').fill('next fixture vault phrase');
+  assert.match(await page.locator('[data-vault-strength]').innerText(),/^Strength: .+(weak|fair|strong)/i);if(output)await page.screenshot({path:path.join(output,'credential-vault-form.png')});assert.equal(await page.locator('#vaultFormPassword').getAttribute('type'),'password');
+  await page.locator('#vaultFormConfirm').fill('a different phrase');await page.locator('#modalRoot .modal-foot .btn.primary').click();
+  await page.locator('[data-app-dialog-error]:not([hidden])').waitFor();assert.match(await page.locator('[data-app-dialog-error]').innerText(),/do not match/);assert.equal(posts('/api/credential-vault').length,beforeChange,'a mismatch sends nothing');
+  await page.locator('#vaultFormConfirm').fill('next fixture vault phrase');await page.locator('#vaultFormRemember').check();await page.locator('#modalRoot .modal-foot .btn.primary').click();
+  assert.deepEqual(await page.evaluate(()=>window.__vaultChange),{ok:true});assert.equal(vaultGeneration,2);assert.equal(vault.remembered,true);
+  assert.deepEqual(posts('/api/credential-vault').at(-1).body,{action:'change-password',secret:{password:'next fixture vault phrase',confirm:'next fixture vault phrase',generateRecovery:false,currentPassword:'fixture vault password',remember:true}});
+  assert.equal(await page.locator('#vaultFormPassword').count(),0,'the form is gone after it was sent');assert(!(await page.content()).includes('next fixture vault phrase'),'the typed password does not stay in the page');
+  await stubForm();await assertNativeOnlyEntry();
   // A backend may have cleared keys before a remembered-file removal fails.
   // Refresh state after the error; never leave stale unlocked metadata/editor.
   await page.locator('#credentialName').fill('Must disappear after partial lock');await page.locator('#credentialSecret').fill('PARTIAL_LOCK_EDITOR_ONLY_104');failLockAfterCompletion=true;
@@ -212,7 +227,7 @@ async function stableCredentialLayout(page){
   assert.equal((await vaultAction('cleanup-legacy')).ok,true);assert.equal(vault.legacyBackup,false);assert.equal(await page.locator('[data-vault-action="cleanup-legacy"]').count(),0);
   denyNext=true;assert.equal((await vaultAction('delete-vault')).ok,false);assert.equal(records.size,4);assert.equal(vault.state,'unlocked');
   assert.equal((await vaultAction('delete-vault')).ok,true);assert.equal(vault.state,'setup-required');assert.equal(records.size,0);assert.equal(await page.locator('#credentialManagerForm').count(),0);await assertNativeOnlyEntry();
-  for(const row of posts('/api/credential-vault'))assert.deepEqual(Object.keys(row.body),['action']);
+  for(const row of posts('/api/credential-vault'))assert.deepEqual(Object.keys(row.body).filter(key=>key!=='secret'||['setup','unlock','change-password','recover'].includes(row.body.action)).sort(),Object.keys(row.body).sort(),'a secret goes only with a vault form action');
   for(const secret of nativeCanaries)assert(!JSON.stringify({calls,responses,saved}).includes(secret),'Native secret crossed the UI/API fixture boundary');
   await page.evaluate(()=>flushState());for(const secret of canaries)assert(!JSON.stringify(saved).includes(secret));
   assert.equal(calls.filter(row=>/^\/api\/credentials\/[^/]+$/.test(row.path)&&row.method==='GET').length,0);
