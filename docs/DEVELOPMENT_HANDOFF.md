@@ -1,3 +1,11 @@
+# v1.21.81 Beta 1 - Administrator shells without a hidden helper
+
+Owner report after v1.21.80 (see CHANGELOG): using Run as administrator for CMD made the program disappear, most likely removed by security software that flagged the hidden elevated copy relaying cmd.exe through a pipe. The helper is gone; Run as administrator now restarts Network Toolkit as administrator (asking first) and administrator shells open as ordinary tabs of the elevated app.
+
+Release channel: `docs/RELEASE_CHANNEL.txt` stays `beta`; promoting to stable is the owner's call.
+
+Known limits: while elevated, every local shell is elevated and Explorer drag-in is blocked (Windows UIPI). The restart is refused while popped-out windows are open. If Windows asks for a different administrator account, the restarted app runs as that account and uses its settings. The app is still unsigned, so security software may still question it; this removes the behaviour most likely to be flagged, it does not prove what removed the file on the owner's PC. Not checked on real Windows.
+
 # v1.21.80 Beta 1 - Terminal paste: cursor at the end, optional final Enter
 
 Owner request after v1.21.79 (see CHANGELOG): the paste review starts with its cursor at the end of the pasted text, and **End multiline pastes with Enter** (off by default) adds a final line break to the user's own multiline paste so its last command runs. Send to terminal, window send and peer send never add an Enter (AGENTS.md rule for those paths), and the rule is recorded in AGENTS.md ("Terminal paste ending").

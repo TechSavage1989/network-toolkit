@@ -73,7 +73,8 @@ func ValidateLocalWorkingDirectory(value string) (string, error) {
 	return filepath.Clean(path), nil
 }
 
-// OpenLocalShellProcess is used only inside the fixed-role native helper. It
+// OpenLocalShellProcess opens Run as administrator shells in a process that
+// already runs as administrator (cmd/network-toolkit). It
 // cannot launch a custom executable, flags, credentials or another helper.
 func OpenLocalShellProcess(ctx context.Context, options LocalShellOptions, output func([]byte)) (LocalShellTransport, error) {
 	if options.Type != "cmd" && options.Type != "powershell" {

@@ -220,8 +220,8 @@ async function run(action,t){if(!enabled(action,t))return;const entry=t.entry;cl
  case'export':exportTerminalTranscript(entry);break;
  case'save-connection':root.NetworkToolkitSessionSidebar?.save(entry);break;
  case'rename':pendingRename=t;openModal('Rename terminal tab','<form id="terminalTabRenameForm" data-terminal-id="'+esc(t.id)+'"><div class="field"><label for="terminalTabName">Tab name</label><input id="terminalTabName" maxlength="100" value="'+esc(entry?.info.label||t.draft?.label||'Terminal')+'" required autocomplete="off"></div></form>','<button class="btn ghost" data-action="close-modal">Cancel</button><button class="btn primary" type="submit" form="terminalTabRenameForm">Rename</button>'+(['ssh','telnet'].includes(entry?.info.type)?'<button class="btn ghost" type="button" data-terminal-clear-name>Use device name / IP</button>':''),true);break;
- case'run-as-admin':{if(!adminCandidate(entry))break;newTerminalTab();openTerminalConnect(adminConfig(entry));if(typeof connectTerminal==='function')await connectTerminal();break;}
- case'convert-admin':requestConvert(t);break;
+ case'run-as-admin':{if(!adminCandidate(entry))break;if(typeof offerAdminRestart==='function'&&status?.processElevated!==true){try{await offerAdminRestart();}catch(error){toast(error.message,'error');}break;}newTerminalTab();openTerminalConnect(adminConfig(entry));if(typeof connectTerminal==='function')await connectTerminal();break;}
+ case'convert-admin':if(typeof offerAdminRestart==='function'&&status?.processElevated!==true){try{await offerAdminRestart();}catch(error){toast(error.message,'error');}break;}requestConvert(t);break;
  case'duplicate':{const config=entry?safeTerminalConfig(entry.config):safeTerminalConfig(state.terminalConnection);newTerminalTab();openTerminalConnect(config);break;}
  case'move':if(DETACHED_WORKSPACE)await detachTerminal(entry);else if(terminalViewForSession(entry.info.id)||DETACHED_TERMINAL)await requestTerminalReattach(entry);else await detachTerminal(entry);break;
  case'workspace':if(DETACHED_TERMINAL||terminalWorkspaceView(entry))await requestTerminalReattach(entry);else await detachTerminalWorkspace();break;
