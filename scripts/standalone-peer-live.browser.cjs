@@ -195,7 +195,8 @@ const pass=text=>{checks.push(text);console.log('PASS '+text);};
    const held=await popEd.evaluate(()=>NetworkToolkitFileEditor.listDocuments()[0].uid);
    await selectLine(popTerm,'synthetic reply to show users');
    await clearToasts(popTerm);
-   await toEditorDialog(popTerm,session);
+   // The Text Editor window reports its documents on its own poll; the dialog lists what was reported when it opened, so open it again until that document is listed.
+   for(let attempt=0;;attempt++){await toEditorDialog(popTerm,session);if(await popTerm.locator('#terminalSendDocument option[value="'+held+'"]').count())break;assert(attempt<20,'the Text Editor window\'s document was never listed');await popTerm.locator('#modalRoot [data-action="close-modal"]').first().click();await popTerm.locator('#terminalSendEditorForm').waitFor({state:'detached'});await popTerm.waitForTimeout(250);await selectLine(popTerm,'synthetic reply to show users');}
    await popTerm.locator('[name="terminalSendSource"][value="selection"]').check();await popTerm.locator('[name="terminalSendTarget"][value="existing"]').check();
    await popTerm.locator('#terminalSendDocument').selectOption(held);await popTerm.locator('#terminalSendWhere').selectOption('end');
    await submitEditor(popTerm);
