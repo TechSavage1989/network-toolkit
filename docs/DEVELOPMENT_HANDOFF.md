@@ -1,3 +1,11 @@
+# v1.21.85 Beta 1 - Signed Windows programs
+
+The Windows programs and Setup are signed with Azure Artifact Signing in the Release workflow (`sign-package` job; setup and secrets in docs/CODE_SIGNING_PLAN.md). Owner tests on 1.21.84 showed SentinelOne removing the unsigned program whenever it hosted an administrator shell.
+
+Release channel: `docs/RELEASE_CHANNEL.txt` stays `beta`.
+
+Known limits: whether SentinelOne accepts the signed program is not known until the owner tries 1.21.85 on the Server 2022 box; a newly signed program may need time to build reputation. The pinned `sign` tool version is confirmed by this first signed release run.
+
 # v1.21.84 Beta 1 - Administrator tabs without a restart again
 
 Owner request on v1.21.83: the administrator tab must not need a restart. The hidden-helper removal of 1.21.81 was based on a guess; the SentinelOne alerts named the vault password box and the suspended shell start, both fixed since. The helper is back (with the fixed shell start); Restart as administrator remains only as the fallback when the tab cannot start.

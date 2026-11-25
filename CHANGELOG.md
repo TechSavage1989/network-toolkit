@@ -1,3 +1,8 @@
+## 1.21.85 Beta 1 - Signed Windows programs
+
+- Owner tests on v1.21.84 (Windows Server 2022, SentinelOne Behavioral AI "Credential Prompt From Signed Process"): the program was removed whenever an administrator shell tab opened, also when the app itself was started as administrator from Explorer and asked for no approval. The pattern flagged is an unsigned program running as administrator and hosting a command shell. The owner chose code signing over per-machine exclusions or a separate console window.
+- The Release workflow signs `Network_Toolkit.exe`, `Network_Toolkit_TextEditor.exe`, `Network_Toolkit_Terminal.exe` and Setup with Azure Artifact Signing in a new Windows job (`sign-package`, OIDC through the `release` environment, no stored password) before the Portable ZIP, Update ZIP and `SHA256SUMS` are written. `github_release.py package --sign <command>` signs each program in place before the archives and Setup before the checksums; `ReleaseSigning` tests it with a stub signer. Setup in docs/CODE_SIGNING_PLAN.md.
+
 ## 1.21.84 Beta 1 - Administrator tabs without a restart again
 
 - Owner on v1.21.83: "Previously the app could run the administrator shell without restarting. the only issue was that sentinel was blocking it". The SentinelOne alerts we have seen named the vault's native password box ("Credential Prompt", fixed in 1.21.82) and the suspended shell start ("Preload Injection", fixed in 1.21.83, which the helper used too); none named the helper itself.
