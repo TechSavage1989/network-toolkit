@@ -122,7 +122,7 @@ async function focusReturn(name,id){
    const b=button.getBoundingClientRect(),p=button.parentElement.getBoundingClientRect();return {label:button.getAttribute('aria-label'),left:b.left,top:b.top,right:b.right,bottom:b.bottom,parent:{left:p.left,top:p.top,right:p.right,bottom:p.bottom}};
   }));
   for(const r of placements)assert(r.left>=r.parent.left-1&&r.right<=r.parent.right+1&&r.top>=r.parent.top-1&&r.bottom<=r.parent.bottom+1,JSON.stringify({width,theme,r}));
-  await copy(address.locator('[data-value-copy-control]'),'192.0.2.4/24',theme==='dark');
+  await copy(address.locator('[data-value-copy-control]'),'192.0.2.4 255.255.255.0',theme==='dark');
   await copy(page.locator('#adapterList [aria-label="Copy MAC address value"]').first(),'02:00:00:00:00:04');
   assert.equal(await page.locator('#entryContextMenu:not(.hidden)').count(),0);
   if(out&&(width===1600||width===960)){await page.evaluate(()=>document.querySelector('#workspaceScroll').scrollTo({top:0,left:0}));await settle(page);await page.screenshot({path:path.join(out,'ui-overview-'+theme+'-'+width+'.png')});}

@@ -1,0 +1,12 @@
+Network Toolkit 1.21.88
+
+## What's New
+
+- Subnet masks are shown in full, such as 255.255.254.0 (/23), in Local network's IP configuration and on the Overview, instead of only the /23 prefix.
+
+## Additional Details
+
+- Current configuration lists the IPv4 address and its subnet mask separately, and the review before applying changes does the same.
+- The Subnet mask or prefix length field starts with the full mask and still accepts either form, such as 255.255.254.0, 23 or /23.
+- Copying an address from an Overview adapter card copies the address and its mask, such as 192.168.120.11 255.255.254.0.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
