@@ -1,3 +1,10 @@
+## 1.21.87 Beta 1 - Packet maps that match the list
+
+- Owner report on v1.21.86 (screenshots): an orange DNS row in the list showed no orange on the map, and orange on the map had no matching row. Two causes. The copy buttons that `value-copy.js` adds to every cell (`.value-copy-cell{white-space:normal!important}` and 28 px padding) wrapped packet rows to two or more lines, while the virtual list and both maps assume one 21 px row, so the map's window pointed at other packets. And the window started at `scrollTop - headerHeight`, though the column header is sticky, so it began one row above the list.
+- Packet rows are one line again (`#packetRows` cells: no wrap, ellipsis, 21 px; the cell copy button is hidden there, the row menu's Copy value stays). `fineMapPosition` starts at `scrollTop / rowHeight` and counts `(clientHeight - headerHeight) / rowHeight` rows; `centerPacketAt` centers in the area below the header.
+- Both map windows are a 2 px accent outline with the rest of the map dimmed. The close-up map's line height defaults to Auto (`mapLineHeight`: the rows on screen fill about a third of the map, 1 to 8 px); `packetMapSettings.version:2` tells a chosen 1 px from the old default, which migrates to Auto. Map titles and the Colors & maps hint explain the window.
+- Checks: `scripts/packet-capture.test.cjs` (Auto default, migration, chosen 1 px kept) and the packet graph browser suites (features-92 to 98); line-by-line comparison of visible rows with the map window in dark and light.
+
 ## 1.21.86 Beta 1 - Clearer packet capture graph and maps
 
 - Owner reports on v1.21.85: the traffic graph's intervals were unexplained, outlined boxes; hovering a packet row popped the Traffic interval card over the list and outlined every row of that interval; the colors of the side maps could not be matched to the list.

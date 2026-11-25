@@ -1,0 +1,13 @@
+Network Toolkit 1.21.87
+
+## What's New
+
+- The maps beside the packet list now match the list. A bright outline on each map marks exactly the packets on screen, in the same colors as their rows, and the rest of the map is dimmed.
+- Packet rows stay on one line again, so long values no longer push packets off the screen.
+
+## Additional Details
+
+- The close-up map now draws each packet taller by default (Auto), so the packets on screen fill about a third of it. Choose a fixed size in Colors & maps; a size you chose before is kept.
+- The whole-capture map can be too small to show a single packet in a large capture; use the close-up map beside it to see each one.
+- To copy a value from the list, right-click the cell and choose Copy value.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
