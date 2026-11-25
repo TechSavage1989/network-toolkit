@@ -35,6 +35,8 @@ The result starts with a verdict, such as *2 problems found* or *No problems fou
 
 **Check a website or device** follows one name or address through the recording, step by step: finding its address, reaching it, connecting and its reply. It shows the step where it stopped. It reads the recording only; nothing is sent.
 
+**Packets** lists every packet under a traffic graph. Each bar of the graph is the number of packets recorded in a short stretch of time (the caption says how long, such as 1 s), measured from zero; a mark above a bar means some of its packets carry a clue. Hover a bar for its times, packets, bytes and rates, or click it to list its packets. Hovering a packet in the list marks its bar. The thin strips beside the list are maps of the whole capture and of the packets around the ones shown; **Map colors** above the list says what each color means, and the dot before each packet's protocol has the same color. Change the colors in **Colors & maps**.
+
 **Conversations** shows whether each connection worked, was refused or got no reply, with service names (such as Remote Desktop or Secure web) and device names learned from name lookups in the recording. **Save as** stores the packets as PCAPNG or PCAP for other packet tools, or as a CSV, JSON or text summary. You can also open a saved PCAP or PCAPNG file.
 
 A recording sees this computer's traffic, not every device on the network, and encrypted contents stay encrypted. A short recording with no findings does not prove the network is healthy.
