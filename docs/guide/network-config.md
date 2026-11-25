@@ -2,6 +2,8 @@
 
 Open **Local network** in the Configure group. Its tabs show IP configuration, the routing table, ARP / neighbors, connections, Wi-Fi and the **Hosts file**. Protected changes to network and system state require explicit review and the appropriate Windows/UAC permission.
 
+IP configuration shows each IPv4 address with its full subnet mask and prefix, for example `192.168.120.11` with `255.255.254.0 (/23)`; the Overview's adapters and Local IPv4 card show the mask the same way. When you edit the settings, **Subnet mask or prefix length** accepts either form (`255.255.254.0`, `23` or `/23`).
+
 ## Before applying a change
 1. Select the correct adapter or system item.
 2. Review the intended changes to IP settings, network interface state or the Hosts file.

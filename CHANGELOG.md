@@ -1,3 +1,10 @@
+## 1.21.88 Beta 1 - Full subnet masks
+
+- Owner request on v1.21.87 (screenshot of Local network > IP configuration): show the subnet mask in full instead of only the prefix (`192.168.120.11/23`).
+- Current configuration splits IPv4 address and **Subnet mask** (`255.255.254.0 (/23)`), the review dialog does the same, and the edit field starts with the dotted mask (`initialIPDraft`). The field still accepts a mask, `23` or `/23`; `ipConfigurationDirty` compares the subnet by prefix (`ipPrefixOr`), so typing `23` for `255.255.254.0` is no change, and DHCP requests read the original prefix from either form.
+- Overview: adapter cards and the adapters list show `address mask 255.255.254.0 (/23)` for IPv4 (`addressMaskHTML`), the card's copy button copies `address mask` (`addressCopyValue`), and the Local IPv4 card puts the mask under the address. IPv6 is unchanged.
+- Checks: `scripts/local-network-actions124.test.cjs` (mask helpers, initial draft, no false change), `ux-phase6` and `ui-consistency` browser checks updated for the mask.
+
 ## 1.21.87 Beta 1 - Packet maps that match the list
 
 - Owner report on v1.21.86 (screenshots): an orange DNS row in the list showed no orange on the map, and orange on the map had no matching row. Two causes. The copy buttons that `value-copy.js` adds to every cell (`.value-copy-cell{white-space:normal!important}` and 28 px padding) wrapped packet rows to two or more lines, while the virtual list and both maps assume one 21 px row, so the map's window pointed at other packets. And the window started at `scrollTop - headerHeight`, though the column header is sticky, so it began one row above the list.

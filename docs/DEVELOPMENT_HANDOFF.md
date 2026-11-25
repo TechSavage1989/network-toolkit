@@ -1,3 +1,9 @@
+# v1.21.88 Beta 1 - Full subnet masks
+
+Owner request on v1.21.87: adapters' IPv4 subnet masks are shown in full (`255.255.254.0 (/23)`) in Local network > IP configuration (Current configuration, review, edit field) and on the Overview (adapter cards, adapters list, Local IPv4 card). The edit field accepts a dotted mask or a prefix.
+
+Release channel: `docs/RELEASE_CHANNEL.txt` stays `beta`.
+
 # v1.21.87 Beta 1 - Packet maps that match the list
 
 Owner report on v1.21.86: the side maps' colors did not match the packets on screen. Packet rows had wrapped to two lines (the cell copy buttons), so the maps pointed at other packets, and the map window started one row early under the sticky header. Rows are one line again, the map window covers exactly the visible rows with the rest dimmed, and the close-up map defaults to an Auto line height. Details in CHANGELOG.md.
