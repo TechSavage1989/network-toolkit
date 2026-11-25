@@ -143,10 +143,12 @@ class SeparateProgramPackaging(unittest.TestCase):
             linux[arch].write_bytes(bytes(header) + self.current.encode())
         self.setups = []
 
-        def fake_setup(exe_path, current, output, given=None):
+        def fake_setup(exe_path, current, output, given=None, sign=None):
             self.setups.append(given)
             setup = output / release.windows_setup_name(current)
             setup.write_bytes(b'MZ synthetic setup')
+            if sign:
+                sign(setup)
             return setup
         self.patches = [mock.patch.object(release, 'ROOT', root), mock.patch.object(release, 'validate', return_value=self.current),
                         mock.patch.object(release, 'source_files', return_value=[source]),

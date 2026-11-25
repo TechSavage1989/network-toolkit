@@ -1,8 +1,21 @@
 # Code signing plan (Azure Artifact Signing)
 
-Status: planning. Nothing is signed yet. This describes what the owner sets up
-in Azure and GitHub, and how the Release workflow will sign the Windows
-binaries once the certificate profile exists.
+Status: implemented on this branch, not yet active. The Release workflow signs
+the Windows binaries with Azure Artifact Signing, gated on three repository
+secrets that are not yet set. Nothing is signed until the secrets exist and a
+signed beta is published and tested. This file records the Azure/GitHub setup
+and how the signing works.
+
+Known configuration (not secret), already in `.github/workflows/release.yml`:
+
+- Endpoint: `https://eus.codesigning.azure.net` (East US)
+- Account: `networktoolkit-signing`
+- Certificate profile: `jpaull-codesign`
+
+To confirm before the first signed run: the pinned version of Microsoft's
+`sign` tool (`SIGN_TOOL_VERSION` in the workflow) against the latest on
+nuget.org, and that `azure/login` leaves the OIDC environment the `sign` tool
+reads. The first signed beta is the real end-to-end test.
 
 ## Why
 
@@ -44,8 +57,7 @@ resource group **azure-signup-rg**, region **East US**
    *Certificate profiles* → **Create**.
    - Profile type: **Public Trust**.
    - Identity validation: the completed validation from step 1.
-   - Name: pick a short name and tell me — the workflow needs it. Suggested:
-     `networktoolkit`.
+   - Name: `jpaull-codesign` (done; wired into the workflow).
 
 3. **App registration for GitHub OIDC** (no client secret, no password stored).
    Microsoft Entra ID → *App registrations* → **New registration** (name e.g.
@@ -53,11 +65,19 @@ resource group **azure-signup-rg**, region **East US**
    - *Certificates & secrets* → *Federated credentials* → **Add credential** →
      scenario **GitHub Actions deploying Azure resources**:
      - Organization: `TechSavage1989`, Repository: `network-toolkit`.
-     - Add one credential for **Branch** = `main` and one for **Tag** with a
-       pattern of `v*` (releases publish from `main` pushes and from `v*` tags).
-     - If we later gate signing behind a GitHub *Environment*, add an
-       Environment credential too.
+     - Entity type **Environment**, environment name `release`. This generates
+       the subject `repo:TechSavage1989@44094233/network-toolkit@1432533692:environment:release`.
+     - Use an **Environment** credential, not a Tag one: Entra matches the
+       subject literally, so a `v*` tag subject (`...:ref:refs/tags/v*`) never
+       matches a real tag like `v1.21.85`. The signing job runs in the GitHub
+       `release` environment, so its OIDC subject is the environment one above
+       and covers both `main`-push and `v*`-tag release runs.
    - Note the **Application (client) ID** and the **Directory (tenant) ID**.
+
+   Also create the environment in GitHub: repo → Settings → Environments →
+   **New environment** → name `release`. Leave it without required reviewers
+   unless you want a manual approval gate on every release (that would pause the
+   signing job until someone approves it).
 
 4. **Give the app permission to sign.** On the **networktoolkit-signing**
    account → *Access control (IAM)* → **Add role assignment** → role
@@ -72,9 +92,11 @@ resource group **azure-signup-rg**, region **East US**
    The endpoint, account name and certificate-profile name are not secret and
    will live in the workflow as plain values (or repository *variables*).
 
-When steps 1–5 are done, send me the **certificate profile name** and confirm
-the three secret names are set. I'll switch the workflow from its unsigned path
-to the signed one and we publish a signed beta to test on the Server 2022 box.
+The three secrets are the only remaining gate. Until they are set, a release run
+fails at the Azure sign-in step rather than publishing anything unsigned. Once
+they are set, the next beta is built signed and we test it on the Server 2022
+box. The role assignment (step 4) and the two federated credentials (step 3)
+also have to be in place, or the sign-in / signing step fails.
 
 ## Workflow change (how it will work)
 
