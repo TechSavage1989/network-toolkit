@@ -619,3 +619,15 @@
 .packet-legend-chip>i{display:inline-block;flex:none;width:8px;height:8px;border-radius:2px;box-shadow:0 0 0 1px color-mix(in srgb,var(--text) 18%,transparent)}
 .packet-workspace .packet-table tbody tr:not(.packet-spacer)>td:nth-child(5)::before{content:'';display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:2px;background:var(--packet-row-color,var(--muted));box-shadow:0 0 0 1px color-mix(in srgb,var(--text) 18%,transparent)}
 .packet-workspace.packet-row-mode-off .packet-table tbody tr:not(.packet-spacer)>td:nth-child(5)::before{content:none}
+
+/* Packet rows stay one line (owner report on v1.21.86). The list and both maps
+   place packets by a fixed row height; per-cell copy buttons made rows wrap to
+   two or more lines, so the maps' outlined window pointed at other packets.
+   A cell's value is copied from its right-click menu (Copy value). */
+.packet-workspace .packet-table tbody tr:not(.packet-spacer)>td{white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal!important;height:21px;max-height:21px}
+.packet-workspace .packet-table tbody tr:not(.packet-spacer)>td *{white-space:nowrap}
+.packet-workspace #packetRows td.value-copy-cell{padding-right:5px!important}.packet-workspace #packetRows .value-copy-control{display:none!important}
+/* The outlined window is the packets on screen: a clear accent frame with the
+   rest of the map dimmed, so the colors inside it are never covered. */
+.packet-map-viewport,.packet-map-detail-viewport{background:transparent!important;border:2px solid var(--accent)!important;border-radius:2px;box-shadow:0 0 0 1px var(--panel),0 0 0 100vh color-mix(in srgb,var(--panel) 45%,transparent)!important}
+.packet-intelligent-scroll:not(.packet-overview-scaled){overflow:hidden}

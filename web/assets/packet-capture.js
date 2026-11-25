@@ -26,13 +26,15 @@ const packetPaletteGroups=[
  ['Events',[['error','Error'],['warn','Warning'],['note','Note']]],
  ['Protocols',[['tcp','TCP'],['udp','UDP'],['dns','DNS'],['dhcp','DHCP'],['arp','ARP'],['icmp','ICMP'],['icmpv6','ICMPv6'],['tls','TLS'],['http','HTTP'],['ssh','SSH'],['mdns','mDNS'],['smb','SMB'],['ntp','NTP'],['wireguard','WireGuard'],['lldp','LLDP'],['cdp','CDP'],['other','Other / unknown']]]
 ];
-const packetMapDefaults=Object.freeze({lineHeight:1,overviewScale:'fit',overviewWidth:12,detailWidth:15,rowStyle:'marker',mapColors:'mixed',showOverview:true,showDetail:true});
+const packetMapDefaults=Object.freeze({lineHeight:'auto',overviewScale:'fit',overviewWidth:12,detailWidth:15,rowStyle:'marker',mapColors:'mixed',showOverview:true,showDetail:true});
 const packetChoice=(value,allowed,fallback)=>allowed.includes(value)?value:fallback;
-function defaultMapSettings(){return {...packetMapDefaults,colors:{...packetPaletteDefaults}};}
+function defaultMapSettings(){return {...packetMapDefaults,version:2,colors:{...packetPaletteDefaults}};}
 function normalizeMapSettings(value){
  const v=value&&typeof value==='object'&&!Array.isArray(value)?value:{},colors=v.colors&&typeof v.colors==='object'&&!Array.isArray(v.colors)?v.colors:{};
  return {
-  lineHeight:packetChoice(v.lineHeight,[1,2,3,4],packetMapDefaults.lineHeight),
+  // 1 px was the default before v1.21.87; it is now Auto (owner report on v1.21.86: the
+  // packets on screen were a sliver of the fine map), so a saved 1 reads as Auto.
+  version:2,lineHeight:v.version!==2&&v.lineHeight===1?'auto':packetChoice(v.lineHeight,['auto',1,2,3,4,6,8],packetMapDefaults.lineHeight),
   overviewScale:packetChoice(v.overviewScale,['fit',1,2,3,4],packetMapDefaults.overviewScale),
   overviewWidth:packetChoice(v.overviewWidth,[8,12,16,20,24],packetMapDefaults.overviewWidth),
   detailWidth:packetChoice(v.detailWidth,[10,15,18,24,32],packetMapDefaults.detailWidth),
@@ -44,7 +46,9 @@ function normalizeMapSettings(value){
  };
 }
 function mapSettings(){if(!state.packetMapSettings)state.packetMapSettings=defaultMapSettings();return state.packetMapSettings;}
-function mapLineHeight(){return mapSettings().lineHeight;}
+// Auto: the packets on screen take about a third of the fine map, so their colors
+// are visible there and the outlined window is easy to find.
+function mapLineHeight(){const value=mapSettings().lineHeight;if(typeof value==='number')return value;const lane=node('packetDetailMap'),scroll=node('packetTableScroll'),laneHeight=lane?.clientHeight||420,rows=Math.max(1,(scroll?.clientHeight||400)/packetMetrics().rowHeight);return clamp(Math.floor(laneHeight/(rows*3)),1,8);}
 function overviewLineHeight(){const scale=mapSettings().overviewScale;return scale==='fit'?0:scale;}
 function contrastText(color){const h=color.slice(1),channels=[0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return .2126*channels[0]+.7152*channels[1]+.0722*channels[2]>.179?'#101820':'#ffffff';}
 function applyPacketAppearance(){
@@ -53,7 +57,7 @@ function applyPacketAppearance(){
  const put=(name,value)=>{if(typeof style.setProperty==='function')style.setProperty(name,value);else style[name]=value;};
  for(const [key,value] of Object.entries(settings.colors))put('--packet-color-'+key,value);
  for(const [key,value] of Object.entries(settings.colors))put('--packet-contrast-'+key,contrastText(value));
- put('--packet-map-line-height',settings.lineHeight+'px');put('--packet-map-overview-line-height',(overviewLineHeight()||1)+'px');put('--packet-map-overview-width',settings.overviewWidth+'px');put('--packet-map-detail-width',settings.detailWidth+'px');
+ put('--packet-map-line-height',mapLineHeight()+'px');put('--packet-map-overview-line-height',(overviewLineHeight()||1)+'px');put('--packet-map-overview-width',settings.overviewWidth+'px');put('--packet-map-detail-width',settings.detailWidth+'px');
  for(const row of ['off','marker','subtle','strong','full'])workspace.classList.toggle('packet-row-mode-'+row,row===settings.rowStyle);
  for(const mode of ['mixed','protocols','alerts'])workspace.classList.toggle('packet-map-mode-'+mode,mode===settings.mapColors);
  refreshPacketMapLegend();const overview=node('packetOverviewMap'),fine=node('packetDetailMap');
@@ -73,8 +77,8 @@ function appearancePanelHTML(){const s=mapSettings();return '<aside id="packetAp
  '<label class="packet-map-visible-toggle"><input type="checkbox" data-packet-visibility="showOverview" '+(s.showOverview?'checked':'')+'> Show full map</label>'+'<label class="packet-map-visible-toggle"><input type="checkbox" data-packet-visibility="showDetail" '+(s.showDetail?'checked':'')+'> Show fine map</label>'+'<label>Full map width<select id="packetOverviewWidth" data-packet-appearance="overviewWidth">'+options([[8,'8 px'],[12,'12 px'],[16,'16 px'],[20,'20 px'],[24,'24 px']],s.overviewWidth)+'</select></label>'+
  '<label>Full map pixels per packet<select id="packetOverviewScale" data-packet-appearance="overviewScale">'+options([['fit','Fit entire capture (default)'],[1,'1 px / packet'],[2,'2 px / packet'],[3,'3 px / packet'],[4,'4 px / packet']],s.overviewScale)+'</select></label>'+
  '<label>Detail map width<select id="packetDetailWidth" data-packet-appearance="detailWidth">'+options([[10,'10 px'],[15,'15 px'],[18,'18 px'],[24,'24 px'],[32,'32 px']],s.detailWidth)+'</select></label>'+
- '<label>Detail pixels per packet<select id="packetMapLineHeight" data-packet-appearance="lineHeight">'+options([[1,'1 px (default)'],[2,'2 px'],[3,'3 px'],[4,'4 px']],s.lineHeight)+'</select></label></div>'+
- '<p class="packet-appearance-hint">Both maps support exact packet lines at 1-4 px per packet. Full map Fit mode compresses the entire capture for quick navigation. Alert colors take priority unless you select Protocols only.</p>'+
+ '<label>Detail pixels per packet<select id="packetMapLineHeight" data-packet-appearance="lineHeight">'+options([['auto','Auto: packets on screen fill a third (default)'],[1,'1 px'],[2,'2 px'],[3,'3 px'],[4,'4 px'],[6,'6 px'],[8,'8 px']],s.lineHeight)+'</select></label></div>'+
+ '<p class="packet-appearance-hint">The outlined window in each map is the packets on screen. The close-up map shows one line per packet; Auto sizes the lines so the packets on screen fill about a third of it. Full map Fit mode compresses the entire capture for quick navigation. Alert colors take priority unless you select Protocols only.</p>'+
  packetPaletteGroups.map(([group,colors])=>'<section class="packet-appearance-group"><h3>'+group+'</h3><div class="packet-appearance-palette">'+colors.map(([key,label])=>'<label>'+packetColorControl(key,label,s.colors[key])+'<span>'+label+'</span></label>').join('')+'</div></section>').join('')+
  '</div><footer><button class="btn small ghost" type="button" data-packet-action="reset-appearance">Restore default colors & maps</button><span>Saved automatically</span></footer></aside>';}
 // What to look for and Colors & maps open under the row that holds their toggles, so pressing a toggle
@@ -88,7 +92,7 @@ function updateAppearanceSetting(element){
  }else if(key&&Object.hasOwn(packetPaletteDefaults,key)){
   if(!/^#[0-9a-f]{6}$/i.test(element.value))return;settings.colors[key]=element.value.toLowerCase();
  }else if(field&&Object.hasOwn(packetMapDefaults,field)){
-  const value=['lineHeight','overviewWidth','detailWidth'].includes(field)||field==='overviewScale'&&element.value!=='fit'?Number(element.value):element.value;
+  const value=['overviewWidth','detailWidth'].includes(field)||field==='lineHeight'&&element.value!=='auto'||field==='overviewScale'&&element.value!=='fit'?Number(element.value):element.value;
   const clean=normalizeMapSettings({...settings,[field]:value});settings[field]=clean[field];
  }else return;
  applyPacketAppearance();
@@ -682,24 +686,27 @@ function packetMapLineClass(index){
  const severity=['normal','note','warn','error'][Math.floor(value/16)]||'normal';
  return 'packet-map-'+severity+' packet-map-proto-'+mapProtocolNames[value%16];
 }
-function detailMapHTML(){return '<div class="packet-map-detail-scroll" id="packetDetailMap" role="region" tabindex="0" aria-label="Packet-level traffic map, one line per packet. Drag the viewport one-to-one to move through frames." title="Detailed map: one line per filtered packet, 1 pixel by default. Drag the outlined viewport one-to-one with the mouse; click a packet line to select."><div class="packet-map-detail-content" id="packetDetailMapContent" style="height:'+Math.max(1,model.total*mapLineHeight())+'px"><div id="packetDetailMapLines" class="packet-map-detail-lines"></div><span id="packetDetailMapViewport" class="packet-map-detail-viewport"></span><span id="packetDetailMapSelected" class="packet-map-detail-selected" hidden></span></div></div>';}
+function detailMapHTML(){return '<div class="packet-map-detail-scroll" id="packetDetailMap" role="region" tabindex="0" aria-label="Packet-level traffic map, one line per packet. Drag the viewport one-to-one to move through frames." title="Close-up map: one line per packet around the ones shown. The outlined window is exactly the packets on screen, in the same colors as their rows. Drag the window to scroll; click a line to select that packet."><div class="packet-map-detail-content" id="packetDetailMapContent" style="height:'+Math.max(1,model.total*mapLineHeight())+'px"><div id="packetDetailMapLines" class="packet-map-detail-lines"></div><span id="packetDetailMapViewport" class="packet-map-detail-viewport"></span><span id="packetDetailMapSelected" class="packet-map-detail-selected" hidden></span></div></div>';}
 function renderPacketDetailMap(force=false){
  const lane=node('packetDetailMap'),content=node('packetDetailMapContent'),lines=node('packetDetailMapLines');if(!lane||!content||!lines)return;
  const height=Math.max(1,model.total*mapLineHeight());if(content.style.height!==height+'px')content.style.height=height+'px';
  const visible=Math.max(1,Math.ceil((lane.clientHeight||420)/mapLineHeight()));
  const first=Math.min(Math.max(0,model.total-1),Math.max(0,Math.floor((Number(lane.scrollTop)||0)/mapLineHeight())-48));
- const start=Math.floor(first/48)*48,end=Math.min(model.total,start+visible+144),key=packetSourceSignature()+'|'+start+'|'+end;
+ const start=Math.floor(first/48)*48,end=Math.min(model.total,start+visible+144),key=packetSourceSignature()+'|'+start+'|'+end+'|'+mapLineHeight();
+ {const workspace=node('packetCaptureWorkspace'),line=mapLineHeight()+'px';if(workspace?.style&&workspace.style.getPropertyValue?.('--packet-map-line-height')!==line)workspace.style.setProperty?.('--packet-map-line-height',line);}
  if(!force&&lane._mapRange===key)return;
  lane._mapRange=key;const row=[];
  for(let i=start;i<end;i++)row.push('<span class="packet-detail-line packet-map-bin '+packetMapLineClass(i)+'" data-map-index="'+i+'" style="top:'+(i*mapLineHeight())+'px"></span>');
  lines.innerHTML=row.join('');
 }
 function fineMapPosition(scroll,height=mapLineHeight()){
- // The table's header does not represent a packet. Preserve sub-packet
+ // The table's header is sticky: it stays over the first rows in view and
+ // represents no packet. The first packet seen is the one at scrollTop below
+ // the header, and the header's height holds no packets. Preserve sub-packet
  // precision here so every map scale tracks the pointer smoothly.
  const {rowHeight,headerHeight}=packetMetrics();
- const first=clamp((scroll.scrollTop-headerHeight)/rowHeight,0,Math.max(0,model.total-1));
- const count=Math.max(1,scroll.clientHeight/rowHeight);
+ const first=clamp(scroll.scrollTop/rowHeight,0,Math.max(0,model.total-1));
+ const count=Math.max(1,(scroll.clientHeight-headerHeight)/rowHeight);
  return {top:first*height,height:Math.max(height,Math.min(model.total-first,count)*height)};
 }
 function syncPacketDetailMap(scroll){
@@ -726,11 +733,11 @@ function syncPacketDetailMap(scroll){
 function detailMapIndexFromPoint(lane,clientY){const bounds=lane.getBoundingClientRect();return clamp(Math.floor(((Number(lane.scrollTop)||0)+clientY-bounds.top)/mapLineHeight()),0,Math.max(0,model.total-1));}
 function centerPacketAt(index){
  if(model.total===0)return;const scroll=node('packetTableScroll'),{rowHeight,headerHeight}=packetMetrics();
- if(!scroll)return;setPacketScroll((index+.5)*rowHeight+headerHeight-(scroll.clientHeight||400)/2);
+ if(!scroll)return;setPacketScroll((index+.5)*rowHeight-((scroll.clientHeight||400)-headerHeight)/2);
 }
 function packetOverviewHTML(){const overview=model.overview||{},bins=Array.isArray(overview.bins)?overview.bins:[],signals=Array.isArray(overview.signals)?overview.signals:[];
  const scale=overviewLineHeight(),scaled=scale>0;
- const map='<div class="packet-intelligent-scroll'+(scaled?' packet-overview-scaled':'')+'" id="packetOverviewMap" tabindex="0" role="slider" aria-label="Full-capture traffic map. Drag the viewport to scroll; optionally display every packet at its selected pixel scale." aria-valuemin="0" aria-valuemax="'+Math.max(0,model.total-1)+'" aria-valuenow="'+Math.max(0,Math.min(model.total-1,Math.floor(model.scrollTop/packetRowHeight)))+'" title="Full capture map: drag the viewport to scroll; click a line to select."><div id="packetOverviewContent" class="packet-overview-content"'+(scaled?' style="height:'+Math.max(1,model.total*scale)+'px"':'')+'><div class="packet-map-bars">'+bins.map(bin=>'<span class="packet-map-bin packet-map-'+(bin.level||'normal')+' packet-map-proto-'+esc(Object.hasOwn(packetPaletteDefaults,String(bin.protocol||'other').toLowerCase().replace(/[^a-z0-9]/g,''))?String(bin.protocol).toLowerCase().replace(/[^a-z0-9]/g,''):'other')+'" title="'+esc((bin.interesting||0)+' highlighted events; '+(bin.protocol||'traffic'))+'"></span>').join('')+'</div><div id="packetOverviewLines" class="packet-map-overview-lines"></div><span id="packetMapViewport" class="packet-map-viewport"></span><span id="packetMapSelected" class="packet-map-selected" hidden></span></div></div>'+detailMapHTML();
+ const map='<div class="packet-intelligent-scroll'+(scaled?' packet-overview-scaled':'')+'" id="packetOverviewMap" tabindex="0" role="slider" aria-label="Full-capture traffic map. Drag the viewport to scroll; optionally display every packet at its selected pixel scale." aria-valuemin="0" aria-valuemax="'+Math.max(0,model.total-1)+'" aria-valuenow="'+Math.max(0,Math.min(model.total-1,Math.floor(model.scrollTop/packetRowHeight)))+'" title="Whole-capture map, top to bottom. The outlined window is the packets on screen. Each line can stand for many packets, so a single packet may not show here; the close-up map beside it shows every packet. Drag the window to scroll; click to jump."><div id="packetOverviewContent" class="packet-overview-content"'+(scaled?' style="height:'+Math.max(1,model.total*scale)+'px"':'')+'><div class="packet-map-bars">'+bins.map(bin=>'<span class="packet-map-bin packet-map-'+(bin.level||'normal')+' packet-map-proto-'+esc(Object.hasOwn(packetPaletteDefaults,String(bin.protocol||'other').toLowerCase().replace(/[^a-z0-9]/g,''))?String(bin.protocol).toLowerCase().replace(/[^a-z0-9]/g,''):'other')+'" title="'+esc((bin.interesting||0)+' highlighted events; '+(bin.protocol||'traffic'))+'"></span>').join('')+'</div><div id="packetOverviewLines" class="packet-map-overview-lines"></div><span id="packetMapViewport" class="packet-map-viewport"></span><span id="packetMapSelected" class="packet-map-selected" hidden></span></div></div>'+detailMapHTML();
  const signalsHTML=signals.length?signals.map(f=>'<button type="button" class="packet-insight-event packet-level-'+esc(f.severity)+'" data-packet-jump="'+Number(f.index)+'" data-packet-number="'+f.number+'" title="'+esc(f.explanation)+'"><span class="packet-insight-event-top"><span class="packet-signal-dot packet-map-'+esc(f.severity)+'">'+(f.severity==='error'?'!':f.severity==='warn'?'!':'·')+'</span><strong>'+esc(f.title)+'</strong><span class="packet-insight-count">'+f.count.toLocaleString()+'</span></span><span class="packet-insight-explanation">'+esc(f.explanation)+'</span><span class="packet-insight-location">Jump to frame '+f.number+'</span></button>').join(''):'<p class="packet-insight-empty">No packet-level events were highlighted by the supported decoder. This does not establish that the traffic is healthy.</p>';
  return map+'<aside class="packet-insights" id="packetInsights" '+(!model.insightsOpen?'hidden':'')+' aria-label="Interesting packet events"><div class="packet-insights-heading"><strong>Interesting traffic</strong></div><div class="packet-insight-totals"><strong>'+(overview.interesting||0).toLocaleString()+'</strong> highlighted packets <span class="packet-insight-levels">'+(overview.counts?.error||0)+' errors · '+(overview.counts?.warn||0)+' warnings · '+(overview.counts?.note||0)+' notes</span></div><div class="packet-insights-list">'+signalsHTML+'</div><p class="packet-insight-caution">Clues from decoded, displayed packets, not a diagnosis. See Troubleshooting for broader request/reply analysis.</p></aside>';
 }

@@ -240,12 +240,12 @@ test('packet overview clicks select the exact proportional frame and keep viewpo
  assert(h.calls.some(c=>c.path.includes('overview=0')),'Adjacent pages omit full-capture overview computation');
 });
 
-test('the detailed map defaults to one pixel per packet and virtualizes offscreen stripes',async()=>{
+test('a 1 px detailed map draws one pixel per packet and virtualizes offscreen stripes',async()=>{
  const n=2000,packets=Array.from({length:n},(_,i)=>({number:i+1,relative:i/100,source:'192.0.2.1',destination:'192.0.2.2',protocol:'UDP',length:60,captured:60,info:String(i),expert:[]}));
  // A=ordinary, h=warning DNS (32+3), R=note TCP (16+1).
  const marks=Array.from({length:n},(_,i)=>i===600?'j':i===1021?'R':'C').join('');
  const h=harness({id:'d'.repeat(24),name:'Granular',state:'completed',count:n,bytes:n*60,revision:7},{packets,total:n,paginate:true,overview:{packetMarks:marks,bins:[],signals:[],counts:{},interesting:0},detail:num=>({packet:packets[num-1],layers:[],data:'',ascii:''})});
- await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+ await h.settle();h.api.mergePreferences({packetMapSettings:{version:2,lineHeight:1}});h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
  const lane=h.doc.getElementById('packetDetailMap'),content=h.doc.getElementById('packetDetailMapContent'),scroll=h.doc.getElementById('packetTableScroll');
  lane.clientHeight=400;lane.scrollHeight=n;scroll.clientHeight=350;scroll.scrollHeight=n*21+26;
  assert.equal(content.style.height,n+'px');
@@ -305,10 +305,10 @@ test('compact packet guidance explains common patterns and applies supported fil
 test('packet colors and map sizes can be customized without removing the packet list or restarting capture',async()=>{
  const n=800,packets=Array.from({length:n},(_,i)=>({number:i+1,relative:i/100,source:'192.0.2.1',destination:'192.0.2.2',protocol:i%2?'DNS':'TCP',length:64,captured:64,info:'Frame '+(i+1),expert:[]}));
  const h=harness({id:'e'.repeat(24),name:'Color options',state:'completed',count:n,bytes:n*64,revision:1},{packets,total:n,paginate:true,overview:{packetMarks:'A'.repeat(n),bins:[{protocol:'TCP',level:'normal'}],signals:[],counts:{},interesting:0},detail:num=>({packet:packets[num-1],layers:[],data:'',ascii:''})});
- await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+ await h.settle();h.api.mergePreferences({packetMapSettings:{version:2,lineHeight:1}});h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
  h.api.model.follow=false;h.doc.emit('click',h.doc.querySelector('[data-packet-action="scroll-first"]'));await h.settle();
  const viewport=h.doc.getElementById('packetTableScroll'),lane=h.doc.getElementById('packetDetailMap'),content=h.doc.getElementById('packetDetailMapContent');
- assert.equal(content.style.height,n+'px','one pixel per packet is the default');
+ assert.equal(content.style.height,n+'px','a chosen 1 px scale draws one pixel per packet');
  assert(h.doc.querySelector('[data-packet-action="toggle-appearance"]'));
  h.doc.emit('click',h.doc.querySelector('[data-packet-action="toggle-appearance"]'));
  const panel=h.doc.getElementById('packetAppearanceSettings');assert.equal(panel.hidden,false);
@@ -339,9 +339,9 @@ test('packet colors and map sizes can be customized without removing the packet 
  assert.equal(h.api.model.detail.packet.number,expected,'custom line-height preserves exact click selection');
  assert(h.saved.length>=1,'appearance changes persist');
  h.doc.emit('click',h.doc.querySelector('[data-packet-action="reset-appearance"]'));
- assert.equal(h.c.state.packetMapSettings.lineHeight,1);
+ assert.equal(h.c.state.packetMapSettings.lineHeight,'auto');
  assert.equal(h.c.state.packetMapSettings.colors.tcp,'#5b8def');
- assert.equal(content.style.height,n+'px');
+ assert.match(content.style.height,/^\d+px$/);assert.notEqual(content.style.height,(n*4)+'px','reset returns the close-up map to Auto');
  assert.equal(h.c.state.packetMapSettings.rowStyle,'marker');
 });
 
@@ -356,10 +356,14 @@ test('saved packet map settings are validated, restored, and cannot inject CSS v
  assert(h.doc.getElementById('packetCaptureWorkspace').classList.contains('packet-row-mode-subtle'));
  assert(h.doc.getElementById('packetCaptureWorkspace').classList.contains('packet-map-mode-protocols'));
  h.api.mergePreferences({packetMapSettings:{lineHeight:0,overviewWidth:500,rowStyle:'javascript:',colors:{dns:'blue'}}});
- assert.equal(h.c.state.packetMapSettings.lineHeight,1);
+ assert.equal(h.c.state.packetMapSettings.lineHeight,'auto');
  assert.equal(h.c.state.packetMapSettings.overviewWidth,12);
  assert.equal(h.c.state.packetMapSettings.rowStyle,'marker');
  assert.equal(h.c.state.packetMapSettings.colors.dns,'#e0a03c');
+ h.api.mergePreferences({packetMapSettings:{lineHeight:1}});
+ assert.equal(h.c.state.packetMapSettings.lineHeight,'auto','the old 1 px default becomes Auto');
+ h.api.mergePreferences({packetMapSettings:{version:2,lineHeight:1}});
+ assert.equal(h.c.state.packetMapSettings.lineHeight,1,'1 px chosen in this version stays');
  h.api.mergePreferences({packetMapSettings:{colors:{tcp:'#a7c6e9',udp:'#123456'}}});
  assert.equal(h.c.state.packetMapSettings.colors.tcp,'#5b8def','an old pastel default becomes the new default');
  assert.equal(h.c.state.packetMapSettings.colors.udp,'#123456','a chosen color stays');
@@ -428,7 +432,7 @@ test('full map supports Fit and exact 1-4 pixel packets, click selection, draggi
  assert.equal(h.doc.getElementById('packetOverviewContent').style.height,'');
  h.doc.emit('click',h.doc.querySelector('[data-packet-action="reset-appearance"]'));
  assert.equal(h.c.state.packetMapSettings.overviewScale,'fit');
- assert.equal(h.c.state.packetMapSettings.lineHeight,1);
+ assert.equal(h.c.state.packetMapSettings.lineHeight,'auto');
  assert.equal(h.doc.getElementById('packetTableScroll'),list);
 });
 
@@ -816,7 +820,7 @@ test('late explicit packet detail completion does not override newer scroll, fil
 test('native map clamp after docking is acknowledged without converting it into packet navigation',async()=>{
  for(const kind of ['fine','overview']){
   const n=402,packets=Array.from({length:n},(_,i)=>({number:i+1,relative:i/100,source:'192.0.2.1',destination:'192.0.2.2',protocol:'UDP',length:60,captured:60,info:String(i),expert:[]}));
-  const h=harness({id:'d'.repeat(24),name:'Synthetic map clamp',state:'completed',count:n,revision:1},{packets,total:n,paginate:true});await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+  const h=harness({id:'d'.repeat(24),name:'Synthetic map clamp',state:'completed',count:n,revision:1},{packets,total:n,paginate:true});await h.settle();h.api.mergePreferences({packetMapSettings:{version:2,lineHeight:1}});h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
   if(kind==='overview'){h.c.state.packetMapSettings.overviewScale=1;h.api.refreshTimeDisplay();}
   const reader=h.doc.getElementById('packetTableScroll'),map=h.doc.getElementById(kind==='fine'?'packetDetailMap':'packetOverviewMap'),expected=kind==='fine'?'mapExpectedTop':'overviewMapExpectedTop';
   h.api.model.measuredRowHeight=21;h.api.model.measuredHeaderHeight=29.5;
@@ -832,7 +836,7 @@ test('native map clamp after docking is acknowledged without converting it into 
 });
 test('map synchronization does not swallow a real wheel offset merely because the old expected offset became invalid',async()=>{
  for(const kind of ['fine','overview']){
-  const h=harness({id:'e'.repeat(24),name:'Synthetic real wheel',state:'completed',count:402,revision:1},{total:402});await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+  const h=harness({id:'e'.repeat(24),name:'Synthetic real wheel',state:'completed',count:402,revision:1},{total:402});await h.settle();h.api.mergePreferences({packetMapSettings:{version:2,lineHeight:1}});h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
   if(kind==='overview'){h.c.state.packetMapSettings.overviewScale=1;h.api.refreshTimeDisplay();}
   const reader=h.doc.getElementById('packetTableScroll'),map=h.doc.getElementById(kind==='fine'?'packetDetailMap':'packetOverviewMap'),expected=kind==='fine'?'mapExpectedTop':'overviewMapExpectedTop';
   h.api.model.measuredRowHeight=21;h.api.model.measuredHeaderHeight=29.5;

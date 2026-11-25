@@ -1,3 +1,11 @@
+# v1.21.87 Beta 1 - Packet maps that match the list
+
+Owner report on v1.21.86: the side maps' colors did not match the packets on screen. Packet rows had wrapped to two lines (the cell copy buttons), so the maps pointed at other packets, and the map window started one row early under the sticky header. Rows are one line again, the map window covers exactly the visible rows with the rest dimmed, and the close-up map defaults to an Auto line height. Details in CHANGELOG.md.
+
+Release channel: `docs/RELEASE_CHANNEL.txt` stays `beta`.
+
+Known limits: the whole-capture map of a large capture is smaller than one pixel per packet; the cell copy button is hidden in the packet list (Copy value in the row menu remains).
+
 # v1.21.86 Beta 1 - Clearer packet capture graph and maps
 
 Owner reports on v1.21.85 about Packet capture: the traffic graph's outlined interval boxes, the interval card and row outlines on packet hover, and side-map colors that matched nothing in the list. The graph is a zero-based column chart with a caption and controls on its title row; packet hover only marks its bar; a Map colors key and per-row protocol dots tie the maps to the list, with distinct default protocol colors (old defaults migrate, chosen colors stay). Details in CHANGELOG.md.
