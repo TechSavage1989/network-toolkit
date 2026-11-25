@@ -16,12 +16,24 @@ import (
 	"networktoolkit/internal/terminal"
 )
 
-func TestAdminShellNeedsAnAdministratorProcess(t *testing.T) {
-	saved := adminShellProcessElevated
-	t.Cleanup(func() { adminShellProcessElevated = saved })
+// Owner request after v1.21.83: a standard Network Toolkit opens an
+// administrator tab through Windows' approval and the private helper, with no
+// restart; one that runs as administrator opens it directly.
+func TestAdminShellUsesTheHelperOnlyWhenNotElevated(t *testing.T) {
+	savedElevated, savedLaunch := adminShellProcessElevated, terminalShellLaunch
+	t.Cleanup(func() { adminShellProcessElevated, terminalShellLaunch = savedElevated, savedLaunch })
+	launched := 0
+	terminalShellLaunch = func(string, uint32) (syscall.Handle, error) { launched++; return 0, syscall.Errno(1223) }
 	adminShellProcessElevated = func() bool { return false }
-	if _, err := openAdministratorShell(context.Background(), terminal.LocalShellOptions{Type: "cmd", Cols: 80, Rows: 24}, func([]byte) {}); !errors.Is(err, errAdminShellNeedsRestart) {
-		t.Fatalf("a standard process opened an administrator shell: %v", err)
+	if _, err := openAdministratorShell(context.Background(), terminal.LocalShellOptions{Type: "cmd", Cols: 80, Rows: 24}, func([]byte) {}); err == nil || launched != 1 {
+		t.Fatalf("a standard process did not ask Windows for the helper: %v (%d)", err, launched)
+	}
+	adminShellProcessElevated = func() bool { return true }
+	if conn, err := openAdministratorShell(context.Background(), terminal.LocalShellOptions{Type: "cmd", Cols: 80, Rows: 24}, func([]byte) {}); err == nil {
+		conn.Close()
+	}
+	if launched != 1 {
+		t.Fatal("an administrator process started the helper")
 	}
 }
 

@@ -182,6 +182,8 @@ func main() {
 	localParent := flag.Uint("local-tools-parent", 0, "Expected local configuration helper parent process")
 	packetHelper := flag.String("packet-capture-helper", "", "Private packet capture helper pipe")
 	packetParent := flag.Uint("packet-capture-parent", 0, "Expected packet capture helper parent process")
+	shellHelper := flag.String("terminal-shell-helper", "", "Private administrator terminal pipe")
+	shellParent := flag.Uint("terminal-shell-parent", 0, "Expected administrator terminal parent")
 	editorRegistration := flag.String(textEditorRegistrationFlag, "", "Private Text Editor registration action for the hosted Setup check")
 	flag.Parse()
 	// Alone only: no other switch, no argument, no window and no data folder.
@@ -198,6 +200,23 @@ func main() {
 			os.Exit(2)
 		}
 		os.Exit(runTextEditorRegistrationCommand(*editorRegistration))
+	}
+	shellRequested, shellOther := false, false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "terminal-shell-helper" || f.Name == "terminal-shell-parent" {
+			shellRequested = true
+		} else {
+			shellOther = true
+		}
+	})
+	if shellRequested {
+		if shellOther || flag.NArg() != 0 || *shellHelper == "" || *shellParent == 0 || uint64(*shellParent) > uint64(^uint32(0)) {
+			platform.NotifyFatal("Invalid private terminal helper request.")
+			return
+		}
+		// No HTTP listener, settings, vault or browser is initialized in this role.
+		_ = runTerminalShellHelper(*shellHelper, uint32(*shellParent))
+		return
 	}
 	packetRequested, packetOther := false, false
 	flag.Visit(func(f *flag.Flag) {

@@ -1,3 +1,11 @@
+# v1.21.84 Beta 1 - Administrator tabs without a restart again
+
+Owner request on v1.21.83: the administrator tab must not need a restart. The hidden-helper removal of 1.21.81 was based on a guess; the SentinelOne alerts named the vault password box and the suspended shell start, both fixed since. The helper is back (with the fixed shell start); Restart as administrator remains only as the fallback when the tab cannot start.
+
+Release channel: `docs/RELEASE_CHANNEL.txt` stays `beta`.
+
+Known limits: whether SentinelOne accepts the helper itself is not known until the owner tries 1.21.84 with the exclusion off; the program is unsigned. Not checked on real Windows with SentinelOne.
+
 # v1.21.83 Beta 1 - Local shells start without a suspended process
 
 Owner report on v1.21.82 (see CHANGELOG): SentinelOne flagged "Preload Injection" when a Command Prompt opened. Local shells were created suspended, put in their cleanup job and resumed; they now start inside the job through the job-list attribute.
