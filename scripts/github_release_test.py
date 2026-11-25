@@ -4,6 +4,7 @@ import io
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -236,3 +237,127 @@ class LinuxArchives(unittest.TestCase):
         release.check_windows_setup(data, '1.21.35')
         with self.assertRaisesRegex(ValueError, 'version resource'):
             release.check_windows_setup(data, '1.21.36')
+
+
+def fake_pe(current, name=None):
+    """A minimal PE32+ GUI x64 image that passes check_exe/check_program."""
+    import struct
+    at = 0x80
+    data = bytearray(at + 160)
+    data[:2] = b'MZ'
+    struct.pack_into('<I', data, 0x3c, at)
+    data[at:at + 4] = b'PE\0\0'
+    struct.pack_into('<H', data, at + 4, 0x8664)
+    struct.pack_into('<H', data, at + 24, 0x20b)
+    struct.pack_into('<H', data, at + 24 + 68, 2)
+    payload = (current + '.0').encode('utf-16le')
+    if name is not None:
+        payload += (name + '\0').encode('utf-16le')
+    return bytes(data) + payload
+
+
+def fake_setup(current):
+    """A minimal PE that passes check_windows_setup, standing in for NSIS output."""
+    import struct
+    data = bytearray(200)
+    data[:2] = b'MZ'
+    struct.pack_into('<I', data, 0x3c, 0x40)
+    data[0x40:0x44] = b'PE\0\0'
+    struct.pack_into('<H', data, 0x40 + 24 + 68, 2)
+    version_words = release.windows_version_words(current)
+    struct.pack_into('<6I', data, 160, 0xFEEF04BD, 0, *version_words, *version_words)
+    return bytes(data)
+
+
+class ReleaseSigning(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.current = release.version()
+        self.tag = 'v' + self.current
+        self.silent = contextlib.redirect_stdout(io.StringIO())
+        self.silent.__enter__()
+        self.addCleanup(self.silent.__exit__, None, None, None)
+
+    def stub_signer(self):
+        # Append a marker, as Authenticode appends an attribute-certificate
+        # overlay; the headers and version resource the checks read are untouched.
+        command = f'{sys.executable} -c ' + repr(
+            'import sys; p=sys.argv[1]; open(p,"ab").write(b"SIGNED:"+p.replace("\\\\","/").rsplit("/",1)[-1].encode())')
+        return release.signer_from_command(command)
+
+    def test_signer_from_command_runs_in_place_and_empty_is_none(self):
+        self.assertIsNone(release.signer_from_command(''))
+        path = self.root / 'thing.bin'
+        path.write_bytes(b'body')
+        self.stub_signer()(path)
+        self.assertEqual(path.read_bytes(), b'bodySIGNED:thing.bin')
+
+    def test_signer_failure_stops_the_release(self):
+        failing = release.signer_from_command(f'{sys.executable} -c ' + repr('import sys; sys.exit(3)'))
+        path = self.root / 'thing.bin'
+        path.write_bytes(b'body')
+        with self.assertRaises(subprocess.CalledProcessError):
+            failing(path)
+
+    def _inputs(self):
+        build = self.root / 'build'
+        build.mkdir(exist_ok=True)
+        exe = build / release.STABLE_EXE
+        exe.write_bytes(fake_pe(self.current))
+        programs = {}
+        for name in release.SEPARATE_PROGRAMS:
+            path = build / name
+            path.write_bytes(fake_pe(self.current, name))
+            programs[name] = path
+        linux = {}
+        for arch, machine in release.LINUX_ARCHES:
+            path = build / f'linux-{arch}'
+            path.write_bytes(fake_elf(machine, self.current))
+            linux[arch] = path
+        return exe, programs, linux
+
+    def test_package_signs_every_program_and_setup_before_the_checksums(self):
+        exe, programs, linux = self._inputs()
+        output = self.root / 'dist'
+        received = {}
+
+        def fake_package_windows_setup(exe, current, out, programs=None, sign=None):
+            received['sign'] = sign
+            setup = out / release.windows_setup_name(current)
+            setup.write_bytes(fake_setup(current))
+            if sign:
+                sign(setup)
+            return setup
+
+        with mock.patch.object(release, 'package_windows_setup', fake_package_windows_setup):
+            release.package(exe, output, self.tag, allow_untracked=True, linux=linux,
+                            programs=programs, sign=self.stub_signer())
+
+        self.assertIsNotNone(received['sign'])
+        prefix = f'Network_Toolkit_{self.current}'
+        self.assertTrue((output / release.STABLE_EXE).read_bytes().endswith(b'SIGNED:' + release.STABLE_EXE.encode()))
+        self.assertTrue((output / release.windows_setup_name(self.current)).read_bytes().startswith(b'MZ'))
+        import zipfile
+        with zipfile.ZipFile(output / f'{prefix}_Portable.zip') as bundle:
+            for name in (release.STABLE_EXE, *release.SEPARATE_PROGRAMS):
+                self.assertTrue(bundle.read(f'{prefix}/{name}').endswith(b'SIGNED:' + name.encode()), name)
+        with zipfile.ZipFile(output / f'{prefix}_Update.zip') as bundle:
+            member = f'{prefix}/{prefix}_Windows_x64.exe'
+            self.assertTrue(bundle.read(member).endswith(b'SIGNED:' + release.STABLE_EXE.encode()))
+        release.verify(output, self.tag)
+
+    def test_package_without_a_signer_leaves_bytes_unsigned(self):
+        exe, programs, linux = self._inputs()
+        output = self.root / 'dist'
+
+        def fake_package_windows_setup(exe, current, out, programs=None, sign=None):
+            self.assertIsNone(sign)
+            setup = out / release.windows_setup_name(current)
+            setup.write_bytes(fake_setup(current))
+            return setup
+
+        with mock.patch.object(release, 'package_windows_setup', fake_package_windows_setup):
+            release.package(exe, output, self.tag, allow_untracked=True, linux=linux, programs=programs)
+        self.assertNotIn(b'SIGNED:', (output / release.STABLE_EXE).read_bytes())

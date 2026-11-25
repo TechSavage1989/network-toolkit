@@ -31,6 +31,15 @@ concurrency:
   group: release-${{ github.repository }}
   cancel-in-progress: false
 
+# Azure Artifact Signing configuration (not secret). The identifiers used to
+# sign (tenant, client and subscription) are GitHub secrets read by the
+# sign-package job; see docs/CODE_SIGNING_PLAN.md.
+env:
+  SIGN_ENDPOINT: https://eus.codesigning.azure.net
+  SIGN_ACCOUNT: networktoolkit-signing
+  SIGN_PROFILE: jpaull-codesign
+  SIGN_TOOL_VERSION: '0.9.1-beta.25278.1'
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -45,7 +54,6 @@ jobs:
       old_manifest: ${{ steps.release.outputs.old_manifest }}
       new_commit: ${{ steps.release.outputs.new_commit }}
       request_commit: ${{ steps.release.outputs.request_commit }}
-      windows_setup: ${{ steps.package.outputs.windows_setup }}
     env:
       GOTOOLCHAIN: local
     steps:
@@ -98,22 +106,75 @@ jobs:
       - name: Build Windows x64 GUI application and Linux x86_64/aarch64 programs
         if: steps.release.outputs.publish == 'true'
         run: sh ./build.sh
+      - name: Upload the built, unsigned programs for signing and packaging
+        if: steps.release.outputs.publish == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-binaries
+          path: |
+            build/Network_Toolkit.exe
+            build/Network_Toolkit_TextEditor.exe
+            build/Network_Toolkit_Terminal.exe
+            build/linux-amd64/network-toolkit
+            build/linux-arm64/network-toolkit
+          if-no-files-found: error
+          retention-days: 7
+
+  sign-package:
+    needs: build
+    if: needs.build.outputs.publish == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    # A GitHub Environment makes this job's OIDC token subject
+    # `repo:<org>/<repo>:environment:release`, which the Entra federated
+    # credential matches exactly (a `v*` tag subject cannot, since Entra
+    # matches literally). The "release" environment must exist in repo
+    # Settings → Environments. See docs/CODE_SIGNING_PLAN.md.
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      windows_setup: ${{ steps.package.outputs.windows_setup }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
       - name: Install the Windows setup compiler
-        if: steps.release.outputs.publish == 'true'
-        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends nsis
-      - name: Package and verify Windows setup, portable assets, updater and Linux assets
+        run: choco install nsis --no-progress --yes
+      - name: Install the Azure Artifact Signing client
+        run: dotnet tool install --global sign --version "$env:SIGN_TOOL_VERSION"
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-binaries
+          path: build
+      - name: Sign in to Azure with OIDC (no stored password)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign the Windows programs and Setup, package, and write checksums
         id: package
-        if: steps.release.outputs.publish == 'true'
         env:
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+        shell: pwsh
         run: |
-          python3 scripts/github_release.py package --tag "$RELEASE_TAG" --exe "build/Network_Toolkit.exe" --editor-exe "build/Network_Toolkit_TextEditor.exe" --terminal-exe "build/Network_Toolkit_Terminal.exe" --linux-x86-64 "build/linux-amd64/network-toolkit" --linux-aarch64 "build/linux-arm64/network-toolkit"
-          if test -f "dist/Network_Toolkit_${RELEASE_VERSION}_Windows_x64_Setup.exe"; then
-            echo "windows_setup=true" >> "$GITHUB_OUTPUT"
-          fi
+          $sign = "sign code trusted-signing --trusted-signing-endpoint $env:SIGN_ENDPOINT --trusted-signing-account $env:SIGN_ACCOUNT --trusted-signing-certificate-profile $env:SIGN_PROFILE"
+          python scripts/github_release.py package --tag "$env:RELEASE_TAG" `
+            --exe "build/Network_Toolkit.exe" --editor-exe "build/Network_Toolkit_TextEditor.exe" --terminal-exe "build/Network_Toolkit_Terminal.exe" `
+            --linux-x86-64 "build/linux-amd64/network-toolkit" --linux-aarch64 "build/linux-arm64/network-toolkit" `
+            --sign "$sign"
+          if (Test-Path "dist/Network_Toolkit_${env:RELEASE_VERSION}_Windows_x64_Setup.exe") {
+            "windows_setup=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
       - uses: actions/upload-artifact@v7
-        if: steps.release.outputs.publish == 'true'
         with:
           name: release-assets
           path: dist/*
@@ -121,8 +182,8 @@ jobs:
           retention-days: 7
 
   windows-setup:
-    needs: build
-    if: needs.build.outputs.publish == 'true' && needs.build.outputs.windows_setup == 'true'
+    needs: [build, sign-package]
+    if: needs.build.outputs.publish == 'true' && needs.sign-package.outputs.windows_setup == 'true'
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
@@ -134,12 +195,12 @@ jobs:
         with:
           name: release-assets
           path: ${{ runner.temp }}/ntk-setup-release
-      - name: Test the exact Windows installer that will be published
+      - name: Test the exact signed Windows installer that will be published
         run: ./scripts/installer/verify-windows.ps1 -ArtifactDirectory "${{ runner.temp }}/ntk-setup-release"
 
   publish:
-    needs: [build, windows-setup]
-    if: ${{ !cancelled() && needs.build.result == 'success' && needs.build.outputs.publish == 'true' && (needs.windows-setup.result == 'success' || (needs.build.outputs.windows_setup != 'true' && needs.windows-setup.result == 'skipped')) }}
+    needs: [build, sign-package, windows-setup]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.sign-package.result == 'success' && needs.build.outputs.publish == 'true' && (needs.windows-setup.result == 'success' || (needs.sign-package.outputs.windows_setup != 'true' && needs.windows-setup.result == 'skipped')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

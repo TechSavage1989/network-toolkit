@@ -10,6 +10,7 @@ import json
 import os
 import re
 import runpy
+import shlex
 import struct
 import subprocess
 import sys
@@ -259,7 +260,24 @@ def windows_version_words(current):
     return major << 16 | minor, patch << 16
 
 
-def package_windows_setup(exe, current, output, programs=None):
+def signer_from_command(command):
+    """Turn a --sign command into a callable that signs a file in place.
+
+    The command is run as `<command> <path>`; a non-zero exit stops the release.
+    Signing (Authenticode) appends an attribute-certificate overlay to the PE,
+    so it never changes the MZ/PE headers or version resource the checks read.
+    """
+    if not command:
+        return None
+    argv = shlex.split(command)
+
+    def sign(path):
+        subprocess.run([*argv, str(Path(path).resolve())], check=True, cwd=ROOT)
+
+    return sign
+
+
+def package_windows_setup(exe, current, output, programs=None, sign=None):
     setup = output / windows_setup_name(current)
     temporary = setup.with_name(setup.name + '.building')
     option = '/' if os.name == 'nt' else '-'
@@ -270,6 +288,8 @@ def package_windows_setup(exe, current, output, programs=None):
                         f'{option}DEDITOR_EXE={programs[EDITOR_EXE].resolve()}', f'{option}DTERMINAL_EXE={programs[TERMINAL_EXE].resolve()}',
                         f'{option}DSETUP_EXE={temporary.resolve()}', f'{option}DAPP_ICON={ROOT / "assets/Network_Toolkit_Icon.ico"}',
                         str(ROOT / 'scripts/installer/windows.nsi')], check=True, cwd=ROOT)
+        if sign:
+            sign(temporary)
         check_windows_setup(temporary.read_bytes(), current)
         os.replace(temporary, setup)
     finally:
@@ -310,7 +330,7 @@ def sums(items):
     return ''.join(f'{sha(data)}  {name}\n' for name, data in sorted(items.items())).encode()
 
 
-def package(exe, output, tag, allow_untracked, linux=None, programs=None):
+def package(exe, output, tag, allow_untracked, linux=None, programs=None, sign=None):
     current = validate(tag)
     linux = linux or {}
     require(set(linux) == {arch for arch, _ in LINUX_ARCHES}, 'Provide the Linux x86_64 and aarch64 executables')
@@ -319,6 +339,14 @@ def package(exe, output, tag, allow_untracked, linux=None, programs=None):
     require(set(programs) == (set(SEPARATE_PROGRAMS) if separate else set()),
             'Provide the separate Text Editor and Terminal programs')
     output.mkdir(parents=True, exist_ok=True)
+    # Sign the Windows programs in place first, so every artifact built below
+    # (the standalone exe, Portable ZIP, Update ZIP and Setup payload) carries
+    # the signed bytes and the final SHA256SUMS covers them. The Linux programs
+    # are not Authenticode-signed. Setup is signed after NSIS builds it, below.
+    if sign:
+        sign(exe)
+        for path in programs.values():
+            sign(path)
     binary = exe.read_bytes()
     check_exe(binary, current)
     program_bytes = {name: path.read_bytes() for name, path in programs.items()}
@@ -355,7 +383,7 @@ def package(exe, output, tag, allow_untracked, linux=None, programs=None):
     update_archive = package_public_update.package(exe, output, write_manifest=False, programs=programs or None)
     packages = [output / STABLE_EXE, archive, update_archive]
     if has_windows_setup(current):
-        packages.append(package_windows_setup(exe, current, output, programs) if separate else package_windows_setup_legacy(exe, current, output))
+        packages.append(package_windows_setup(exe, current, output, programs, sign) if separate else package_windows_setup_legacy(exe, current, output))
     packages.extend(package_linux(linux[arch].read_bytes(), current, arch, machine, output) for arch, machine in LINUX_ARCHES)
     atomic_write(output / 'SHA256SUMS', sums({path.name: path.read_bytes() for path in packages}))
     verify(output, tag)
@@ -519,6 +547,7 @@ def main():
                 command.add_argument('--linux-' + arch.replace('_', '-'), type=Path, required=True, dest='linux_' + arch,
                                      help=f'Linux {arch} executable')
             command.add_argument('--allow-untracked-source', action='store_true', help='Explicit local setup/testing only')
+            command.add_argument('--sign', default='', help='Command that signs a Windows PE file in place: run as "<command> <path>" on each program and on Setup')
         if name == 'publish':
             command.add_argument('--repo', required=True)
     args = parser.parse_args()
@@ -532,7 +561,8 @@ def main():
     elif args.command == 'package':
         programs = {name: path for name, path in ((EDITOR_EXE, args.editor_exe), (TERMINAL_EXE, args.terminal_exe)) if path}
         package(args.exe, args.output_dir.resolve(), args.tag, args.allow_untracked_source,
-                {arch: getattr(args, 'linux_' + arch) for arch, _ in LINUX_ARCHES}, programs)
+                {arch: getattr(args, 'linux_' + arch) for arch, _ in LINUX_ARCHES}, programs,
+                signer_from_command(args.sign))
     elif args.command == 'verify':
         print('Verified ' + verify(args.output_dir.resolve(), args.tag))
     else:

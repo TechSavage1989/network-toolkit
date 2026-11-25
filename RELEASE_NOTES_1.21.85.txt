@@ -1,0 +1,11 @@
+Network Toolkit 1.21.85
+
+## What's New
+
+- Network Toolkit is now digitally signed. Windows and security software can see who published it, which should stop the warnings and removals some security tools showed for the unsigned program.
+
+## Additional Details
+
+- The program, the separate Text Editor and Terminal programs and Setup are signed with Microsoft's Artifact Signing service.
+- Some security software builds trust in a newly signed program over time, so a warning may still appear at first.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
