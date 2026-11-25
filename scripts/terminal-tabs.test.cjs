@@ -305,13 +305,13 @@ test('Restart this tab as administrator asks first, replaces the tab only once t
  assert.deepEqual(calls.filter(c=>['pane','delete','select'].includes(c[0])),[['pane',0,'elevated'],['delete','one',true],['select','elevated']]);
  assert.deepEqual(order,['elevated','two'],'the elevated tab takes the original position');assert(!h.entries.has('one'));
 });
-test('a standard Network Toolkit offers Restart as administrator for both admin actions and opens no tab, helper or dialog of its own',async()=>{
+test('both admin tab actions open the administrator tab through the normal connection path, with no restart',async()=>{
  const h=harness(),shell=h.entries.get('one');shell.info.type='cmd';shell.config={type:'cmd',workingDirectory:'C:\\Tools'};
- const calls=[];Object.assign(h.context,{DETACHED_TERMINAL:false,DETACHED_WORKSPACE:false,terminalConnectBusy:false,terminalWorkspaceTransferBusy:false,status:{processElevated:false},
+ const calls=[];Object.assign(h.context,{DETACHED_TERMINAL:false,DETACHED_WORKSPACE:false,terminalConnectBusy:false,terminalWorkspaceTransferBusy:false,status:{processElevated:false,adminRestartAvailable:true},
   safeTerminalConfig:c=>({...c}),newTerminalTab:()=>calls.push(['new-tab']),openTerminalConnect:c=>calls.push(['dialog',c]),connectTerminal:async()=>calls.push(['connect']),
   openModal:title=>calls.push(['modal',title]),offerAdminRestart:async()=>{calls.push(['restart']);return false;}});
- await h.api.run('run-as-admin',h.api.token('one'));await h.api.run('convert-admin',h.api.token('one'));
- assert.deepEqual(calls,[['restart'],['restart']]);assert(h.entries.has('one'),'the tab is kept');
- h.context.status.processElevated=true;calls.length=0;await h.api.run('run-as-admin',h.api.token('one'));
- assert.deepEqual(calls.map(c=>c[0]),['new-tab','dialog','connect'],'an administrator Network Toolkit opens the shell as a tab');
+ await h.api.run('run-as-admin',h.api.token('one'));
+ assert.deepEqual(calls.map(c=>c[0]),['new-tab','dialog','connect'],'Open as administrator connects through Windows approval');
+ calls.length=0;await h.api.run('convert-admin',h.api.token('one'));assert.deepEqual(calls,[['modal','Restart tab as administrator']],'Restart this tab asks first, as before');
+ assert(!calls.some(c=>c[0]==='restart'));
 });

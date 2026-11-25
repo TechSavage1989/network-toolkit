@@ -1,0 +1,12 @@
+Network Toolkit 1.21.84
+
+## What's New
+
+- Run as administrator for Command Prompt and PowerShell opens an administrator tab again without restarting Network Toolkit. Windows asks for approval and the rest of the app keeps running as it was.
+
+## Additional Details
+
+- The SentinelOne alerts behind the earlier change came from the way shells were started and from the vault's Windows password box. Both are fixed (1.21.82 and 1.21.83), so the administrator tab works the way it did before.
+- If the administrator tab cannot start, the connection form offers Restart Network Toolkit as administrator instead. A declined Windows approval changes nothing.
+- When Network Toolkit itself runs as administrator, every Command Prompt and PowerShell tab is an administrator shell.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

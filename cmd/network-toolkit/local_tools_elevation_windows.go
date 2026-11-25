@@ -214,7 +214,7 @@ func localLaunchElevatedMode(id string, parent uint32, packetCapture bool) (sysc
 }
 
 func localLaunchElevatedRole(id string, parent uint32, role string) (syscall.Handle, error) {
-	if role != "local-tools" && role != "packet-capture" {
+	if role != "local-tools" && role != "packet-capture" && role != "terminal-shell" {
 		return 0, errors.New("Invalid private helper role.")
 	}
 	if !validLocalHelperID(id) || parent == 0 {
