@@ -1,0 +1,15 @@
+Network Toolkit 1.21.86
+
+## What's New
+
+- The packet capture traffic graph now shows plain bars of how many packets were recorded over time, with a caption saying how much time each bar covers.
+- Hovering a packet in the list no longer opens a card over the list. It only marks that packet's bar in the graph.
+- The maps beside the packet list use clearer colors. A color key above the list explains them, and each packet shows a matching color dot.
+
+## Additional Details
+
+- Bars start from zero, so their heights compare fairly. Hover a bar for its times, packets, bytes and rates, or click it to list its packets, as before.
+- A small mark above a bar means some of its packets carry an error, warning or note.
+- The graph's view controls moved onto the Traffic graph title row, leaving more room for the bars.
+- Protocol colors you changed yourself in Colors & maps are kept; only the old default colors change.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

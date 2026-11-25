@@ -1,3 +1,11 @@
+# v1.21.86 Beta 1 - Clearer packet capture graph and maps
+
+Owner reports on v1.21.85 about Packet capture: the traffic graph's outlined interval boxes, the interval card and row outlines on packet hover, and side-map colors that matched nothing in the list. The graph is a zero-based column chart with a caption and controls on its title row; packet hover only marks its bar; a Map colors key and per-row protocol dots tie the maps to the list, with distinct default protocol colors (old defaults migrate, chosen colors stay). Details in CHANGELOG.md.
+
+Release channel: `docs/RELEASE_CHANNEL.txt` stays `beta`.
+
+Known limits: the clue mark above a bar shows the strongest clue only; bar duration in a held or zoomed view is the server's bucket size and may read as, for example, 997 ms.
+
 # v1.21.85 Beta 1 - Signed Windows programs
 
 The Windows programs and Setup are signed with Azure Artifact Signing in the Release workflow (`sign-package` job; setup and secrets in docs/CODE_SIGNING_PLAN.md). Owner tests on 1.21.84 showed SentinelOne removing the unsigned program whenever it hosted an administrator shell.

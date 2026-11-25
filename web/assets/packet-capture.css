@@ -357,9 +357,6 @@
 .packet-timeline [data-packet-bucket]{cursor:pointer;outline:none}
 .packet-timeline .packet-timeline-bar{fill:var(--accent);opacity:.75;pointer-events:none}
 .packet-timeline .packet-timeline-hit{fill:transparent;pointer-events:all}
-.packet-timeline [data-packet-bucket]:hover .packet-timeline-hit,.packet-timeline [data-packet-bucket].selected .packet-timeline-hit{fill:var(--accent);fill-opacity:.16}
-.packet-timeline [data-packet-bucket]:focus-visible .packet-timeline-hit{stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke}
-.packet-timeline [data-packet-bucket].selected .packet-timeline-bar{opacity:1}
 .packet-timeline-axis{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--muted);padding:5px 0}
 .packet-timeline-details{min-width:0;padding:10px;border:1px solid var(--line);border-radius:7px;margin:7px 0 10px;background:var(--panel2);font-size:11px}
 .packet-timeline-prompt{margin:0;color:var(--muted);line-height:1.6}
@@ -391,8 +388,6 @@
 .packet-traffic-heading select{width:auto;max-width:210px;min-height:25px;font-size:10px;padding:3px 22px 3px 5px}
 .packet-graph-scroll{min-width:0;max-width:100%;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:thin}
 .packet-graph-scroll .packet-timeline{max-width:none;overflow:hidden;height:105px}
-.packet-timeline [data-packet-bucket].packet-bucket-hovered .packet-timeline-hit{fill:var(--accent);fill-opacity:.2;stroke:var(--text);stroke-width:1;vector-effect:non-scaling-stroke}
-.packet-timeline [data-packet-bucket].selected .packet-timeline-hit{stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke}
 .packet-timeline-retained,.packet-timeline-correlation,.packet-timeline-aggregation{margin:4px 0 7px;font-size:10px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
 .packet-graph-reader .packet-timeline-values{grid-template-columns:repeat(auto-fit,minmax(min(100%,135px),1fr));gap:5px 10px}
 .packet-graph-reader .packet-timeline-details{margin-bottom:5px;padding:7px}
@@ -401,8 +396,6 @@
 .packet-graph-popup{position:fixed;z-index:10010;pointer-events:none;max-width:min(430px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:hidden;padding:10px 12px;border:1px solid var(--accent);border-radius:8px;background:var(--panel);color:var(--text);box-shadow:0 5px 22px #0005;font-size:11px}
 .packet-graph-popup>strong{display:block;margin-bottom:7px;font-size:12px}
 .packet-graph-popup .packet-timeline-values{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 12px}
-.packet-workspace .packet-table tbody tr.packet-graph-hovered:not(.packet-spacer){outline:2px solid var(--accent);outline-offset:-2px;box-shadow:inset 0 0 0 999px color-mix(in srgb,var(--accent) 13%,transparent)}
-.packet-workspace .packet-table tbody tr.packet-graph-pinned:not(.packet-spacer){border-inline:2px solid var(--accent)}
 @media(max-width:600px){
  .packet-graph-dock{flex-basis:200px;max-height:39%}
  .packet-graph-reader{padding:6px}
@@ -427,9 +420,6 @@
 .packet-graph-heading{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:8px;padding:3px 8px;font-size:11px}.packet-graph-heading .btn{min-height:24px;padding:3px 6px}
 .packet-graph-dock.packet-graph-collapsed{flex:0 0 auto!important;min-height:0;max-height:none!important}.packet-zoom-controls{display:flex;align-items:center;gap:4px;font-size:10px}.packet-zoom-controls .btn{min-width:25px}
 .packet-detail-filters{display:flex;flex:0 0 auto;align-items:center;gap:6px;padding:4px 7px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:thin;min-width:0}.packet-detail-filters label{display:flex;flex:none;align-items:center;gap:4px;font-size:10px;white-space:nowrap}.packet-detail-filters select{width:auto;max-width:160px;min-height:25px;font-size:10px;padding:3px 22px 3px 5px}.packet-detail-filters>.btn{flex:none;white-space:nowrap;min-height:25px}.packet-stat-filter-label{font-size:10px;min-width:210px;max-width:370px;color:var(--muted)}
-.packet-timeline .packet-bucket-error .packet-timeline-bar{fill:var(--packet-color-error,var(--bad))}.packet-timeline .packet-bucket-warn .packet-timeline-bar{fill:var(--packet-color-warn,var(--warn))}.packet-timeline .packet-bucket-note .packet-timeline-bar{fill:var(--packet-color-note,var(--info,var(--accent)))}
-.packet-timeline .packet-stat-matched .packet-timeline-bar{opacity:1}.packet-timeline .packet-stat-matched .packet-timeline-hit{stroke:var(--accent);stroke-width:.7;vector-effect:non-scaling-stroke}
-.packet-workspace .packet-table tbody tr.packet-graph-hovered:not(.packet-spacer){box-shadow:none;outline:2px solid var(--text);outline-offset:-2px}.packet-timeline [data-packet-bucket].selected .packet-timeline-hit{fill:none;stroke:var(--text)}
 @media(max-width:600px){.packet-graph-summary{padding:4px;gap:4px}.packet-statistic{min-height:41px;padding:4px 6px;flex-basis:106px}.packet-statistic strong{font-size:12px}.packet-detail-filters{padding:3px 5px}.packet-graph-heading{padding:3px 6px}}
 .packet-review-metrics>button{padding:8px;border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;gap:3px;min-width:0;background:var(--panel2);color:var(--text);font:inherit;text-align:left;cursor:pointer}.packet-review-metrics>button:hover,.packet-review-metrics>button:focus-visible{border-color:var(--accent);outline:1px solid var(--accent);outline-offset:-2px}.packet-review-metrics>button[data-packet-stat="tcpresets"] strong{color:var(--packet-color-note,var(--info,var(--accent)))}.packet-review-metrics>button[data-packet-stat="icmperrors"] strong{color:var(--packet-color-warn,var(--warn))}
 
@@ -580,3 +570,52 @@
 /* Packet details can also dock on the left (owner request, v1.21.3). */
 .packet-analysis.packet-details-left>.packet-list-panel{grid-column:3}
 .packet-analysis.packet-details-left>.packet-inspector,.packet-analysis.packet-details-left>.packet-details-rail{grid-column:1}
+
+/* Traffic graph (owner report on v1.21.85: outlined interval boxes read as
+   unexplained and ugly). A column chart of packets per interval from zero:
+   filled bars, two faint gridlines, a soft column behind a hovered or
+   selected bar, and a thin flag above a bar whose packets carry a clue.
+   SVG shapes here never inherit the icon stroke, which preserveAspectRatio
+   would stretch into thick white edges. */
+.packet-timeline{border:0;border-radius:0;background:transparent}
+.packet-timeline rect,.packet-timeline line{stroke:none}
+.packet-timeline .packet-timeline-grid{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4;vector-effect:non-scaling-stroke}
+.packet-timeline .packet-timeline-baseline{stroke:var(--border);stroke-width:1;vector-effect:non-scaling-stroke}
+.packet-timeline .packet-timeline-column{fill:transparent;pointer-events:none;transition:fill .12s}
+.packet-timeline .packet-timeline-bar{fill:var(--accent);opacity:.78;pointer-events:none;transition:opacity .12s}
+.packet-timeline .packet-timeline-clue{pointer-events:none;fill:var(--muted)}
+.packet-timeline .packet-bucket-warn .packet-timeline-clue{fill:var(--diag-warn,var(--warn))}
+.packet-timeline .packet-bucket-error .packet-timeline-clue{fill:var(--diag-bad,var(--bad))}
+.packet-timeline .packet-bucket-note .packet-timeline-clue{fill:var(--muted)}
+.packet-timeline .packet-timeline-hit{fill:transparent;stroke:none;pointer-events:all}
+.packet-timeline [data-packet-bucket]:hover .packet-timeline-column,.packet-timeline [data-packet-bucket].packet-bucket-hovered .packet-timeline-column{fill:color-mix(in srgb,var(--text) 7%,transparent)}
+.packet-timeline [data-packet-bucket]:hover .packet-timeline-bar,.packet-timeline [data-packet-bucket].packet-bucket-hovered .packet-timeline-bar,.packet-timeline .packet-stat-matched .packet-timeline-bar{opacity:1}
+.packet-timeline [data-packet-bucket].selected .packet-timeline-column{fill:color-mix(in srgb,var(--accent) 24%,transparent)}
+.packet-timeline [data-packet-bucket].selected .packet-timeline-bar{opacity:1}
+.packet-timeline [data-packet-bucket]:focus-visible .packet-timeline-column{fill:color-mix(in srgb,var(--accent) 12%,transparent);stroke:var(--accent);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.packet-graph-scroll .packet-timeline{border-left:1px solid var(--line)}
+.packet-y-axis{font-size:9px}.packet-y-mid{top:calc(54% - 6px)}.packet-y-upper{top:calc(8% - 6px)}.packet-y-lower{bottom:0}
+/* Packets of a hovered or selected bar get a quiet marker, never an outline. */
+#packetCaptureWorkspace .packet-table tbody tr.packet-graph-hovered:not(.packet-spacer){outline:none;box-shadow:inset 3px 0 var(--accent)}
+#packetCaptureWorkspace .packet-table tbody tr.packet-graph-pinned:not(.packet-spacer){box-shadow:inset 3px 0 var(--accent)}
+.packet-graph-popup{border-color:var(--border);box-shadow:0 6px 20px #0004}
+/* The graph's view controls share the Traffic graph title row. */
+.packet-graph-heading>.packet-traffic-heading{display:flex;align-items:center;gap:5px;flex:1 1 auto;min-width:0;margin:0 6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;white-space:nowrap}
+.packet-graph-heading>.packet-traffic-heading>*{flex-shrink:0}
+.packet-graph-heading>.packet-traffic-heading .packet-mode-control{flex:0 0 auto;width:96px;min-width:0}
+.packet-graph-heading>.packet-traffic-heading select{min-height:24px;padding-top:2px;padding-bottom:2px;font-size:10px}
+.packet-graph-heading>.packet-traffic-heading .graph-timeframe{display:flex;align-items:center;gap:4px;font-size:10px}
+.packet-graph-heading>.packet-traffic-heading .graph-timeframe select{width:96px}
+.packet-graph-heading>.packet-traffic-heading .graph-inline-zoom{display:flex;align-items:center;gap:3px;margin:0}
+.packet-graph-heading>.packet-traffic-heading .btn{min-height:24px;padding:2px 6px}
+.packet-graph-heading>strong{margin-right:0}
+
+/* Map color key and the matching dot before each packet's protocol, so a color
+   in the side maps can be found in the list (owner report on v1.21.85). */
+.packet-map-legend{display:flex;align-items:center;gap:8px;flex:0 1 auto;min-width:0;overflow:hidden;margin-left:auto;white-space:nowrap;color:var(--muted);font-size:10px}
+.packet-map-legend[hidden]{display:none}
+.packet-legend-title{font-weight:600}
+.packet-legend-chip{display:inline-flex;align-items:center;gap:4px;color:var(--text)}
+.packet-legend-chip>i{display:inline-block;flex:none;width:8px;height:8px;border-radius:2px;box-shadow:0 0 0 1px color-mix(in srgb,var(--text) 18%,transparent)}
+.packet-workspace .packet-table tbody tr:not(.packet-spacer)>td:nth-child(5)::before{content:'';display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:2px;background:var(--packet-row-color,var(--muted));box-shadow:0 0 0 1px color-mix(in srgb,var(--text) 18%,transparent)}
+.packet-workspace.packet-row-mode-off .packet-table tbody tr:not(.packet-spacer)>td:nth-child(5)::before{content:none}

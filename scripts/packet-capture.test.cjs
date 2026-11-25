@@ -340,7 +340,7 @@ test('packet colors and map sizes can be customized without removing the packet 
  assert(h.saved.length>=1,'appearance changes persist');
  h.doc.emit('click',h.doc.querySelector('[data-packet-action="reset-appearance"]'));
  assert.equal(h.c.state.packetMapSettings.lineHeight,1);
- assert.equal(h.c.state.packetMapSettings.colors.tcp,'#a7c6e9');
+ assert.equal(h.c.state.packetMapSettings.colors.tcp,'#5b8def');
  assert.equal(content.style.height,n+'px');
  assert.equal(h.c.state.packetMapSettings.rowStyle,'marker');
 });
@@ -352,14 +352,17 @@ test('saved packet map settings are validated, restored, and cannot inject CSS v
  assert.equal(h.c.state.packetMapSettings.overviewWidth,20);
  assert.equal(h.c.state.packetMapSettings.colors.dns,'#1a2b3c');
  assert.equal(h.c.state.packetMapSettings.colors.error,'#ffff00');
- assert.equal(h.c.state.packetMapSettings.colors.tcp,'#a7c6e9','invalid CSS is rejected');
+ assert.equal(h.c.state.packetMapSettings.colors.tcp,'#5b8def','invalid CSS is rejected');
  assert(h.doc.getElementById('packetCaptureWorkspace').classList.contains('packet-row-mode-subtle'));
  assert(h.doc.getElementById('packetCaptureWorkspace').classList.contains('packet-map-mode-protocols'));
  h.api.mergePreferences({packetMapSettings:{lineHeight:0,overviewWidth:500,rowStyle:'javascript:',colors:{dns:'blue'}}});
  assert.equal(h.c.state.packetMapSettings.lineHeight,1);
  assert.equal(h.c.state.packetMapSettings.overviewWidth,12);
  assert.equal(h.c.state.packetMapSettings.rowStyle,'marker');
- assert.equal(h.c.state.packetMapSettings.colors.dns,'#b8a5d9');
+ assert.equal(h.c.state.packetMapSettings.colors.dns,'#e0a03c');
+ h.api.mergePreferences({packetMapSettings:{colors:{tcp:'#a7c6e9',udp:'#123456'}}});
+ assert.equal(h.c.state.packetMapSettings.colors.tcp,'#5b8def','an old pastel default becomes the new default');
+ assert.equal(h.c.state.packetMapSettings.colors.udp,'#123456','a chosen color stays');
 });
 
 test('fine map viewport drag follows pointer one-to-one at 1, 2, and 4 pixels per packet',async()=>{
@@ -575,7 +578,9 @@ test('packet graph and packet rows highlight each other with half-open interval 
  const h=harness({id:'5'.repeat(24),name:'Correlated',state:'completed',count:4,bytes:400,revision:1},{packets,statistics});await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
  const row=n=>h.doc.querySelector('#packetRows [data-packet-number="'+n+'"]'),first=h.doc.querySelector('[data-packet-bucket="0"]'),last=h.doc.querySelector('[data-packet-bucket="1"]');
  h.doc.emit('pointerover',first);assert(row(1).classList.contains('packet-graph-hovered'));assert(!row(2).classList.contains('packet-graph-hovered'),'boundary time belongs to the later interval');assert(!row(4).classList.contains('packet-graph-hovered'));h.doc.emit('pointerout',first);
- h.doc.emit('pointerover',row(2));assert(last.classList.contains('packet-bucket-hovered'));assert(row(2).classList.contains('packet-graph-hovered'));assert(row(3).classList.contains('packet-graph-hovered'),'the final observed endpoint is included');assert(!row(4).classList.contains('packet-graph-hovered'));h.doc.emit('pointerout',row(2));assert(!last.classList.contains('packet-bucket-hovered'));
+ h.doc.emit('pointerover',last);assert(row(2).classList.contains('packet-graph-hovered'));assert(row(3).classList.contains('packet-graph-hovered'),'the final observed endpoint is included');assert(!row(4).classList.contains('packet-graph-hovered'));h.doc.emit('pointerout',last);
+ // Hovering a packet marks only its bar (owner report on v1.21.85): no card over the list and no marks on the other rows.
+ h.doc.emit('pointerover',row(2));assert(last.classList.contains('packet-bucket-hovered'));assert.equal(h.doc.getElementById('packetGraphPopup'),null,'hovering a packet shows no interval card');assert(!row(3).classList.contains('packet-graph-hovered'),'hovering a packet marks no other rows');h.doc.emit('pointerout',row(2));assert(!last.classList.contains('packet-bucket-hovered'));
  h.doc.emit('click',last);assert(row(2).classList.contains('packet-graph-pinned'));assert(row(3).classList.contains('packet-graph-pinned'));h.doc.emit('pointerover',row(4));assert.equal(h.doc.getElementById('packetGraphPopup'),null,'unknown timestamps cannot highlight a guessed interval');
 });
 

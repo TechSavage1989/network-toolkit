@@ -1,3 +1,11 @@
+## 1.21.86 Beta 1 - Clearer packet capture graph and maps
+
+- Owner reports on v1.21.85: the traffic graph's intervals were unexplained, outlined boxes; hovering a packet row popped the Traffic interval card over the list and outlined every row of that interval; the colors of the side maps could not be matched to the list.
+- The boxes were an inherited icon stroke (`stroke:currentColor`, 1.7 px) on every SVG rect, stretched by `preserveAspectRatio="none"`, and the bars were scaled from the visible minimum (`valueScale`), not zero. The graph is now a column chart from zero (`packetTrafficHTML`: rounded top `packetNiceCeiling`, gridlines, axis labels 0/half/top, caption "Each bar shows the packets recorded in 1 s" from the interval boundaries, a small mark above bars whose packets carry a clue, a soft column for hover and selection). Its controls sit on the Traffic graph title row (`packetTrafficControlsHTML`, `.packet-traffic-bare`), roughly doubling the plot height at the default pane size.
+- A hovered packet row marks only its bar (`selectPacketTimeline(..., 'row')`, `hoverSource`): no card, no marks on the other rows. Hovering a bar still shows the card and marks its packets, now with a 3 px accent edge instead of outlines.
+- Map color key above the list (`packetMapLegendHTML`, `[data-packet-map-legend]`) for the alerts and protocols in the capture, honoring Map colors; a color dot before each packet's protocol. The pastel protocol defaults are replaced by distinct hues; a saved color equal to an old default becomes the new default (`legacyProtocolColors`), a chosen color stays.
+- Checks: `scripts/packet-capture.test.cjs` (row hover shows no card and marks no rows; old defaults migrate, chosen colors stay) and the packet graph browser suites (features-92 to 98).
+
 ## 1.21.85 Beta 1 - Signed Windows programs
 
 - Owner tests on v1.21.84 (Windows Server 2022, SentinelOne Behavioral AI "Credential Prompt From Signed Process"): the program was removed whenever an administrator shell tab opened, also when the app itself was started as administrator from Explorer and asked for no approval. The pattern flagged is an unsigned program running as administrator and hosting a command shell. The owner chose code signing over per-machine exclusions or a separate console window.
