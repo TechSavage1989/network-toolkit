@@ -136,7 +136,14 @@ jobs:
       id-token: write
     outputs:
       windows_setup: ${{ steps.package.outputs.windows_setup }}
+    env:
+      # Read and write text as UTF-8, as the Ubuntu build does.
+      PYTHONUTF8: '1'
     steps:
+      # Keep the checkout's LF line endings: the Portable ZIP carries the source
+      # files byte for byte and the icon manifest pins exact bytes.
+      - name: Check out with LF line endings
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.build.outputs.commit }}
@@ -146,7 +153,10 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install the Windows setup compiler
-        run: choco install nsis --no-progress --yes
+        run: |
+          choco install nsis --no-progress --yes
+          # Chocolatey does not put makensis on PATH.
+          "${env:ProgramFiles(x86)}\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Install the Azure Artifact Signing client
         run: dotnet tool install --global sign --version "$env:SIGN_TOOL_VERSION"
       - uses: actions/download-artifact@v8
