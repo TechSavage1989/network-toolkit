@@ -1,0 +1,17 @@
+Network Toolkit 1.21.90
+
+## What's New
+
+- Network Toolkit is now digitally signed, so Windows and security software can see who published it. This should stop the removals some security tools caused.
+- Run as administrator for Command Prompt and PowerShell opens an administrator tab without restarting the app.
+- The packet capture graph shows plain bars of packets over time, and the map beside the packet list is in the rows' colors and scrolls like the Text Editor's map.
+- Subnet masks are shown in full, such as 255.255.254.0 (/23), in Local network and on the Overview.
+- When you paste several lines into the terminal, the review opens with the cursor at the end, and a new setting can end multiline pastes with Enter.
+
+## Additional Details
+
+- This stable release includes every change from the 1.21.80 to 1.21.89 betas.
+- The credential vault's master password is typed into Password manager itself, and local shells start the way ordinary programs do; security software had flagged the old ways.
+- Packet capture: hovering a packet only marks its bar in the graph; packet rows stay on one line; the map's outlined window is the packets on screen. Scroll the mouse wheel over the map to look around without moving the list, and drag the window to move the list. The whole-capture map is off by default (turn it on in Colors & maps).
+- If an administrator tab cannot start for another reason, the connection form offers to restart Network Toolkit as administrator.
+- Stable channel. Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

@@ -1,3 +1,9 @@
+# v1.21.90 Stable - Signed release with the 1.21.80 to 1.21.89 changes
+
+Owner request on v1.21.89: release the full version. 1.21.90 is the 1.21.89 beta source published on the stable channel (`docs/RELEASE_CHANNEL.txt` = `stable`, `updateBuildChannel = "stable"`), the first signed stable release. The last stable release was 1.21.79. Return the channel to `beta` for the next beta.
+
+Known limits: as listed for 1.21.80 to 1.21.89 below.
+
 # v1.21.89 Beta 1 - Packet map that scrolls like the Text Editor's map
 
 Owner requests on v1.21.88: the packet side map should scroll like the Text Editor's Document Map, and its colors and position did not match the list (Map colors was Alerts only; two maps). The maps now always use the rows' colors, only the close-up map shows by default (24 px), and it follows the list proportionally, scrolls alone under the wheel, and auto-scrolls when its window is dragged into an edge. Details in CHANGELOG.md.
