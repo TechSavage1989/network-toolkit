@@ -1,3 +1,7 @@
+## 1.21.90 Stable - Signed release with the 1.21.80 to 1.21.89 changes
+
+- Owner request on v1.21.89: "release full version". Stable release of the 1.21.89 beta source (release channel `stable`, `updateBuildChannel = "stable"`): code signing (1.21.85), administrator tabs without a restart (1.21.84), shell start and vault password fixes for SentinelOne (1.21.81 to 1.21.83), terminal paste ending (1.21.80), the packet capture graph and map (1.21.86, 1.21.87, 1.21.89) and full subnet masks (1.21.88). No code change beyond the version and channel.
+
 ## 1.21.89 Beta 1 - Packet map that scrolls like the Text Editor's map
 
 - Owner requests on v1.21.88: "can we make the side map scroll work the same for packet capture as it does with text editor", and (two screenshots) the full map did not line up with the list and its details could not be found. The screenshots had **Map colors: Alerts only** with full-strength protocol row colors, so the map was gray where the list was green, blue and purple, and two maps whose windows sat in different places.
