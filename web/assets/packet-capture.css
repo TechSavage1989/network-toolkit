@@ -629,5 +629,5 @@
 .packet-workspace #packetRows td.value-copy-cell{padding-right:5px!important}.packet-workspace #packetRows .value-copy-control{display:none!important}
 /* The outlined window is the packets on screen: a clear accent frame with the
    rest of the map dimmed, so the colors inside it are never covered. */
-.packet-map-viewport,.packet-map-detail-viewport{background:transparent!important;border:2px solid var(--accent)!important;border-radius:2px;box-shadow:0 0 0 1px var(--panel),0 0 0 100vh color-mix(in srgb,var(--panel) 45%,transparent)!important}
+.packet-map-viewport,.packet-map-detail-viewport{background:transparent!important;border:2px solid var(--accent)!important;border-radius:2px;box-shadow:0 0 0 1px var(--panel),0 0 0 100vh color-mix(in srgb,var(--panel) 25%,transparent)!important}
 .packet-intelligent-scroll:not(.packet-overview-scaled){overflow:hidden}

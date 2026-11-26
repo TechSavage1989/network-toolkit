@@ -1,3 +1,11 @@
+## 1.21.89 Beta 1 - Packet map that scrolls like the Text Editor's map
+
+- Owner requests on v1.21.88: "can we make the side map scroll work the same for packet capture as it does with text editor", and (two screenshots) the full map did not line up with the list and its details could not be found. The screenshots had **Map colors: Alerts only** with full-strength protocol row colors, so the map was gray where the list was green, blue and purple, and two maps whose windows sat in different places.
+- One rule for colors: the maps always use the rows' own colors (alert color, else protocol). `packetMapSettings.mapColors` is always `mixed` and its select is gone.
+- One map by default: settings `version:3`. A saved setting from before (old defaults: whole-capture map shown, close-up 15 px) reads as the new defaults (whole-capture map off, close-up 24 px); version 3 values stay. Labels say whole-capture map and close-up map.
+- Scrolling as the Document Map (editor-document-map.js): a following map is placed by the list's share of the capture (`packetMapFollowTop`); the wheel over a map that scrolls moves the map alone and holds it (`packetMapOwn`) until the list is scrolled by anything but the map; dragging the window holds the map, keeps the window under the pointer (`packetMapHoldAt`, `grab`) and auto-scrolls in the edge zones with `NTKEditorDocumentMap.boxEdgeDepth`/`autoSpeed` (`packetMapAutoStep`, fractional position, one animation frame loop stopped on release); a click still selects the packet under the pointer. Over a map that fits, the wheel scrolls the list. `packetJump` centers below the sticky header. The dimming around the window is lighter (25%).
+- Checks: `scripts/packet-capture.test.cjs` (wheel moves only the map and the list scroll releases it; a fitting map scrolls the list; migration to version 3; no map color mode; proportional placement) and the packet graph browser suites (features-92 to 98); real-app drag with edge auto-scroll in light and dark.
+
 ## 1.21.88 Beta 1 - Full subnet masks
 
 - Owner request on v1.21.87 (screenshot of Local network > IP configuration): show the subnet mask in full instead of only the prefix (`192.168.120.11/23`).

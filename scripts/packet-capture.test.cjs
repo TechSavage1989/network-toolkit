@@ -248,6 +248,8 @@ test('a 1 px detailed map draws one pixel per packet and virtualizes offscreen s
  await h.settle();h.api.mergePreferences({packetMapSettings:{version:2,lineHeight:1}});h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
  const lane=h.doc.getElementById('packetDetailMap'),content=h.doc.getElementById('packetDetailMapContent'),scroll=h.doc.getElementById('packetTableScroll');
  lane.clientHeight=400;lane.scrollHeight=n;scroll.clientHeight=350;scroll.scrollHeight=n*21+26;
+ // The map follows the list like the Text Editor's map: at the list's start it shows the start.
+ scroll.scrollTop=0;h.doc.emit('scroll',scroll);await h.settle();assert.equal(lane.scrollTop,0);
  assert.equal(content.style.height,n+'px');
  assert.equal(h.doc.querySelector('[data-map-index="0"]').getAttribute('style'),'top:0px');
  assert.equal(h.doc.querySelector('[data-map-index="1"]').getAttribute('style'),'top:1px');
@@ -262,6 +264,37 @@ test('a 1 px detailed map draws one pixel per packet and virtualizes offscreen s
  assert.equal(h.api.model.detail.packet.number,expected,'clicking a specific 1-pixel line selects that packet');
  assert.equal(h.api.model.selectedIndex,expected-1);
  assert(h.api.model.windowStart>=before-180);
+});
+
+test('the wheel over the close-up map scrolls the map alone, like the Text Editor map, until the list is scrolled',async()=>{
+ const n=3000,packets=Array.from({length:n},(_,i)=>({number:i+1,relative:i/100,source:'192.0.2.1',destination:'192.0.2.2',protocol:'TCP',transport:'TCP',length:60,captured:60,info:'packet '+(i+1),expert:[]}));
+ const h=harness({id:'e'.repeat(24),name:'Wheel',state:'completed',count:n,bytes:n*60,revision:3},{packets,total:n,paginate:true,overview:{packetMarks:'C'.repeat(n),bins:[],signals:[],counts:{},interesting:0},detail:num=>({packet:packets[num-1],layers:[],data:'',ascii:''})});
+ await h.settle();h.api.mergePreferences({packetMapSettings:{version:3,lineHeight:2}});h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+ const lane=h.doc.getElementById('packetDetailMap'),scroll=h.doc.getElementById('packetTableScroll');
+ lane.clientHeight=400;lane.scrollHeight=n*2;scroll.clientHeight=350;scroll.scrollHeight=n*21+26;
+ scroll.scrollTop=21*100;h.doc.emit('scroll',scroll);await h.settle();
+ const listTop=scroll.scrollTop,mapTop=Number(lane.scrollTop)||0;let prevented=false;
+ h.doc.emit('wheel',lane,{deltaY:900,deltaMode:0,preventDefault(){prevented=true;}});h.doc.emit('scroll',lane);await h.settle();
+ assert(prevented,'the map handles its own wheel');
+ assert.equal(lane.scrollTop,mapTop+900,'the wheel moves the map');
+ assert.equal(scroll.scrollTop,listTop,'the list stays where it is');
+ h.api.refresh&&await h.api.refresh();
+ assert.equal(lane.scrollTop,mapTop+900,'a held map is not pulled back to the list by a redraw');
+ scroll.scrollTop=21*102;h.doc.emit('scroll',scroll);await h.settle();
+ const overlay=h.doc.getElementById('packetDetailMapViewport'),top=parseFloat(overlay.style.transform.match(/,\s*([\d.]+)px/)[1]);
+ assert(top>=lane.scrollTop&&top+parseFloat(overlay.style.height)<=lane.scrollTop+400+0.5,'scrolling the list brings the map back to its window');
+ // A map that fits scrolls the list instead.
+ h.api.mergePreferences({packetMapSettings:{version:3,lineHeight:1}});await h.settle();lane.scrollHeight=n;lane.clientHeight=n+10;
+ const before=scroll.scrollTop;h.doc.emit('wheel',lane,{deltaY:120,deltaMode:0,preventDefault(){}});await h.settle();
+ assert.equal(scroll.scrollTop,before+120,'over a map that fits, the wheel scrolls the list');
+});
+
+test('settings from before v1.21.89 move to one close-up map; v1.21.89 choices stay',()=>{
+ const h=harness();
+ h.api.mergePreferences({packetMapSettings:{version:2,lineHeight:2,showOverview:true,detailWidth:15,mapColors:'alerts'}});
+ assert.equal(h.c.state.packetMapSettings.showOverview,false);assert.equal(h.c.state.packetMapSettings.detailWidth,24);assert.equal(h.c.state.packetMapSettings.mapColors,'mixed');assert.equal(h.c.state.packetMapSettings.lineHeight,2);
+ h.api.mergePreferences({packetMapSettings:{version:3,showOverview:true,detailWidth:15}});
+ assert.equal(h.c.state.packetMapSettings.showOverview,true);assert.equal(h.c.state.packetMapSettings.detailWidth,15);
 });
 
 test('dragging the main map thumb retains the pointer offset; outside-clicks still select the exact frame',async()=>{
@@ -324,8 +357,9 @@ test('packet colors and map sizes can be customized without removing the packet 
  assert(h.doc.getElementById('packetCaptureWorkspace').classList.contains('packet-row-mode-strong'));
  const overview=h.doc.getElementById('packetOverviewWidth');overview.value='24';h.doc.emit('change',overview);
  const width=h.doc.getElementById('packetDetailWidth');width.value='32';h.doc.emit('change',width);
- const mode=h.doc.getElementById('packetMapColorMode');mode.value='alerts';h.doc.emit('change',mode);
- assert(h.doc.getElementById('packetCaptureWorkspace').classList.contains('packet-map-mode-alerts'));
+ // The maps always use the rows' colors: there is no separate map color mode.
+ assert.equal(h.doc.getElementById('packetMapColorMode'),null);
+ assert(h.doc.getElementById('packetCaptureWorkspace').classList.contains('packet-map-mode-mixed'));
  assert.equal(h.doc.getElementById('packetCaptureWorkspace').style['--packet-map-overview-width'],'24px');
  assert.equal(h.doc.getElementById('packetCaptureWorkspace').style['--packet-map-detail-width'],'32px');
  const scale=h.doc.getElementById('packetMapLineHeight');scale.value='4';h.doc.emit('change',scale);
@@ -334,8 +368,7 @@ test('packet colors and map sizes can be customized without removing the packet 
  assert.equal(h.doc.getElementById('packetTableScroll'),viewport);
  assert.equal(h.doc.getElementById('packetDetailMap'),lane);
  lane.scrollHeight=n*4;lane.clientHeight=380;lane.scrollTop=0;viewport.scrollHeight=n*21+26;viewport.clientHeight=350;
- const rect=lane.getBoundingClientRect();h.doc.emit('click',lane,{clientY:rect.top+42});await h.settle();
- const expected=Math.floor((lane.scrollTop+42)/4)+1;
+ const rect=lane.getBoundingClientRect(),expected=Math.floor((lane.scrollTop+42)/4)+1;h.doc.emit('click',lane,{clientY:rect.top+42});await h.settle();
  assert.equal(h.api.model.detail.packet.number,expected,'custom line-height preserves exact click selection');
  assert(h.saved.length>=1,'appearance changes persist');
  h.doc.emit('click',h.doc.querySelector('[data-packet-action="reset-appearance"]'));
@@ -354,7 +387,7 @@ test('saved packet map settings are validated, restored, and cannot inject CSS v
  assert.equal(h.c.state.packetMapSettings.colors.error,'#ffff00');
  assert.equal(h.c.state.packetMapSettings.colors.tcp,'#5b8def','invalid CSS is rejected');
  assert(h.doc.getElementById('packetCaptureWorkspace').classList.contains('packet-row-mode-subtle'));
- assert(h.doc.getElementById('packetCaptureWorkspace').classList.contains('packet-map-mode-protocols'));
+ assert(h.doc.getElementById('packetCaptureWorkspace').classList.contains('packet-map-mode-mixed'),'a saved map color mode no longer differs from the rows');
  h.api.mergePreferences({packetMapSettings:{lineHeight:0,overviewWidth:500,rowStyle:'javascript:',colors:{dns:'blue'}}});
  assert.equal(h.c.state.packetMapSettings.lineHeight,'auto');
  assert.equal(h.c.state.packetMapSettings.overviewWidth,12);
@@ -481,7 +514,10 @@ test('backend alert severity drives matching packet row and fine map colors; ind
  assert(h.doc.querySelector('#packetOverviewMap .packet-map-bin').classList.contains('packet-map-warn'),'overview bin has matching severity');
  h.doc.emit('click',h.doc.querySelector('[data-packet-action="toggle-appearance"]'));
  const overviewToggle=h.doc.querySelector('[data-packet-visibility="showOverview"]'),fineToggle=h.doc.querySelector('[data-packet-visibility="showDetail"]');
- assert.equal(h.c.state.packetMapSettings.showOverview,true);assert.equal(h.c.state.packetMapSettings.showDetail,true);
+ // One close-up map by default (v1.21.89); the whole-capture map is a choice.
+ assert.equal(h.c.state.packetMapSettings.showOverview,false);assert.equal(h.c.state.packetMapSettings.showDetail,true);
+ assert.equal(h.doc.getElementById('packetOverviewMap').hidden,true,'the whole-capture map is off by default');
+ overviewToggle.checked=true;h.doc.emit('change',overviewToggle);assert.equal(h.doc.getElementById('packetOverviewMap').hidden,false);assert.equal(h.c.state.packetMapSettings.showOverview,true);
  overviewToggle.checked=false;h.doc.emit('change',overviewToggle);assert.equal(h.doc.getElementById('packetOverviewMap').hidden,true);
  assert.equal(h.doc.getElementById('packetDetailMap').hidden,false,'fine map independently remains visible');
  fineToggle.checked=false;h.doc.emit('change',fineToggle);assert.equal(h.doc.getElementById('packetDetailMap').hidden,true);
@@ -841,8 +877,9 @@ test('map synchronization does not swallow a real wheel offset merely because th
   const reader=h.doc.getElementById('packetTableScroll'),map=h.doc.getElementById(kind==='fine'?'packetDetailMap':'packetOverviewMap'),expected=kind==='fine'?'mapExpectedTop':'overviewMapExpectedTop';
   h.api.model.measuredRowHeight=21;h.api.model.measuredHeaderHeight=29.5;
   reader.scrollHeight=402*21+29.5;reader.clientHeight=244;reader.scrollTop=21*150+29.5;map.clientHeight=244;map.scrollTop=100;h.api.model[expected]=262;
-  h.doc.emit('scroll',reader);assert.equal(h.api.model[expected],262,kind+' interior offset is not evidence of a native clamp');
-  const before=reader.scrollTop;h.doc.emit('scroll',map);assert.notEqual(reader.scrollTop,before,kind+' genuine interior wheel is processed');await h.settle();
+  // Since v1.21.89 a following map is placed by the list's share of the capture (as the Text Editor's map is).
+  h.doc.emit('scroll',reader);assert.equal(h.api.model[expected],map.scrollTop,kind+' map follows the list to its proportional place');assert(map.scrollTop>0&&map.scrollTop<402-244);
+  map.scrollTop=20;const before=reader.scrollTop;h.doc.emit('scroll',map);assert.notEqual(reader.scrollTop,before,kind+' genuine interior wheel is processed');await h.settle();
  }
 });
 const checkSteps=[{id:'lookup',label:'Name lookup',state:'skipped',detail:'Not needed: you entered an IP address.'},{id:'reach',label:'Reach the device',state:'ok',detail:'192.0.2.12 answered.',packetNumbers:[7],filter:'ip.addr == "192.0.2.12"'},{id:'connect',label:'Connect',state:'fail',detail:'<b>refused</b> on Remote Desktop (port 3389)',packetNumbers:[8,9],filter:'tcp.port == 3389'},{id:'respond',label:'Service reply',state:'unexpected',detail:'Not reached.'}];
