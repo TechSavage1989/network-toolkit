@@ -1,3 +1,11 @@
+# v1.21.89 Beta 1 - Packet map that scrolls like the Text Editor's map
+
+Owner requests on v1.21.88: the packet side map should scroll like the Text Editor's Document Map, and its colors and position did not match the list (Map colors was Alerts only; two maps). The maps now always use the rows' colors, only the close-up map shows by default (24 px), and it follows the list proportionally, scrolls alone under the wheel, and auto-scrolls when its window is dragged into an edge. Details in CHANGELOG.md.
+
+Release channel: `docs/RELEASE_CHANNEL.txt` stays `beta`.
+
+Known limits: the map has no visible scroll bar of its own (it is 24 px wide); a held map returns to the list when the list is scrolled. Saved settings from before 1.21.89 lose a deliberate choice of the whole-capture map or a 15 px close-up map (indistinguishable from the old defaults).
+
 # v1.21.88 Beta 1 - Full subnet masks
 
 Owner request on v1.21.87: adapters' IPv4 subnet masks are shown in full (`255.255.254.0 (/23)`) in Local network > IP configuration (Current configuration, review, edit field) and on the Overview (adapter cards, adapters list, Local IPv4 card). The edit field accepts a dotted mask or a prefix.

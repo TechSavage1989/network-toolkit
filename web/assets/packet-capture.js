@@ -26,21 +26,30 @@ const packetPaletteGroups=[
  ['Events',[['error','Error'],['warn','Warning'],['note','Note']]],
  ['Protocols',[['tcp','TCP'],['udp','UDP'],['dns','DNS'],['dhcp','DHCP'],['arp','ARP'],['icmp','ICMP'],['icmpv6','ICMPv6'],['tls','TLS'],['http','HTTP'],['ssh','SSH'],['mdns','mDNS'],['smb','SMB'],['ntp','NTP'],['wireguard','WireGuard'],['lldp','LLDP'],['cdp','CDP'],['other','Other / unknown']]]
 ];
-const packetMapDefaults=Object.freeze({lineHeight:'auto',overviewScale:'fit',overviewWidth:12,detailWidth:15,rowStyle:'marker',mapColors:'mixed',showOverview:true,showDetail:true});
+const packetMapDefaults=Object.freeze({lineHeight:'auto',overviewScale:'fit',overviewWidth:12,detailWidth:24,rowStyle:'marker',mapColors:'mixed',showOverview:false,showDetail:true});
 const packetChoice=(value,allowed,fallback)=>allowed.includes(value)?value:fallback;
-function defaultMapSettings(){return {...packetMapDefaults,version:2,colors:{...packetPaletteDefaults}};}
+function defaultMapSettings(){return {...packetMapDefaults,version:3,colors:{...packetPaletteDefaults}};}
 function normalizeMapSettings(value){
  const v=value&&typeof value==='object'&&!Array.isArray(value)?value:{},colors=v.colors&&typeof v.colors==='object'&&!Array.isArray(v.colors)?v.colors:{};
  return {
   // 1 px was the default before v1.21.87; it is now Auto (owner report on v1.21.86: the
   // packets on screen were a sliver of the fine map), so a saved 1 reads as Auto.
-  version:2,lineHeight:v.version!==2&&v.lineHeight===1?'auto':packetChoice(v.lineHeight,['auto',1,2,3,4,6,8],packetMapDefaults.lineHeight),
+  // Version 3 (owner reports on v1.21.87 and v1.21.88: two maps whose windows
+  // and colors could not be matched with the list): one close-up map by
+  // default, like the Text Editor's Document Map, 24 px wide, colored like
+  // the rows. A saved setting from before cannot tell the old defaults (full
+  // map shown, 15 px) from a choice, so those two read as the new defaults;
+  // Colors & maps turns the whole-capture map back on.
+  version:3,lineHeight:(v.version!==2&&v.version!==3)&&v.lineHeight===1?'auto':packetChoice(v.lineHeight,['auto',1,2,3,4,6,8],packetMapDefaults.lineHeight),
   overviewScale:packetChoice(v.overviewScale,['fit',1,2,3,4],packetMapDefaults.overviewScale),
   overviewWidth:packetChoice(v.overviewWidth,[8,12,16,20,24],packetMapDefaults.overviewWidth),
-  detailWidth:packetChoice(v.detailWidth,[10,15,18,24,32],packetMapDefaults.detailWidth),
+  detailWidth:v.version!==3&&v.detailWidth===15?packetMapDefaults.detailWidth:packetChoice(v.detailWidth,[10,15,18,24,32],packetMapDefaults.detailWidth),
   rowStyle:packetChoice(v.rowStyle,['off','marker','subtle','strong','full'],packetMapDefaults.rowStyle),
-  mapColors:packetChoice(v.mapColors,['mixed','protocols','alerts'],packetMapDefaults.mapColors),
-  showOverview:v.showOverview!==false,
+  // The maps always use the rows' own colors (an alert's color, else the
+  // protocol's): a separate map color mode made the map show colors the list
+  // did not (owner report on v1.21.88: list in protocol colors, map gray).
+  mapColors:'mixed',
+  showOverview:v.version===3?v.showOverview===true:false,
   showDetail:v.showDetail!==false,
   colors:Object.fromEntries(Object.entries(packetPaletteDefaults).map(([key,defaultColor])=>{const stored=typeof colors[key]==='string'&&/^#[0-9a-f]{6}$/i.test(colors[key])?colors[key].toLowerCase():defaultColor;return [key,legacyEventColors[key]===stored||legacyProtocolColors[key]===stored?defaultColor:stored];}))
  };
@@ -73,12 +82,11 @@ function openPacketColor(button){const key=button.dataset.packetColor,picker=roo
 }
 function appearancePanelHTML(){const s=mapSettings();return '<aside id="packetAppearanceSettings" class="packet-appearance-settings" '+(!model.appearanceOpen?'hidden':'')+' aria-label="Packet color and map appearance settings"><header><strong>Packet colors & maps</strong></header><div class="packet-appearance-scroll"><div class="packet-appearance-controls">'+
  '<label>Packet row coloring<select id="packetRowStyle" data-packet-appearance="rowStyle">'+options([['off','Off'],['marker','Color marker only'],['subtle','Subtle row tint'],['strong','Strong row tint'],['full','Full strength (100% color)']],s.rowStyle)+'</select></label>'+
- '<label>Map colors<select id="packetMapColorMode" data-packet-appearance="mapColors">'+options([['mixed','Protocol + alerts'],['protocols','Protocols only'],['alerts','Alerts only']],s.mapColors)+'</select></label>'+
- '<label class="packet-map-visible-toggle"><input type="checkbox" data-packet-visibility="showOverview" '+(s.showOverview?'checked':'')+'> Show full map</label>'+'<label class="packet-map-visible-toggle"><input type="checkbox" data-packet-visibility="showDetail" '+(s.showDetail?'checked':'')+'> Show fine map</label>'+'<label>Full map width<select id="packetOverviewWidth" data-packet-appearance="overviewWidth">'+options([[8,'8 px'],[12,'12 px'],[16,'16 px'],[20,'20 px'],[24,'24 px']],s.overviewWidth)+'</select></label>'+
- '<label>Full map pixels per packet<select id="packetOverviewScale" data-packet-appearance="overviewScale">'+options([['fit','Fit entire capture (default)'],[1,'1 px / packet'],[2,'2 px / packet'],[3,'3 px / packet'],[4,'4 px / packet']],s.overviewScale)+'</select></label>'+
- '<label>Detail map width<select id="packetDetailWidth" data-packet-appearance="detailWidth">'+options([[10,'10 px'],[15,'15 px'],[18,'18 px'],[24,'24 px'],[32,'32 px']],s.detailWidth)+'</select></label>'+
- '<label>Detail pixels per packet<select id="packetMapLineHeight" data-packet-appearance="lineHeight">'+options([['auto','Auto: packets on screen fill a third (default)'],[1,'1 px'],[2,'2 px'],[3,'3 px'],[4,'4 px'],[6,'6 px'],[8,'8 px']],s.lineHeight)+'</select></label></div>'+
- '<p class="packet-appearance-hint">The outlined window in each map is the packets on screen. The close-up map shows one line per packet; Auto sizes the lines so the packets on screen fill about a third of it. Full map Fit mode compresses the entire capture for quick navigation. Alert colors take priority unless you select Protocols only.</p>'+
+  '<label class="packet-map-visible-toggle"><input type="checkbox" data-packet-visibility="showOverview" '+(s.showOverview?'checked':'')+'> Show whole-capture map</label>'+'<label class="packet-map-visible-toggle"><input type="checkbox" data-packet-visibility="showDetail" '+(s.showDetail?'checked':'')+'> Show close-up map</label>'+'<label>Whole-capture map width<select id="packetOverviewWidth" data-packet-appearance="overviewWidth">'+options([[8,'8 px'],[12,'12 px'],[16,'16 px'],[20,'20 px'],[24,'24 px']],s.overviewWidth)+'</select></label>'+
+ '<label>Whole-capture map pixels per packet<select id="packetOverviewScale" data-packet-appearance="overviewScale">'+options([['fit','Fit entire capture (default)'],[1,'1 px / packet'],[2,'2 px / packet'],[3,'3 px / packet'],[4,'4 px / packet']],s.overviewScale)+'</select></label>'+
+ '<label>Close-up map width<select id="packetDetailWidth" data-packet-appearance="detailWidth">'+options([[10,'10 px'],[15,'15 px'],[18,'18 px'],[24,'24 px (default)'],[32,'32 px']],s.detailWidth)+'</select></label>'+
+ '<label>Close-up map pixels per packet<select id="packetMapLineHeight" data-packet-appearance="lineHeight">'+options([['auto','Auto: packets on screen fill a third (default)'],[1,'1 px'],[2,'2 px'],[3,'3 px'],[4,'4 px'],[6,'6 px'],[8,'8 px']],s.lineHeight)+'</select></label></div>'+
+ '<p class="packet-appearance-hint">The map beside the list shows one line per packet in the same color as its row, and its outlined window is the packets on screen. Scroll the map with the wheel to look around without moving the list; drag the window to move the list, and hold it near the map&#39;s top or bottom edge to keep going. Auto sizes the lines so the packets on screen fill about a third of the map. The whole-capture map, off by default, compresses the entire capture for quick navigation.</p>'+
  packetPaletteGroups.map(([group,colors])=>'<section class="packet-appearance-group"><h3>'+group+'</h3><div class="packet-appearance-palette">'+colors.map(([key,label])=>'<label>'+packetColorControl(key,label,s.colors[key])+'<span>'+label+'</span></label>').join('')+'</div></section>').join('')+
  '</div><footer><button class="btn small ghost" type="button" data-packet-action="reset-appearance">Restore default colors & maps</button><span>Saved automatically</span></footer></aside>';}
 // What to look for and Colors & maps open under the row that holds their toggles, so pressing a toggle
@@ -686,7 +694,7 @@ function packetMapLineClass(index){
  const severity=['normal','note','warn','error'][Math.floor(value/16)]||'normal';
  return 'packet-map-'+severity+' packet-map-proto-'+mapProtocolNames[value%16];
 }
-function detailMapHTML(){return '<div class="packet-map-detail-scroll" id="packetDetailMap" role="region" tabindex="0" aria-label="Packet-level traffic map, one line per packet. Drag the viewport one-to-one to move through frames." title="Close-up map: one line per packet around the ones shown. The outlined window is exactly the packets on screen, in the same colors as their rows. Drag the window to scroll; click a line to select that packet."><div class="packet-map-detail-content" id="packetDetailMapContent" style="height:'+Math.max(1,model.total*mapLineHeight())+'px"><div id="packetDetailMapLines" class="packet-map-detail-lines"></div><span id="packetDetailMapViewport" class="packet-map-detail-viewport"></span><span id="packetDetailMapSelected" class="packet-map-detail-selected" hidden></span></div></div>';}
+function detailMapHTML(){return '<div class="packet-map-detail-scroll" id="packetDetailMap" role="region" tabindex="0" aria-label="Packet-level traffic map, one line per packet. Drag the viewport one-to-one to move through frames." title="Close-up map: one line per packet around the ones shown. The outlined window is exactly the packets on screen, in the same colors as their rows. Scroll the wheel here to look around without moving the list; drag the window to move the list (hold it at the top or bottom edge to keep going); click a line to select that packet."><div class="packet-map-detail-content" id="packetDetailMapContent" style="height:'+Math.max(1,model.total*mapLineHeight())+'px"><div id="packetDetailMapLines" class="packet-map-detail-lines"></div><span id="packetDetailMapViewport" class="packet-map-detail-viewport"></span><span id="packetDetailMapSelected" class="packet-map-detail-selected" hidden></span></div></div>';}
 function renderPacketDetailMap(force=false){
  const lane=node('packetDetailMap'),content=node('packetDetailMapContent'),lines=node('packetDetailMapLines');if(!lane||!content||!lines)return;
  const height=Math.max(1,model.total*mapLineHeight());if(content.style.height!==height+'px')content.style.height=height+'px';
@@ -709,15 +717,18 @@ function fineMapPosition(scroll,height=mapLineHeight()){
  const count=Math.max(1,(scroll.clientHeight-headerHeight)/rowHeight);
  return {top:first*height,height:Math.max(height,Math.min(model.total-first,count)*height)};
 }
+function packetMapFollowTop(scroll,maxTop){const {rowHeight}=packetMetrics(),last=Math.max(0,model.total-packetMapSpan(scroll)),first=clamp((Number(scroll.scrollTop)||0)/rowHeight,0,last);return last>0?first/last*maxTop:0;}
 function syncPacketDetailMap(scroll){
  const lane=node('packetDetailMap'),overlay=node('packetDetailMapViewport'),selected=node('packetDetailMapSelected');if(!lane||!overlay||!selected)return;
  const position=fineMapPosition(scroll),laneHeight=lane.clientHeight||420;
- // Keep the fine-map viewport wherever the operator dragged it. Pan the
- // packet-level strip only if the outlined range actually leaves its bounds.
- // Recentering after every scroll makes the thumb appear stuck in place.
- if(!model.granularDragging){
+ // A map that follows the list is placed as the Text Editor's Document Map
+ // is: the window's share of the way down the map is the list's share of the
+ // way through the capture, so the window moves smoothly from the map's top
+ // to its bottom and never sits in an edge zone mid-capture. A map the user
+ // holds (packetMapOwn) stays where it is.
+ if(!model.granularDragging&&packetMapOwn.detail===null){
   const current=Number(lane.scrollTop)||0,maxTop=Math.max(0,model.total*mapLineHeight()-laneHeight);
-  const destination=clamp(position.top<current?position.top:position.top+position.height>current+laneHeight?position.top+position.height-laneHeight:current,0,maxTop);
+  const destination=packetMapFollowTop(scroll,maxTop);
   if(Math.abs(current-destination)>0.5){model.mapExpectedTop=destination;lane.scrollTop=destination;}
   // A larger reader can make the browser clamp the map before this sync runs.
   // Acknowledge only that impossible old offset at the new maximum; an ordinary
@@ -779,11 +790,10 @@ function updateOverviewScale(force=false){
 function syncOverviewMap(scroll){
  const bar=node('packetOverviewMap'),overlay=node('packetMapViewport'),scale=overviewLineHeight();if(!bar||!overlay||!scale)return;
  const position=fineMapPosition(scroll,scale),laneHeight=bar.clientHeight||420;
- // Preserve the operator's thumb position. Pan the strip only when its visible
- // packet range moves out of the map viewport.
- if(!model.overviewDragging){
+ // Placed like the close-up map (packetMapFollowTop) unless the user holds it.
+ if(!model.overviewDragging&&packetMapOwn.overview===null){
   const current=Number(bar.scrollTop)||0,maxTop=Math.max(0,model.total*scale-laneHeight);
-  const destination=clamp(position.top<current?position.top:position.top+position.height>current+laneHeight?position.top+position.height-laneHeight:current,0,maxTop);
+  const destination=packetMapFollowTop(scroll,maxTop);
   if(Math.abs(destination-current)>0.5){model.overviewMapExpectedTop=destination;bar.scrollTop=destination;}
   // As with the fine map, a layout clamp is not a new navigation gesture.
   else if(model.overviewMapExpectedTop>maxTop&&Math.abs(current-maxTop)<0.5)model.overviewMapExpectedTop=current;
@@ -832,7 +842,7 @@ function packetJump(index,number){
  const scroll=node('packetTableScroll'),{rowHeight,headerHeight}=packetMetrics(),visibleHeight=scroll?.clientHeight||400;
  // Center the frame represented by the clicked map coordinate. The frame's
  // map marker should align with the middle of the viewport rectangle.
- const desired=index*rowHeight+headerHeight+rowHeight/2-visibleHeight/2;
+ const desired=(index+.5)*rowHeight-(visibleHeight-headerHeight)/2;
  setPacketScroll(desired,number||0,number?null:index);
 }
 function packetOverviewRefresh(){
@@ -1082,12 +1092,66 @@ root.addEventListener?.('resize',()=>closePacketMenu());root.addEventListener?.(
 let packetScrollFrame=0;
 function packetScrollUpdate(){packetScrollFrame=0;if(!visible()||model.view!=='packets')return;updateMapViewport();const wanted=windowOffset();if(wanted!==model.windowStart)void refreshPacketWindow(wanted);}
 document.addEventListener('scroll',event=>{if(event.target?.id!=='packetTableScroll'||!visible()||model.view!=='packets')return;model.scrollTop=event.target.scrollTop;
+ releasePacketMaps();
  if(typeof root.requestAnimationFrame==='function'){if(!packetScrollFrame)packetScrollFrame=root.requestAnimationFrame(packetScrollUpdate);}else packetScrollUpdate();
 },{capture:true,passive:true});
 // The main traffic bar is a draggable proportional scrollbar. Starting on
 // the viewport preserves the click offset, so the thumb never snaps its top
 // to the pointer. Starting outside the thumb jumps to that part of the trace.
 let mapDrag=null;
+// The close-up map, and the whole-capture map when it scrolls, behave like the
+// Text Editor's Document Map (owner request after v1.21.87): the wheel over a
+// map that scrolls moves the map alone and leaves the list where it is;
+// dragging the outlined window holds the map, so the window follows the
+// pointer row for row, and once its edge is in the map's top or bottom edge
+// zone the map scrolls by itself, faster the further in it is pushed (the
+// Document Map's own ramp, NTKEditorDocumentMap.autoSpeed/boxEdgeDepth). A
+// held map stays where the user left it until the list is scrolled by
+// anything but the map; then it follows the list again. null = follows the
+// list; a number = held, and list scrolls before that time (a click or drag
+// on the map moving the list) do not release it.
+const packetMapOwn={detail:null,overview:null};
+const packetNow=()=>root.performance?.now?.()??Date.now();
+function releasePacketMaps(){const now=packetNow();
+ if(packetMapOwn.detail!==null&&!model.granularDragging&&now>packetMapOwn.detail)packetMapOwn.detail=null;
+ if(packetMapOwn.overview!==null&&!model.overviewDragging&&now>packetMapOwn.overview)packetMapOwn.overview=null;}
+function packetAutoSpeed(depth){const map=root.NTKEditorDocumentMap;return map?.autoSpeed?map.autoSpeed(depth):120+(30000-120)*Math.min(1,depth/8)**3;}
+function packetBoxEdgeDepth(top,size,height,pointer){const map=root.NTKEditorDocumentMap;if(map?.boxEdgeDepth)return map.boxEdgeDepth(top,size,height,pointer);
+ const edge=Math.min(24,height/4),depth=(a,b)=>clamp(a<edge?(a-edge)/edge:b>height-edge?(b-(height-edge))/edge:0,-8,8);return size>=height-2*edge?depth(pointer,pointer):depth(top,top+size);}
+function packetMapKind(drag){return drag.kind==='detail'?'detail':'overview';}
+function packetMapScale(drag){return drag.kind==='overview-scaled'?overviewLineHeight():mapLineHeight();}
+function packetMapSpan(scroll){const {rowHeight,headerHeight}=packetMetrics();return Math.min(model.total,Math.max(1,((scroll.clientHeight||400)-headerHeight)/rowHeight));}
+function setPacketMapTop(drag,top){const lane=drag.lane;if(drag.kind==='detail')model.mapExpectedTop=top;else model.overviewMapExpectedTop=top;lane.scrollTop=top;}
+function repaintPacketMap(drag){if(drag.kind==='detail')renderPacketDetailMap();else renderPacketOverviewLines();}
+// The list goes to the packets under the dragged window; at the capture's
+// start and end the map keeps the whole window inside itself.
+function packetMapHoldAt(drag,scroll){
+ const lane=drag.lane,scale=packetMapScale(drag),rect=lane.getBoundingClientRect(),laneHeight=lane.clientHeight||420,span=packetMapSpan(scroll),last=Math.max(0,model.total-span),max=Math.max(0,model.total*scale-laneHeight);
+ let top=Number(lane.scrollTop)||0;
+ const target=clamp((drag.lastY-rect.top+top-drag.grab)/scale,0,last);
+ if(target<=0)top=0;else if(target>=last)top=clamp(Math.max(top,(target+span)*scale-laneHeight),0,max);
+ if(Math.abs(top-(Number(lane.scrollTop)||0))>0.5)setPacketMapTop(drag,top);
+ setPacketScroll(target*packetMetrics().rowHeight);repaintPacketMap(drag);
+}
+function packetMapAutoDepth(drag,scroll){
+ const lane=drag.lane,scale=packetMapScale(drag),rect=lane.getBoundingClientRect(),y=drag.lastY-rect.top;
+ if(!(model.total*scale>(lane.clientHeight||420)+1))return 0;
+ return packetBoxEdgeDepth(y-drag.grab,packetMapSpan(scroll)*scale,lane.clientHeight||420,y);
+}
+function packetMapAutoStep(time){
+ const drag=mapDrag;if(!drag||!drag.autoFrame)return;drag.autoFrame=0;
+ const scroll=node('packetTableScroll');if(!scroll)return;
+ const depth=packetMapAutoDepth(drag,scroll);if(!depth)return;
+ const lane=drag.lane,max=Math.max(0,model.total*packetMapScale(drag)-(lane.clientHeight||420)),passed=drag.autoTime?Math.min(50,time-drag.autoTime):16;drag.autoTime=time;
+ // scrollTop snaps to device pixels, so keep the position's fraction here.
+ if(!Number.isFinite(drag.autoPos)||Math.abs((Number(lane.scrollTop)||0)-drag.autoPos)>=1)drag.autoPos=Number(lane.scrollTop)||0;
+ const next=clamp(drag.autoPos+Math.sign(depth)*packetAutoSpeed(Math.abs(depth))*passed/1000,0,max);
+ if(next===drag.autoPos)return;
+ drag.autoPos=next;setPacketMapTop(drag,next);packetMapHoldAt(drag,scroll);
+ if(typeof root.requestAnimationFrame==='function')drag.autoFrame=root.requestAnimationFrame(packetMapAutoStep);
+}
+function startPacketMapAuto(drag,scroll){if(drag.autoFrame||typeof root.requestAnimationFrame!=='function'||!packetMapAutoDepth(drag,scroll))return;drag.autoTime=0;drag.autoFrame=root.requestAnimationFrame(packetMapAutoStep);}
+function stopPacketMapAuto(drag){if(drag?.autoFrame){root.cancelAnimationFrame?.(drag.autoFrame);drag.autoFrame=0;}}
 function mapThumbMetrics(bar){
  const rect=bar.getBoundingClientRect(),overlay=node('packetMapViewport'),barHeight=rect.height||bar.clientHeight||1;
  const height=parseFloat(overlay?.style.height)||10,top=clamp(parseFloat(overlay?.style.transform.match(/,([-\d.]+)px/)?.[1])||0,0,Math.max(0,barHeight-height));
@@ -1107,7 +1171,7 @@ function beginMapDrag(event){
   const rect=bar.getBoundingClientRect(),position=fineMapPosition(scroll,overviewLineHeight()),clickY=event.clientY-rect.top+(Number(bar.scrollTop)||0);
   const inThumb=clickY>=position.top&&clickY<=position.top+position.height;
   mapDrag={kind:'overview-scaled',bar,lane:bar,pointerId:event.pointerId,startY:event.clientY,lastY:event.clientY,
-   startListTop:scroll.scrollTop,pressedIndex:overviewMapIndexFromPoint(bar,event.clientY),inThumb,initialized:inThumb,moved:false};
+   startListTop:scroll.scrollTop,pressedIndex:overviewMapIndexFromPoint(bar,event.clientY),inThumb,initialized:inThumb,moved:false,grab:inThumb?clickY-position.top:position.height/2};
   model.overviewDragging=true;
  }else if(bar){const m=mapThumbMetrics(bar),y=event.clientY-m.rect.top,inThumb=y>=m.top&&y<=m.top+m.height;
   mapDrag={kind:'overview',bar,pointerId:event.pointerId,startY:event.clientY,lastY:event.clientY,moved:false,inThumb,offset:inThumb?y-m.top:m.height/2};
@@ -1118,7 +1182,7 @@ function beginMapDrag(event){
   const rect=lane.getBoundingClientRect(),position=fineMapPosition(scroll),clickY=event.clientY-rect.top+(Number(lane.scrollTop)||0);
   const inThumb=clickY>=position.top&&clickY<=position.top+position.height;
   mapDrag={kind:'detail',lane,pointerId:event.pointerId,startY:event.clientY,lastY:event.clientY,
-   startListTop:scroll.scrollTop,pressedIndex:detailMapIndexFromPoint(lane,event.clientY),inThumb,initialized:inThumb,moved:false};
+   startListTop:scroll.scrollTop,pressedIndex:detailMapIndexFromPoint(lane,event.clientY),inThumb,initialized:inThumb,moved:false,grab:inThumb?clickY-position.top:position.height/2};
   model.granularDragging=true;
  }
  const owner=bar||lane;owner.setPointerCapture?.(event.pointerId);
@@ -1133,27 +1197,21 @@ function moveMapDrag(event){
   const scroll=node('packetTableScroll');if(!scroll)return;
   if(!drag.initialized){
    // A drag starting on a colored packet line first brings that frame into
-   // view. A drag starting on the outlined viewport has NO initial jump.
-   centerPacketAt(drag.pressedIndex);drag.startListTop=scroll.scrollTop;drag.initialized=true;
+   // view, the window centred on the pointer. A drag starting on the
+   // outlined window has NO initial jump.
+   centerPacketAt(drag.pressedIndex);drag.initialized=true;drag.grab=fineMapPosition(scroll,packetMapScale(drag)).height/2;
   }
-  const {rowHeight}=packetMetrics(),scale=drag.kind==='overview-scaled'?overviewLineHeight():mapLineHeight();
-  // One logical pixel is one packet at the default scale. With a custom
-  // line height, N pixels travel N / scale packets. Do not move the map's
-  // own scrollTop on every pointer move: it would cancel the thumb motion.
-  setPacketScroll(drag.startListTop+delta*rowHeight/Math.max(1,scale));
-  const position=fineMapPosition(scroll,scale),lane=drag.lane,laneHeight=lane.clientHeight||420;
-  const current=Number(lane.scrollTop)||0,maxTop=Math.max(0,model.total*scale-laneHeight);
-  // Auto-pan the strip only when the moving range crosses an edge. Dragging
-  // within the strip keeps the viewport under the pointer, pixel for pixel.
-  const destination=clamp(position.top<current?position.top:position.top+position.height>current+laneHeight?position.top+position.height-laneHeight:current,0,maxTop);
-  if(Math.abs(destination-current)>0.5){if(drag.kind==='detail')model.mapExpectedTop=destination;else model.overviewMapExpectedTop=destination;lane.scrollTop=destination;
-   if(drag.kind==='detail')renderPacketDetailMap();else renderPacketOverviewLines();}
+  // The map is held while the window is dragged (see packetMapOwn).
+  packetMapOwn[packetMapKind(drag)]=Infinity;
+  packetMapHoldAt(drag,scroll);startPacketMapAuto(drag,scroll);
   model.suppressMapClick=true;
  }
 }
 function endMapDrag(event){const drag=mapDrag;if(!drag||(drag.pointerId!==undefined&&event.pointerId!==undefined&&drag.pointerId!==event.pointerId))return;
  if(drag.moved)model.suppressMapClick=true;
  drag.bar?.releasePointerCapture?.(drag.pointerId);drag.lane?.releasePointerCapture?.(drag.pointerId);
+ stopPacketMapAuto(drag);
+ if(drag.kind==='detail'||drag.kind==='overview-scaled'){const kind=packetMapKind(drag);if(drag.moved||packetMapOwn[kind]!==null)packetMapOwn[kind]=packetNow()+1500;}
  model.granularDragging=false;model.overviewDragging=false;mapDrag=null;
  if((drag.kind==='detail'||drag.kind==='overview-scaled')&&!drag.moved&&event.type!=='pointercancel'){
   // Use the original clicked line. Synchronized strip scrolling must not
@@ -1166,7 +1224,7 @@ document.addEventListener('pointerdown',beginMapDrag);
 root.addEventListener?.('pointermove',moveMapDrag);
 root.addEventListener?.('pointerup',endMapDrag);
 root.addEventListener?.('pointercancel',endMapDrag);
-root.addEventListener?.('blur',()=>{mapDrag=null;model.granularDragging=false;model.overviewDragging=false;});
+root.addEventListener?.('blur',()=>{stopPacketMapAuto(mapDrag);mapDrag=null;model.granularDragging=false;model.overviewDragging=false;});
 document.addEventListener('click',event=>{const bar=event.target.closest('#packetOverviewMap'),lane=event.target.closest('#packetDetailMap');if(!bar&&!lane)return;
  event.preventDefault();if(model.suppressMapClick){model.suppressMapClick=false;return;}
  if(lane){packetJump(detailMapIndexFromPoint(lane,event.clientY));return;}
@@ -1179,7 +1237,17 @@ document.addEventListener('scroll',event=>{if(event.target?.id!=='packetOverview
  model.overviewMapExpectedTop=top;
  const center=clamp(Math.floor((top+(bar.clientHeight||420)/2)/overviewLineHeight()),0,Math.max(0,model.total-1));centerPacketAt(center);
 },{capture:true,passive:true});
-// Native wheel/trackpad scrolling on the detailed strip updates the list.
+// The wheel over a map that scrolls moves that map alone (as the Text
+// Editor's Document Map does); over a map that fits it scrolls the list.
+document.addEventListener('wheel',event=>{if(!visible()||model.view!=='packets'||event.ctrlKey||!event.deltaY)return;
+ const lane=event.target.closest?.('#packetDetailMap'),bar=lane?null:event.target.closest?.('#packetOverviewMap'),map=lane||(bar&&overviewLineHeight()?bar:null);if(!map||mapDrag)return;
+ event.preventDefault?.();
+ const scale=lane?mapLineHeight():overviewLineHeight(),max=Math.max(0,model.total*scale-(map.clientHeight||420)),unit=event.deltaMode===1?16:event.deltaMode===2?(map.clientHeight||420):1;
+ if(max<1){const scroll=node('packetTableScroll'),{rowHeight}=packetMetrics();if(scroll)setPacketScroll((Number(scroll.scrollTop)||0)+event.deltaY*(event.deltaMode===1?rowHeight:event.deltaMode===2?(scroll.clientHeight||400):1));return;}
+ const kind=lane?'detail':'overview',top=clamp((Number(map.scrollTop)||0)+event.deltaY*unit,0,max);
+ packetMapOwn[kind]=0;setPacketMapTop({kind:lane?'detail':'overview-scaled',lane:map},top);repaintPacketMap({kind:lane?'detail':'overview-scaled'});
+},{capture:true,passive:false});
+// Other native scrolling of the detailed strip (keys) updates the list.
 // Programmatic synchronization is detected by matching its expected position.
 document.addEventListener('scroll',event=>{if(event.target?.id!=='packetDetailMap'||!visible()||model.view!=='packets')return;
  const lane=event.target,top=Number(lane.scrollTop)||0;

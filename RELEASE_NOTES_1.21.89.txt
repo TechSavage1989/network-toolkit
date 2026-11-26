@@ -1,0 +1,13 @@
+Network Toolkit 1.21.89
+
+## What's New
+
+- Packet capture now shows one map beside the packet list, in the same colors as the rows, so each packet's color on the map matches its row.
+- The map scrolls like the Text Editor's map. Scroll the mouse wheel over it to look around the capture without moving the list. Drag its outlined window to move the list, and hold the window near the map's top or bottom edge to keep going, faster the further you push.
+
+## Additional Details
+
+- The outlined window moves smoothly down the map as you move through the list, from the top of the map at the first packet to the bottom at the last.
+- The map is 24 px wide by default. The whole-capture map is now off by default; turn it back on with Show whole-capture map in Colors & maps.
+- The separate Map colors setting is gone: the map always uses the row colors (an error, warning or note color first, then the protocol color).
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
